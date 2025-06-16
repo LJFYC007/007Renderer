@@ -3,35 +3,37 @@ project(007Renderer)
 
 set(CMAKE_CXX_STANDARD 17)
 
-# ----------------------------------------------------------------------------
-# Slang Shader Compilation
-# ----------------------------------------------------------------------------
-
+# ---------------------------------------------------------------------------
+# Slang shader support
+# ---------------------------------------------------------------------------
 set(SLANG_ROOT_DIR "${CMAKE_SOURCE_DIR}/external/slang")
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake")
 find_package(SLANG REQUIRED COMPONENTS slang slang-rt gfx)
 
-# ----------------------------------------------------------------------------
-# Add NVRHI
-# ----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Imgui shader support
+# ---------------------------------------------------------------------------
+set(IMGUI_ROOT_DIR "${CMAKE_SOURCE_DIR}/external/imgui")
+find_package(ImGui REQUIRED)
 
+# ---------------------------------------------------------------------------
+# NVRHI (D3D12 backend only)
+# ---------------------------------------------------------------------------
 set(NVRHI_WITH_VULKAN OFF CACHE BOOL "")
 set(NVRHI_WITH_DX12 ON CACHE BOOL "")
 set(NVRHI_WITH_DX11 OFF CACHE BOOL "")
-
 add_subdirectory(external/nvrhi)
 
-# ----------------------------------------------------------------------------
-# Your Executable
-# ----------------------------------------------------------------------------
-
+# ---------------------------------------------------------------------------
+# Executable target
+# ---------------------------------------------------------------------------
 file(GLOB_RECURSE SOURCES src/*.cpp)
-
 add_executable(007Renderer ${SOURCES})
 
 target_include_directories(007Renderer PRIVATE
     external/nvrhi/include
     ${SLANG_INCLUDE_DIRS}
+    ${IMGUI_INCLUDE_DIRS}
 )
 
 target_link_libraries(007Renderer PRIVATE
@@ -39,8 +41,12 @@ target_link_libraries(007Renderer PRIVATE
     nvrhi_d3d12
     d3d12 dxgi dxguid
     ${SLANG_LIBRARIES}
+    ${IMGUI_LIBRARIES}
 )
 
+# ---------------------------------------------------------------------------
+# Post-build: Copy Slang runtime DLLs
+# ---------------------------------------------------------------------------
 add_custom_command(TARGET 007Renderer POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${SLANG_ROOT_DIR}/bin/slang.dll"
@@ -48,9 +54,9 @@ add_custom_command(TARGET 007Renderer POST_BUILD
         $<TARGET_FILE_DIR:007Renderer>
 )
 
-# ----------------------------------------------------------------------------
-# Copy DXC runtime DLLs (dxcompiler.dll, dxil.dll)
-# ----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Post-build: Copy DXC runtime DLLs
+# ---------------------------------------------------------------------------
 set(DXC_DLL_DIR "${CMAKE_SOURCE_DIR}/external/dxc/bin/x64")
 
 add_custom_command(TARGET 007Renderer POST_BUILD
