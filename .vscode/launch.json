@@ -1,0 +1,22 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug 007Renderer",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/Debug/007Renderer.exe",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": true
+        }
+    ],
+    "name": "Debug 007Renderer",
+    "type": "cppvsdbg",
+    "request": "launch",
+    "program": "${workspaceFolder}/build/Debug/007Renderer.exe",
+    "cwd": "${workspaceFolder}",
+    "externalConsole": true
+}

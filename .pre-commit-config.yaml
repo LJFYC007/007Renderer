@@ -1,0 +1,9 @@
+repos:
+  - repo: local
+    hooks:
+      - id: clang-format
+        name: clang-format (local)
+        entry: python run-clang-format.py
+        language: system
+        types: [file]
+        files: ^src/.*\.(cpp|cc|cxx|h|hpp|hh)$
