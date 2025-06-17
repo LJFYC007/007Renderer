@@ -114,130 +114,129 @@ int main()
     // -------------------------
     // 4. Prepare shader buffer data
     // -------------------------
-    // const uint32_t elementCount = 8;
-    // std::vector<float> inputA(elementCount, 1.0f);
-    // std::vector<float> inputB(elementCount, 5.0f);
+    const uint32_t elementCount = 8;
+    std::vector<float> inputA(elementCount, 1.0f);
+    std::vector<float> inputB(elementCount, 5.0f);
 
-    // auto createBuffer = [&](const void* data, uint64_t size, nvrhi::ResourceStates initState, bool isOutput) -> nvrhi::BufferHandle
-    // {
-    //     nvrhi::BufferDesc desc;
-    //     desc.byteSize = size;
-    //     desc.debugName = "Buffer";
-    //     desc.cpuAccess = nvrhi::CpuAccessMode::None;
-    //     desc.structStride = sizeof(float);
+    auto createBuffer = [&](const void* data, uint64_t size, nvrhi::ResourceStates initState, bool isOutput) -> nvrhi::BufferHandle
+    {
+        nvrhi::BufferDesc desc;
+        desc.byteSize = size;
+        desc.debugName = "Buffer";
+        desc.cpuAccess = nvrhi::CpuAccessMode::None;
+        desc.structStride = sizeof(float);
 
-    //     if (isOutput)
-    //     {
-    //         desc.canHaveUAVs = true;
-    //         desc.initialState = nvrhi::ResourceStates::UnorderedAccess;
-    //     }
-    //     else
-    //     {
-    //         desc.initialState = nvrhi::ResourceStates::ShaderResource;
-    //     }
+        if (isOutput)
+        {
+            desc.canHaveUAVs = true;
+            desc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+        }
+        else
+        {
+            desc.initialState = nvrhi::ResourceStates::ShaderResource;
+        }
 
-    //     auto buffer = nvrhiDevice->createBuffer(desc);
-    //     if (data)
-    //     {
-    //         auto uploadCmd = nvrhiDevice->createCommandList();
-    //         uploadCmd->open();
-    //         uploadCmd->beginTrackingBufferState(buffer, initState);
-    //         uploadCmd->writeBuffer(buffer, data, size);
-    //         uploadCmd->close();
-    //         nvrhiDevice->executeCommandList(uploadCmd);
-    //     }
-    //     return buffer;
-    // };
+        auto buffer = nvrhiDevice->createBuffer(desc);
+        if (data)
+        {
+            auto uploadCmd = nvrhiDevice->createCommandList();
+            uploadCmd->open();
+            uploadCmd->beginTrackingBufferState(buffer, initState);
+            uploadCmd->writeBuffer(buffer, data, size);
+            uploadCmd->close();
+            nvrhiDevice->executeCommandList(uploadCmd);
+        }
+        return buffer;
+    };
 
-    // auto bufA = createBuffer(inputA.data(), inputA.size() * sizeof(float), nvrhi::ResourceStates::ShaderResource, false);
-    // auto bufB = createBuffer(inputB.data(), inputB.size() * sizeof(float), nvrhi::ResourceStates::ShaderResource, false);
-    // auto bufOut = createBuffer(nullptr, inputA.size() * sizeof(float), nvrhi::ResourceStates::UnorderedAccess, true);
+    auto bufA = createBuffer(inputA.data(), inputA.size() * sizeof(float), nvrhi::ResourceStates::ShaderResource, false);
+    auto bufB = createBuffer(inputB.data(), inputB.size() * sizeof(float), nvrhi::ResourceStates::ShaderResource, false);
+    auto bufOut = createBuffer(nullptr, inputA.size() * sizeof(float), nvrhi::ResourceStates::UnorderedAccess, true);
 
     // -------------------------
     // 5. Setup shader & dispatch
     // -------------------------
-    // nvrhi::ShaderDesc shaderDesc;
-    // shaderDesc.entryName = "computeMain";
-    // shaderDesc.shaderType = nvrhi::ShaderType::Compute;
-    // nvrhi::ShaderHandle computeShader = nvrhiDevice->createShader(shaderDesc, shaderBlob->getBufferPointer(),
-    // shaderBlob->getBufferSize());
+    nvrhi::ShaderDesc shaderDesc;
+    shaderDesc.entryName = "computeMain";
+    shaderDesc.shaderType = nvrhi::ShaderType::Compute;
+    nvrhi::ShaderHandle computeShader = nvrhiDevice->createShader(shaderDesc, shaderBlob->getBufferPointer(), shaderBlob->getBufferSize());
 
-    // nvrhi::BindingLayoutDesc layoutDesc;
-    // layoutDesc.visibility = nvrhi::ShaderType::Compute;
-    // layoutDesc.addItem(nvrhi::BindingLayoutItem::StructuredBuffer_SRV(0)); // buffer0
-    // layoutDesc.addItem(nvrhi::BindingLayoutItem::StructuredBuffer_SRV(1)); // buffer1
-    // layoutDesc.addItem(nvrhi::BindingLayoutItem::StructuredBuffer_UAV(2)); // result
+    nvrhi::BindingLayoutDesc layoutDesc;
+    layoutDesc.visibility = nvrhi::ShaderType::Compute;
+    layoutDesc.addItem(nvrhi::BindingLayoutItem::StructuredBuffer_SRV(0)); // buffer0
+    layoutDesc.addItem(nvrhi::BindingLayoutItem::StructuredBuffer_SRV(1)); // buffer1
+    layoutDesc.addItem(nvrhi::BindingLayoutItem::StructuredBuffer_UAV(2)); // result
 
-    // auto bindingLayout = nvrhiDevice->createBindingLayout(layoutDesc);
+    auto bindingLayout = nvrhiDevice->createBindingLayout(layoutDesc);
 
-    // nvrhi::BindingSetDesc bindingSetDesc;
-    // bindingSetDesc.addItem(nvrhi::BindingSetItem::StructuredBuffer_SRV(0, bufA));
-    // bindingSetDesc.addItem(nvrhi::BindingSetItem::StructuredBuffer_SRV(1, bufB));
-    // bindingSetDesc.addItem(nvrhi::BindingSetItem::StructuredBuffer_UAV(2, bufOut));
+    nvrhi::BindingSetDesc bindingSetDesc;
+    bindingSetDesc.addItem(nvrhi::BindingSetItem::StructuredBuffer_SRV(0, bufA));
+    bindingSetDesc.addItem(nvrhi::BindingSetItem::StructuredBuffer_SRV(1, bufB));
+    bindingSetDesc.addItem(nvrhi::BindingSetItem::StructuredBuffer_UAV(2, bufOut));
 
-    // nvrhi::BindingSetHandle bindingSet = nvrhiDevice->createBindingSet(bindingSetDesc, bindingLayout);
+    nvrhi::BindingSetHandle bindingSet = nvrhiDevice->createBindingSet(bindingSetDesc, bindingLayout);
 
-    // nvrhi::ComputePipelineDesc pipelineDesc;
-    // pipelineDesc.bindingLayouts = {bindingLayout};
-    // pipelineDesc.setComputeShader(computeShader);
+    nvrhi::ComputePipelineDesc pipelineDesc;
+    pipelineDesc.bindingLayouts = {bindingLayout};
+    pipelineDesc.setComputeShader(computeShader);
 
-    // nvrhi::ComputePipelineHandle pipeline = nvrhiDevice->createComputePipeline(pipelineDesc);
-    // nvrhi::CommandListHandle commandList = nvrhiDevice->createCommandList();
-    // commandList->open();
-    // commandList->beginTrackingBufferState(bufA, nvrhi::ResourceStates::ShaderResource);
-    // commandList->beginTrackingBufferState(bufB, nvrhi::ResourceStates::ShaderResource);
-    // commandList->beginTrackingBufferState(bufOut, nvrhi::ResourceStates::UnorderedAccess);
+    nvrhi::ComputePipelineHandle pipeline = nvrhiDevice->createComputePipeline(pipelineDesc);
+    nvrhi::CommandListHandle commandList = nvrhiDevice->createCommandList();
+    commandList->open();
+    commandList->beginTrackingBufferState(bufA, nvrhi::ResourceStates::ShaderResource);
+    commandList->beginTrackingBufferState(bufB, nvrhi::ResourceStates::ShaderResource);
+    commandList->beginTrackingBufferState(bufOut, nvrhi::ResourceStates::UnorderedAccess);
 
-    // nvrhi::ComputeState computeState;
-    // computeState.pipeline = pipeline;
-    // computeState.bindings = {bindingSet};
+    nvrhi::ComputeState computeState;
+    computeState.pipeline = pipeline;
+    computeState.bindings = {bindingSet};
 
-    // commandList->setComputeState(computeState);
-    // commandList->dispatch(elementCount, 1, 1);
-    // commandList->close();
-    // nvrhiDevice->executeCommandList(commandList);
+    commandList->setComputeState(computeState);
+    commandList->dispatch(elementCount, 1, 1);
+    commandList->close();
+    nvrhiDevice->executeCommandList(commandList);
 
     // -------------------------
     // 6. Read back and print result
     // -------------------------
-    // std::vector<float> result(elementCount);
+    std::vector<float> result(elementCount);
 
-    // nvrhi::BufferDesc readbackDesc;
-    // readbackDesc.setByteSize(result.size() * sizeof(float))
-    //     .setCpuAccess(nvrhi::CpuAccessMode::Read)
-    //     .setInitialState(nvrhi::ResourceStates::CopyDest)
-    //     .setDebugName("ReadbackBuffer");
+    nvrhi::BufferDesc readbackDesc;
+    readbackDesc.setByteSize(result.size() * sizeof(float))
+        .setCpuAccess(nvrhi::CpuAccessMode::Read)
+        .setInitialState(nvrhi::ResourceStates::CopyDest)
+        .setDebugName("ReadbackBuffer");
 
-    // nvrhi::BufferHandle readbackBuffer = nvrhiDevice->createBuffer(readbackDesc);
+    nvrhi::BufferHandle readbackBuffer = nvrhiDevice->createBuffer(readbackDesc);
 
-    // auto readCmd = nvrhiDevice->createCommandList();
-    // readCmd->open();
-    // readCmd->beginTrackingBufferState(bufOut, nvrhi::ResourceStates::CopySource);
-    // readCmd->beginTrackingBufferState(readbackBuffer, nvrhi::ResourceStates::CopyDest);
-    // readCmd->copyBuffer(
-    //     readbackBuffer,               // dest
-    //     0,                            // dest offset in bytes
-    //     bufOut,                       // src (GPU buffer)
-    //     0,                            // src offset in bytes
-    //     result.size() * sizeof(float) // number of bytes to copy
-    // );
-    // readCmd->close();
-    // nvrhiDevice->executeCommandList(readCmd);
-    // nvrhiDevice->waitForIdle();
+    auto readCmd = nvrhiDevice->createCommandList();
+    readCmd->open();
+    readCmd->beginTrackingBufferState(bufOut, nvrhi::ResourceStates::CopySource);
+    readCmd->beginTrackingBufferState(readbackBuffer, nvrhi::ResourceStates::CopyDest);
+    readCmd->copyBuffer(
+        readbackBuffer,               // dest
+        0,                            // dest offset in bytes
+        bufOut,                       // src (GPU buffer)
+        0,                            // src offset in bytes
+        result.size() * sizeof(float) // number of bytes to copy
+    );
+    readCmd->close();
+    nvrhiDevice->executeCommandList(readCmd);
+    nvrhiDevice->waitForIdle();
 
-    // void* mappedPtr = nvrhiDevice->mapBuffer(readbackBuffer, nvrhi::CpuAccessMode::Read);
-    // if (mappedPtr)
-    // {
-    //     std::memcpy(result.data(), mappedPtr, result.size() * sizeof(float));
-    //     nvrhiDevice->unmapBuffer(readbackBuffer);
-    // }
-    // else
-    //     std::cerr << "Failed to map readback buffer." << std::endl;
+    void* mappedPtr = nvrhiDevice->mapBuffer(readbackBuffer, nvrhi::CpuAccessMode::Read);
+    if (mappedPtr)
+    {
+        std::memcpy(result.data(), mappedPtr, result.size() * sizeof(float));
+        nvrhiDevice->unmapBuffer(readbackBuffer);
+    }
+    else
+        std::cerr << "Failed to map readback buffer." << std::endl;
 
-    // std::cout << "Result: ";
-    // for (float val : result)
-    //     std::cout << val << " ";
-    // std::cout << std::endl;
+    std::cout << "Result: ";
+    for (float val : result)
+        std::cout << val << " ";
+    std::cout << std::endl;
 
     // -------------------------
     // 6. Create and run the window
@@ -254,6 +253,16 @@ int main()
     // --------------------------
     // 7. Cleanup
     // --------------------------
+
+    bufA = nullptr;
+    bufB = nullptr;
+    bufOut = nullptr;
+    readbackBuffer = nullptr;
+    commandList = nullptr;
+    pipeline = nullptr;
+    bindingSet = nullptr;
+    bindingLayout = nullptr;
+    computeShader = nullptr;
 
     window.CleanupResources();
     nvrhiDevice->waitForIdle();

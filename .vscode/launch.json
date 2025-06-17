@@ -10,13 +10,8 @@
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],
-            "externalConsole": true
+            "console": "integratedTerminal",
+            "preLaunchTask": "build"
         }
     ],
-    "name": "Debug 007Renderer",
-    "type": "cppvsdbg",
-    "request": "launch",
-    "program": "${workspaceFolder}/build/Debug/007Renderer.exe",
-    "cwd": "${workspaceFolder}",
-    "externalConsole": true
 }
