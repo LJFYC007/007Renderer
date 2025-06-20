@@ -33,6 +33,8 @@ struct FrameContext
     UINT64 FenceValue;
 };
 
+namespace
+{
 // Data
 static FrameContext g_frameContext[APP_NUM_FRAMES_IN_FLIGHT] = {};
 static UINT g_frameIndex = 0;
@@ -51,6 +53,7 @@ static bool g_SwapChainOccluded = false;
 static HANDLE g_hSwapChainWaitableObject = nullptr;
 static ID3D12Resource* g_mainRenderTargetResource[APP_NUM_BACK_BUFFERS] = {};
 static D3D12_CPU_DESCRIPTOR_HANDLE g_mainRenderTargetDescriptor[APP_NUM_BACK_BUFFERS] = {};
+} // namespace
 
 void CreateRenderTarget();
 void CleanupRenderTarget();
@@ -88,6 +91,7 @@ public:
     void PrepareResources();
     void CleanupResources();
     bool Render();
+    void SetDisplayTexture(ID3D12Resource* texture);
 
     // Forward declarations of helper functions
     bool CreateDeviceD3D(HWND hWnd);
@@ -95,14 +99,17 @@ public:
     FrameContext* WaitForNextFrameResources();
 
 private:
-    // Our state
-    bool show_demo_window = true;
-    bool show_another_window = false;
-    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-
     // Internal state
     float main_scale;
     HWND hwnd;
     WNDCLASSEXW wc;
     ImGuiIO* io;
+
+    // Display texture and descriptor handles
+    ID3D12Resource* m_CurrentDisplayTexture = nullptr;
+    ImTextureID m_DisplayImGuiHandle = (ImTextureID)0;
+    D3D12_CPU_DESCRIPTOR_HANDLE m_DisplaySrvCpuHandle = {};
+    D3D12_GPU_DESCRIPTOR_HANDLE m_DisplaySrvGpuHandle = {};
+
+    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 };

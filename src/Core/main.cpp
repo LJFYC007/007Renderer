@@ -238,6 +238,32 @@ int main()
         std::cout << val << " ";
     std::cout << std::endl;
 
+    // Generate texture
+    nvrhi::TextureDesc textureDesc;
+    textureDesc.width = 1920;
+    textureDesc.height = 1080;
+    textureDesc.format = nvrhi::Format::RGBA8_UNORM;
+    textureDesc.isRenderTarget = false;
+    textureDesc.isUAV = true;
+    textureDesc.debugName = "TestDisplayTexture";
+    textureDesc.initialState = nvrhi::ResourceStates::ShaderResource;
+    textureDesc.keepInitialState = true;
+
+    nvrhi::TextureHandle nvrhiTexture = nvrhiDevice->createTexture(textureDesc);
+
+    nvrhi::Color color(0.0f, 0.5f, 1.0f, 1.0f); // Clear color for the texture
+    nvrhi::TextureSubresourceSet allSubresources;
+
+    auto clearCmd = nvrhiDevice->createCommandList();
+    clearCmd->open();
+    clearCmd->beginTrackingTextureState(nvrhiTexture, allSubresources, nvrhi::ResourceStates::ShaderResource);
+    clearCmd->setTextureState(nvrhiTexture, allSubresources, nvrhi::ResourceStates::UnorderedAccess);
+    clearCmd->clearTextureFloat(nvrhiTexture, allSubresources, color);
+    clearCmd->setPermanentTextureState(nvrhiTexture, nvrhi::ResourceStates::ShaderResource);
+    clearCmd->close();
+    nvrhiDevice->executeCommandList(clearCmd);
+    nvrhiDevice->waitForIdle();
+
     // -------------------------
     // 6. Create and run the window
     // -------------------------
@@ -245,9 +271,13 @@ int main()
     Window window(d3d12Device, commandQueue);
     window.PrepareResources();
 
-    while (window.Render())
+    bool notDone = true;
+    while (notDone)
     {
         // Main loop
+        ID3D12Resource* d3d12Texture = static_cast<ID3D12Resource*>(nvrhiTexture->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource));
+        window.SetDisplayTexture(d3d12Texture);
+        notDone = window.Render();
     }
 
     // --------------------------
@@ -258,6 +288,7 @@ int main()
     bufB = nullptr;
     bufOut = nullptr;
     readbackBuffer = nullptr;
+    nvrhiTexture = nullptr;
     commandList = nullptr;
     pipeline = nullptr;
     bindingSet = nullptr;

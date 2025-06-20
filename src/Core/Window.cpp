@@ -1,4 +1,5 @@
 #include "Window.h"
+#include <iostream>
 
 Window::Window(ComPtr<ID3D12Device> device, ComPtr<ID3D12CommandQueue> commandQueue)
 {
@@ -15,8 +16,8 @@ Window::Window(ComPtr<ID3D12Device> device, ComPtr<ID3D12CommandQueue> commandQu
         WS_OVERLAPPEDWINDOW,
         100,
         100,
-        (int)(1280 * main_scale),
-        (int)(800 * main_scale),
+        1920,
+        1080,
         nullptr,
         nullptr,
         wc.hInstance,
@@ -94,28 +95,12 @@ void Window::PrepareResources()
     { return g_pd3dSrvDescHeapAlloc.Free(cpu_handle, gpu_handle); };
     ImGui_ImplDX12_Init(&init_info);
 
-    // Before 1.91.6: our signature was using a single descriptor. From 1.92, specifying SrvDescriptorAllocFn/SrvDescriptorFreeFn will be
-    // required to benefit from new features.
-    // ImGui_ImplDX12_Init(g_pd3dDevice, APP_NUM_FRAMES_IN_FLIGHT, DXGI_FORMAT_R8G8B8A8_UNORM, g_pd3dSrvDescHeap,
-    // g_pd3dSrvDescHeap->GetCPUDescriptorHandleForHeapStart(), g_pd3dSrvDescHeap->GetGPUDescriptorHandleForHeapStart());
+    // Prepare resources for display
+    int descriptorSize = g_pd3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    m_DisplaySrvCpuHandle = g_pd3dSrvDescHeap->GetCPUDescriptorHandleForHeapStart();
 
-    // Load Fonts
-    // - If no fonts are loaded, dear imgui will use the default font. You can also load multiple fonts and use ImGui::PushFont()/PopFont()
-    // to select them.
-    // - AddFontFromFileTTF() will return the ImFont* so you can store it if you need to select the font among multiple.
-    // - If the file cannot be loaded, the function will return a nullptr. Please handle those errors in your application (e.g. use an
-    // assertion, or display an error and quit).
-    // - Use '#define IMGUI_ENABLE_FREETYPE' in your imconfig file to use Freetype for higher quality font rendering.
-    // - Read 'docs/FONTS.md' for more instructions and details.
-    // - Remember that in C/C++ if you want to include a backslash \ in a string literal you need to write a double backslash \\ !
-    // style.FontSizeBase = 20.0f;
-    // io->Fonts->AddFontDefault();
-    // io->Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\segoeui.ttf");
-    // io->Fonts->AddFontFromFileTTF("../../misc/fonts/DroidSans.ttf");
-    // io->Fonts->AddFontFromFileTTF("../../misc/fonts/Roboto-Medium.ttf");
-    // io->Fonts->AddFontFromFileTTF("../../misc/fonts/Cousine-Regular.ttf");
-    // ImFont* font = io->Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\ArialUni.ttf");
-    // IM_ASSERT(font != nullptr);
+    g_pd3dSrvDescHeapAlloc.Alloc(&m_DisplaySrvCpuHandle, &m_DisplaySrvGpuHandle);
+    m_DisplayImGuiHandle = (ImTextureID)(intptr_t)m_DisplaySrvGpuHandle.ptr;
 }
 
 bool Window::Render()
@@ -147,20 +132,16 @@ bool Window::Render()
     ImGui_ImplWin32_NewFrame();
     ImGui::NewFrame();
 
-    // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear
-    // ImGui!). if (show_demo_window)
-    //     ImGui::ShowDemoWindow(&show_demo_window);
+    ImDrawList* bg = ImGui::GetBackgroundDrawList();
+    bg->AddImage(m_DisplayImGuiHandle, ImVec2(0, 0), ImGui::GetIO().DisplaySize);
 
-    // 2. Show a simple window that we create ourselves. We use a Begin/End pair to create a named window.
     {
         static float f = 0.0f;
         static int counter = 0;
 
         ImGui::Begin("Hello, world!"); // Create a window called "Hello, world!" and append into it.
 
-        ImGui::Text("This is some useful text.");          // Display some text (you can use a format strings too)
-        ImGui::Checkbox("Demo Window", &show_demo_window); // Edit bools storing our window open/close state
-        ImGui::Checkbox("Another Window", &show_another_window);
+        ImGui::Text("This is some useful text."); // Display some text (you can use a format strings too)
 
         ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
         ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
@@ -173,15 +154,6 @@ bool Window::Render()
         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io->Framerate, io->Framerate);
         ImGui::End();
     }
-
-    // 3. Show another simple window.
-    // if (show_another_window)
-    // {
-    //     ImGui::Begin("Another Window", &show_another_window);   // Pass a pointer to our bool variable (the window will have a closing
-    //     button that will clear the bool when clicked) ImGui::Text("Hello from another window!"); if (ImGui::Button("Close Me"))
-    //         show_another_window = false;
-    //     ImGui::End();
-    // }
 
     // Rendering
     ImGui::Render();
@@ -204,7 +176,7 @@ bool Window::Render()
     const float clear_color_with_alpha[4] = {
         clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w
     };
-    g_pd3dCommandList->ClearRenderTargetView(g_mainRenderTargetDescriptor[backBufferIdx], clear_color_with_alpha, 0, nullptr);
+    // g_pd3dCommandList->ClearRenderTargetView(g_mainRenderTargetDescriptor[backBufferIdx], clear_color_with_alpha, 0, nullptr);
     g_pd3dCommandList->OMSetRenderTargets(1, &g_mainRenderTargetDescriptor[backBufferIdx], FALSE, nullptr);
     g_pd3dCommandList->SetDescriptorHeaps(1, &g_pd3dSrvDescHeap);
     ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), g_pd3dCommandList);
@@ -233,6 +205,24 @@ bool Window::Render()
     frameCtx->FenceValue = fenceValue;
 
     return true;
+}
+
+void Window::SetDisplayTexture(ID3D12Resource* texture)
+{
+    if (!texture)
+        return;
+    m_CurrentDisplayTexture = texture;
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    srvDesc.Texture2D.MipLevels = 1;
+    srvDesc.Texture2D.MostDetailedMip = 0;
+    srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
+
+    g_pd3dDevice->CreateShaderResourceView(texture, &srvDesc, m_DisplaySrvCpuHandle);
+    m_DisplayImGuiHandle = (ImTextureID)(intptr_t)m_DisplaySrvGpuHandle.ptr;
 }
 
 void Window::CleanupResources()
