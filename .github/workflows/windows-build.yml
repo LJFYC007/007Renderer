@@ -15,6 +15,11 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v3
 
+    - name: Git LFS pull
+      run: |
+        git lfs install
+        git lfs pull
+
     - name: Init submodules
       run: git submodule update --init --recursive
 
