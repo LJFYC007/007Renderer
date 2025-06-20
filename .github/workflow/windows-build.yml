@@ -1,0 +1,36 @@
+name: Windows CMake Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    name: Build on Windows (MSVC)
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Init submodules
+      run: git submodule update --init --recursive
+
+    - name: Install dependencies
+      shell: pwsh
+      run: |
+        echo "No additional packages needed for now."
+
+    - name: Configure CMake (VS Generator)
+      run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+
+    - name: Build
+      run: cmake --build build --config Release
+
+    - name: Verify executable exists
+      run: |
+        if (!(Test-Path -Path "build/Release/007Renderer.exe")) {
+          throw "Executable not found"
+        }
