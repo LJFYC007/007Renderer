@@ -29,14 +29,14 @@ bool ShaderProgram::loadFromFile(
     module = m_Session->loadModule(filePath.c_str());
     if (!module)
     {
-        std::cerr << "[Slang] Failed to load module: " << filePath << std::endl;
+        LOG_ERROR("[Slang] Failed to load module: {}", filePath);
         return false;
     }
 
     Slang::ComPtr<slang::IEntryPoint> slangEntryPoint;
     if (SLANG_FAILED(module->findEntryPointByName(entryPoint.c_str(), slangEntryPoint.writeRef())))
     {
-        std::cerr << "[Slang] Failed to find entry point: " << entryPoint << std::endl;
+        LOG_ERROR("[Slang] Failed to find entry point: {}", entryPoint);
         return false;
     }
 
@@ -45,14 +45,14 @@ bool ShaderProgram::loadFromFile(
         slang::IComponentType* components[] = {module, slangEntryPoint};
         if (SLANG_FAILED(m_Session->createCompositeComponentType(components, 2, program.writeRef())))
         {
-            std::cerr << "[Slang] Failed to create composite component type" << std::endl;
+            LOG_ERROR("[Slang] Failed to create composite component type");
             return false;
         }
     }
 
     if (SLANG_FAILED(program->link(m_LinkedProgram.writeRef())))
     {
-        std::cerr << "[Slang] Failed to link program" << std::endl;
+        LOG_ERROR("[Slang] Failed to link program");
         return false;
     }
 
@@ -60,19 +60,17 @@ bool ShaderProgram::loadFromFile(
     Slang::ComPtr<slang::IBlob> diagnostics;
     m_ProgramLayout = m_LinkedProgram->getLayout(0, diagnostics.writeRef());
     if (diagnostics && diagnostics->getBufferSize() > 0)
-    {
-        std::cerr << "[Slang] Layout diagnostics: " << (const char*)diagnostics->getBufferPointer() << std::endl;
-    }
+        LOG_ERROR("[Slang] Program layout diagnostics: {}", (const char*)diagnostics->getBufferPointer());
     if (!m_ProgramLayout)
     {
-        std::cerr << "[Slang] Failed to get program layout" << std::endl;
+        LOG_ERROR("[Slang] Failed to get program layout");
         return false;
     }
 
     Slang::ComPtr<slang::IBlob> shaderBlob;
     if (SLANG_FAILED(m_LinkedProgram->getTargetCode(0, shaderBlob.writeRef())))
     {
-        std::cerr << "[Slang] Failed to get target code" << std::endl;
+        LOG_ERROR("[Slang] Failed to get target code");
         return false;
     }
 
@@ -88,16 +86,15 @@ void ShaderProgram::printReflectionInfo() const
 {
     if (!m_ProgramLayout)
     {
-        std::cout << "No program layout available" << std::endl;
+        LOG_DEBUG("[ShaderProgram] No program layout available for reflection");
         return;
     }
-
-    std::cout << "=== Shader Reflection Information ===" << std::endl;
+    LOG_DEBUG("[ShaderProgram] Printing shader reflection information");
 
     auto globalScopeLayout = m_ProgramLayout->getGlobalParamsVarLayout();
     if (globalScopeLayout)
     {
-        std::cout << "Global Parameters:" << std::endl;
+        LOG_DEBUG("[ShaderProgram] Global Parameters:");
         printVariableLayout(globalScopeLayout, 1);
     }
 
@@ -105,7 +102,7 @@ void ShaderProgram::printReflectionInfo() const
     for (unsigned int i = 0; i < entryPointCount; i++)
     {
         auto entryPoint = m_ProgramLayout->getEntryPointByIndex(i);
-        std::cout << "Entry Point " << i << ": " << entryPoint->getName() << std::endl;
+        LOG_DEBUG("[ShaderProgram] Entry Point {}: {}", i, entryPoint->getName());
 
         auto entryPointLayout = entryPoint->getVarLayout();
         if (entryPointLayout)
@@ -117,18 +114,26 @@ void ShaderProgram::printVariableLayout(slang::VariableLayoutReflection* varLayo
 {
     if (!varLayout)
         return;
-
     std::string indentStr(indent * 2, ' ');
     auto typeLayout = varLayout->getTypeLayout();
 
     if (varLayout->getName() != nullptr)
-        std::cout << indentStr << "Variable: " << varLayout->getName() << std::endl;
-    std::cout << indentStr << "  Type: ";
+        LOG_DEBUG("{}Variable: {}", indentStr, varLayout->getName());
 
+    const char* typeName = nullptr;
+    if (typeLayout)
+        typeName = typeLayout->getName();
+    LOG_DEBUG("{}Type: {}", indentStr, typeName ? typeName : "Unknown");
+
+    if (!typeLayout)
+    {
+        LOG_WARN("{}No type layout available", indentStr);
+        return;
+    }
     switch (typeLayout->getKind())
     {
     case slang::TypeReflection::Kind::Struct:
-        std::cout << "Struct" << std::endl;
+        LOG_DEBUG("{}Kind: Struct", indentStr);
         {
             auto fieldCount = typeLayout->getFieldCount();
             for (unsigned int i = 0; i < fieldCount; i++)
@@ -140,45 +145,51 @@ void ShaderProgram::printVariableLayout(slang::VariableLayoutReflection* varLayo
         break;
 
     case slang::TypeReflection::Kind::Array:
-        std::cout << "Array[" << typeLayout->getElementCount() << "]" << std::endl;
+        LOG_DEBUG("{}Kind: Array[{}]", indentStr, typeLayout->getElementCount());
         break;
 
     case slang::TypeReflection::Kind::Vector:
-        std::cout << "Vector" << typeLayout->getElementCount() << std::endl;
+        LOG_DEBUG("{}Kind: Vector[{}]", indentStr, typeLayout->getElementCount());
         break;
 
     case slang::TypeReflection::Kind::Matrix:
-        std::cout << "Matrix" << typeLayout->getRowCount() << "x" << typeLayout->getColumnCount() << std::endl;
+        LOG_DEBUG("{}Kind: Matrix[{}x{}]", indentStr, typeLayout->getRowCount(), typeLayout->getColumnCount());
         break;
 
     case slang::TypeReflection::Kind::Scalar:
-        std::cout << "Scalar" << std::endl;
+        LOG_DEBUG("{}Kind: Scalar", indentStr);
         break;
 
     case slang::TypeReflection::Kind::Resource:
-        std::cout << "Resource" << std::endl;
-        break;
+    {
+        LOG_DEBUG("{}Kind: Resource", indentStr);
+        auto resourceShape = typeLayout->getResourceShape();
+        auto resourceAccess = typeLayout->getResourceAccess();
+        LOG_DEBUG("{}  Resource Shape: {}", indentStr, static_cast<int>(resourceShape));
+        LOG_DEBUG("{}  Resource Access: {}", indentStr, static_cast<int>(resourceAccess));
+    }
+    break;
 
     case slang::TypeReflection::Kind::ConstantBuffer:
-        std::cout << "ConstantBuffer" << std::endl;
+        LOG_DEBUG("{}Kind: ConstantBuffer", indentStr);
         break;
 
     case slang::TypeReflection::Kind::ParameterBlock:
-        std::cout << "ParameterBlock" << std::endl;
+        LOG_DEBUG("{}Kind: ParameterBlock", indentStr);
         break;
 
     default:
-        std::cout << "Unknown" << std::endl;
+        LOG_WARN("{}Kind: Unknown type kind ({})", indentStr, static_cast<int>(typeLayout->getKind()));
         break;
     }
 
     auto offset = varLayout->getOffset(slang::ParameterCategory::Uniform);
     if (offset != ~0u)
-        std::cout << indentStr << "  Uniform Offset: " << offset << std::endl;
+        LOG_DEBUG("{}  Uniform Offset: {}", indentStr, offset);
 
     auto bindingOffset = varLayout->getOffset(slang::ParameterCategory::DescriptorTableSlot);
     if (bindingOffset != ~0u)
-        std::cout << indentStr << "  Binding Offset: " << bindingOffset << std::endl;
+        LOG_DEBUG("{}  Binding Offset: {}", indentStr, bindingOffset);
 }
 
 bool ShaderProgram::generateBindingLayout(
@@ -189,7 +200,7 @@ bool ShaderProgram::generateBindingLayout(
 {
     if (!m_ProgramLayout)
     {
-        std::cerr << "[ShaderProgram] No program layout available for binding generation" << std::endl;
+        LOG_ERROR("[ShaderProgram] No program layout available for binding generation");
         return false;
     }
 
@@ -201,9 +212,7 @@ bool ShaderProgram::generateBindingLayout(
     if (globalScopeLayout)
     {
         if (!processParameterGroup(globalScopeLayout, outLayoutItems, outBindings, bufferMap))
-        {
             return false;
-        }
     }
 
     // Process entry point parameters
@@ -215,9 +224,7 @@ bool ShaderProgram::generateBindingLayout(
         if (entryPointLayout)
         {
             if (!processParameterGroup(entryPointLayout, outLayoutItems, outBindings, bufferMap))
-            {
                 return false;
-            }
         }
     }
 
@@ -297,7 +304,10 @@ bool ShaderProgram::processParameter(
 
     // If no binding slot is available, skip this parameter
     if (bindingSlot == ~0u)
+    {
+        LOG_WARN("[ShaderBinding] No binding slot for parameter: {}", paramNameStr);
         return true;
+    }
 
     // Create binding layout item based on resource type
     nvrhi::BindingLayoutItem layoutItem;
@@ -322,9 +332,9 @@ bool ShaderProgram::processParameter(
                     bindingItem = nvrhi::BindingSetItem::StructuredBuffer_SRV(bindingSlot, bufferIt->second);
                 }
                 else
-                    std::cout << "[ShaderBinding] WARNING: SRV Buffer not found in map: " << paramNameStr << std::endl;
+                    LOG_WARN("[ShaderBinding] SRV Buffer not found in map: {}", paramNameStr);
 
-                std::cout << "[ShaderBinding] Found SRV structured buffer: " << paramNameStr << " at slot " << bindingSlot << std::endl;
+                LOG_DEBUG("[ShaderBinding] Found SRV structured buffer: {} at slot {}", paramNameStr, bindingSlot);
             }
             else if (resourceAccess == SLANG_RESOURCE_ACCESS_READ_WRITE)
             {
@@ -336,14 +346,14 @@ bool ShaderProgram::processParameter(
                     bindingItem = nvrhi::BindingSetItem::StructuredBuffer_UAV(bindingSlot, bufferIt->second);
                 }
                 else
-                    std::cout << "[ShaderBinding] WARNING: UAV Buffer not found in map: " << paramNameStr << std::endl;
+                    LOG_WARN("[ShaderBinding] UAV Buffer not found in map: {}", paramNameStr);
 
-                std::cout << "[ShaderBinding] Found UAV structured buffer: " << paramNameStr << " at slot " << bindingSlot << std::endl;
+                LOG_DEBUG("[ShaderBinding] Found UAV structured buffer: {} at slot {}", paramNameStr, bindingSlot);
             }
             break;
 
         default:
-            std::cout << "[ShaderBinding] Unknown resource shape for: " << paramNameStr << " (shape: " << resourceShape << ")" << std::endl;
+            LOG_WARN("[ShaderBinding] Unknown resource shape for: {} (shape: {})", paramNameStr, static_cast<int>(resourceShape));
             return true;
         }
     }

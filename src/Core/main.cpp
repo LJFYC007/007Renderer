@@ -1,23 +1,18 @@
+#pragma once
+#include <iostream>
+#include <vector>
+#include <nvrhi/nvrhi.h>
+#include <nvrhi/d3d12.h>
+
 #include "Window.h"
 #include "Buffer.h"
 #include "ComputePass.h"
-
-#include <iostream>
-#include <vector>
-#include <d3d12.h>
-#include <dxgi1_6.h>
-#include <wrl.h>
-#include <slang.h>
-#include <slang-com-helper.h>
-#include <slang-com-ptr.h>
-#include <nvrhi/nvrhi.h>
-#include <nvrhi/d3d12.h>
+#include "Utils/Logger.h"
 
 #ifdef _DEBUG
 #define DX12_ENABLE_DEBUG_LAYER
 #endif
 
-using namespace Microsoft::WRL;
 using Microsoft::WRL::ComPtr;
 
 // Helper: check HRESULT
@@ -73,6 +68,12 @@ int main()
 
     Window window(d3d12Device, commandQueue);
     window.PrepareResources();
+
+    Logger::init();
+    auto logger = Logger::get();
+    LOG_INFO("Renderer initialized successfully.");
+    auto streamRedirector = Logger::createStreamRedirector();
+
     {
         // -------------------------
         // 3. Prepare shader buffer data

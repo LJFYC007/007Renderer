@@ -5,13 +5,25 @@
             "name": "Debug 007Renderer",
             "type": "cppvsdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/Debug/007Renderer.exe",
+            "program": "${workspaceFolder}/build/bin/Debug/007Renderer.exe",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],
             "console": "integratedTerminal",
-            "preLaunchTask": "build"
+            "preLaunchTask": "build-debug"
+        },
+        {
+            "name": "Release 007Renderer",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/bin/Release/007Renderer.exe",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "console": "integratedTerminal",
+            "preLaunchTask": "build-release"
         }
-    ],
+    ]
 }

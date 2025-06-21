@@ -3,30 +3,43 @@ project(007Renderer)
 
 set(CMAKE_CXX_STANDARD 17)
 
-# ---------------------------------------------------------------------------
+# Set output directories for different build types
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/bin/Debug)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}/bin/Release)
+
+# ----------------------------------------------------------------------------
 # Slang shader support
-# ---------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
 set(SLANG_ROOT_DIR "${CMAKE_SOURCE_DIR}/external/slang")
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake")
 find_package(SLANG REQUIRED COMPONENTS slang slang-rt gfx)
 
-# ---------------------------------------------------------------------------
-# Imgui shader support
-# ---------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
+# ImGui support
+# ----------------------------------------------------------------------------
 set(IMGUI_ROOT_DIR "${CMAKE_SOURCE_DIR}/external/imgui")
 find_package(ImGui REQUIRED)
 
-# ---------------------------------------------------------------------------
-# NVRHI (D3D12 backend only)
-# ---------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
+# Spdlog support
+# ----------------------------------------------------------------------------
+set(SPDLOG_BUILD_SHARED OFF CACHE BOOL "" FORCE)
+set(SPDLOG_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(SPDLOG_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(SPDLOG_FMT_EXTERNAL OFF CACHE BOOL "" FORCE)
+add_subdirectory(external/spdlog)
+
+# ----------------------------------------------------------------------------
+# NVRHI (D3D12 only)
+# ----------------------------------------------------------------------------
 set(NVRHI_WITH_VULKAN OFF CACHE BOOL "")
 set(NVRHI_WITH_DX12 ON CACHE BOOL "")
 set(NVRHI_WITH_DX11 OFF CACHE BOOL "")
 add_subdirectory(external/nvrhi)
 
-# ---------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
 # Executable target
-# ---------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
 file(GLOB_RECURSE SOURCES src/*.cpp)
 add_executable(007Renderer ${SOURCES})
 
@@ -43,11 +56,20 @@ target_link_libraries(007Renderer PRIVATE
     d3d12 dxgi dxguid
     ${SLANG_LIBRARIES}
     ${IMGUI_LIBRARIES}
+    spdlog::spdlog
 )
 
-# ---------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
+# Debug/Release configuration macros
+# ----------------------------------------------------------------------------
+target_compile_definitions(007Renderer PRIVATE
+    $<$<CONFIG:Debug>:SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_DEBUG>
+    $<$<CONFIG:Release>:SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_INFO>
+)
+
+# ----------------------------------------------------------------------------
 # Post-build: Copy Slang runtime DLLs
-# ---------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
 add_custom_command(TARGET 007Renderer POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${SLANG_ROOT_DIR}/bin/slang.dll"
@@ -55,9 +77,9 @@ add_custom_command(TARGET 007Renderer POST_BUILD
         $<TARGET_FILE_DIR:007Renderer>
 )
 
-# ---------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
 # Post-build: Copy DXC runtime DLLs
-# ---------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
 set(DXC_DLL_DIR "${CMAKE_SOURCE_DIR}/external/dxc/bin/x64")
 
 add_custom_command(TARGET 007Renderer POST_BUILD

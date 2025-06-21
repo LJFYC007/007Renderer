@@ -1,6 +1,38 @@
 #include "Window.h"
 #include <iostream>
 
+namespace
+{
+// Config for example app
+static const int APP_NUM_FRAMES_IN_FLIGHT = 2;
+static const int APP_NUM_BACK_BUFFERS = 2;
+static const int APP_SRV_HEAP_SIZE = 64;
+
+// Data
+static FrameContext g_frameContext[APP_NUM_FRAMES_IN_FLIGHT] = {};
+static UINT g_frameIndex = 0;
+
+static ComPtr<ID3D12Device> g_pd3dDevice = nullptr;
+static ID3D12DescriptorHeap* g_pd3dRtvDescHeap = nullptr;
+static ID3D12DescriptorHeap* g_pd3dSrvDescHeap = nullptr;
+static ExampleDescriptorHeapAllocator g_pd3dSrvDescHeapAlloc;
+static ComPtr<ID3D12CommandQueue> g_pd3dCommandQueue = nullptr;
+static ID3D12GraphicsCommandList* g_pd3dCommandList = nullptr;
+static ID3D12Fence* g_fence = nullptr;
+static HANDLE g_fenceEvent = nullptr;
+static UINT64 g_fenceLastSignaledValue = 0;
+static IDXGISwapChain3* g_pSwapChain = nullptr;
+static bool g_SwapChainOccluded = false;
+static HANDLE g_hSwapChainWaitableObject = nullptr;
+static ID3D12Resource* g_mainRenderTargetResource[APP_NUM_BACK_BUFFERS] = {};
+static D3D12_CPU_DESCRIPTOR_HANDLE g_mainRenderTargetDescriptor[APP_NUM_BACK_BUFFERS] = {};
+} // namespace
+
+void CreateRenderTarget();
+void CleanupRenderTarget();
+void WaitForLastSubmittedFrame();
+LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+
 Window::Window(ComPtr<ID3D12Device> device, ComPtr<ID3D12CommandQueue> commandQueue)
 {
     // Make process DPI aware and obtain main monitor scale
@@ -143,8 +175,7 @@ bool Window::Render()
 
         ImGui::Text("This is some useful text."); // Display some text (you can use a format strings too)
 
-        ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
-        ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
+        ImGui::SliderFloat("float", &f, 0.0f, 1.0f); // Edit 1 float using a slider from 0.0f to 1.0f
 
         if (ImGui::Button("Button")) // Buttons return true when clicked (most widgets return true when edited/activated)
             counter++;
@@ -172,11 +203,6 @@ bool Window::Render()
     g_pd3dCommandList->Reset(frameCtx->CommandAllocator, nullptr);
     g_pd3dCommandList->ResourceBarrier(1, &barrier);
 
-    // Render Dear ImGui graphics
-    const float clear_color_with_alpha[4] = {
-        clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w
-    };
-    // g_pd3dCommandList->ClearRenderTargetView(g_mainRenderTargetDescriptor[backBufferIdx], clear_color_with_alpha, 0, nullptr);
     g_pd3dCommandList->OMSetRenderTargets(1, &g_mainRenderTargetDescriptor[backBufferIdx], FALSE, nullptr);
     g_pd3dCommandList->SetDescriptorHeaps(1, &g_pd3dSrvDescHeap);
     ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), g_pd3dCommandList);

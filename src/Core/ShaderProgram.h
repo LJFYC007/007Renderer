@@ -6,6 +6,8 @@
 #include <string>
 #include <unordered_map>
 
+#include "Utils/Logger.h"
+
 class ShaderProgram
 {
 public:

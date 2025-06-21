@@ -10,7 +10,6 @@
 
 #include "DescriptorHeapAllocator.h"
 
-using namespace Microsoft::WRL;
 using Microsoft::WRL::ComPtr;
 
 #ifdef _DEBUG
@@ -22,43 +21,11 @@ using Microsoft::WRL::ComPtr;
 #pragma comment(lib, "dxguid.lib")
 #endif
 
-// Config for example app
-static const int APP_NUM_FRAMES_IN_FLIGHT = 2;
-static const int APP_NUM_BACK_BUFFERS = 2;
-static const int APP_SRV_HEAP_SIZE = 64;
-
 struct FrameContext
 {
     ID3D12CommandAllocator* CommandAllocator;
     UINT64 FenceValue;
 };
-
-namespace
-{
-// Data
-static FrameContext g_frameContext[APP_NUM_FRAMES_IN_FLIGHT] = {};
-static UINT g_frameIndex = 0;
-
-static ComPtr<ID3D12Device> g_pd3dDevice = nullptr;
-static ID3D12DescriptorHeap* g_pd3dRtvDescHeap = nullptr;
-static ID3D12DescriptorHeap* g_pd3dSrvDescHeap = nullptr;
-static ExampleDescriptorHeapAllocator g_pd3dSrvDescHeapAlloc;
-static ComPtr<ID3D12CommandQueue> g_pd3dCommandQueue = nullptr;
-static ID3D12GraphicsCommandList* g_pd3dCommandList = nullptr;
-static ID3D12Fence* g_fence = nullptr;
-static HANDLE g_fenceEvent = nullptr;
-static UINT64 g_fenceLastSignaledValue = 0;
-static IDXGISwapChain3* g_pSwapChain = nullptr;
-static bool g_SwapChainOccluded = false;
-static HANDLE g_hSwapChainWaitableObject = nullptr;
-static ID3D12Resource* g_mainRenderTargetResource[APP_NUM_BACK_BUFFERS] = {};
-static D3D12_CPU_DESCRIPTOR_HANDLE g_mainRenderTargetDescriptor[APP_NUM_BACK_BUFFERS] = {};
-} // namespace
-
-void CreateRenderTarget();
-void CleanupRenderTarget();
-void WaitForLastSubmittedFrame();
-LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 class Window
 {
@@ -110,6 +77,4 @@ private:
     ImTextureID m_DisplayImGuiHandle = (ImTextureID)0;
     D3D12_CPU_DESCRIPTOR_HANDLE m_DisplaySrvCpuHandle = {};
     D3D12_GPU_DESCRIPTOR_HANDLE m_DisplaySrvGpuHandle = {};
-
-    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 };

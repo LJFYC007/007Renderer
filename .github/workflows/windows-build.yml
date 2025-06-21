@@ -2,40 +2,66 @@ name: Windows CMake Build
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, develop ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, develop ]
 
 jobs:
   build:
     name: Build on Windows (MSVC)
     runs-on: windows-latest
+    
+    strategy:
+      matrix:
+        build_type: [Debug, Release]
+      fail-fast: false
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
+      with:
+        lfs: true
+        submodules: recursive
 
-    - name: Git LFS pull
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v2
+
+    - name: Cache CMake build files
+      uses: actions/cache@v4
+      with:
+        path: |
+          build/
+          !build/bin/
+        key: ${{ runner.os }}-cmake-${{ hashFiles('CMakeLists.txt', 'cmake/**') }}
+        restore-keys: |
+          ${{ runner.os }}-cmake-
+
+    - name: Configure CMake
       run: |
-        git lfs install
-        git lfs pull
+        cmake -S . -B build -G "Visual Studio 17 2022" -A x64 `
+          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} `
+          -DCMAKE_CONFIGURATION_TYPES="${{ matrix.build_type }}"
 
-    - name: Init submodules
-      run: git submodule update --init --recursive
-
-    - name: Install dependencies
-      shell: pwsh
+    - name: Build ${{ matrix.build_type }}
       run: |
-        echo "No additional packages needed for now."
-
-    - name: Configure CMake (VS Generator)
-      run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64
-
-    - name: Build
-      run: cmake --build build --config Release
+        cmake --build build --config ${{ matrix.build_type }} --parallel 4
 
     - name: Verify executable exists
       run: |
-        if (!(Test-Path -Path "build/Release/007Renderer.exe")) {
-          throw "Executable not found"
+        $executablePath = "build/bin/${{ matrix.build_type }}/007Renderer.exe"
+        if (!(Test-Path -Path $executablePath)) {
+          Write-Error "Executable not found at: $executablePath"
+          Get-ChildItem -Path "build" -Recurse -Name "*.exe" | ForEach-Object { Write-Host "Found executable: $_" }
+          throw "Expected executable not found"
         }
+        Write-Host "✅ Successfully built ${{ matrix.build_type }} version"
+        
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      if: success()
+      with:
+        name: 007Renderer-${{ matrix.build_type }}-${{ github.sha }}
+        path: |
+          build/bin/${{ matrix.build_type }}/
+          !build/bin/${{ matrix.build_type }}/**/*.pdb
+        retention-days: 7

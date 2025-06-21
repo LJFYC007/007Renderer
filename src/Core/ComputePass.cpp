@@ -12,7 +12,7 @@ bool ComputePass::initialize(
     if (!program.loadFromFile(device, shaderPath, entryPoint, nvrhi::ShaderType::Compute))
         return false;
     m_Shader = program.getShader();
-    // program.printReflectionInfo(); DEBUG
+    program.printReflectionInfo();
 
     std::vector<nvrhi::BindingLayoutItem> layoutItems;
     std::vector<nvrhi::BindingSetItem> bindings;
@@ -60,7 +60,7 @@ void ComputePass::dispatch(nvrhi::IDevice* device, uint32_t threadX, uint32_t th
                 );
             }
             else
-                std::cout << "[ComputePass] WARNING: No buffer handle for slot " << item.slot << std::endl;
+                LOG_WARN("[ComputePass] WARNING: Resource handle for slot {} is not a buffer", item.slot);
         }
 
     nvrhi::ComputeState state;
