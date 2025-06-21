@@ -80,6 +80,11 @@
         "xstring": "cpp",
         "xtr1common": "cpp",
         "xtree": "cpp",
-        "xutility": "cpp"
+        "xutility": "cpp",
+        "condition_variable": "cpp",
+        "cstdarg": "cpp",
+        "numbers": "cpp",
+        "numeric": "cpp",
+        "random": "cpp"
     }
 }

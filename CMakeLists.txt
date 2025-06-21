@@ -31,6 +31,7 @@ file(GLOB_RECURSE SOURCES src/*.cpp)
 add_executable(007Renderer ${SOURCES})
 
 target_include_directories(007Renderer PRIVATE
+    src/
     external/nvrhi/include
     ${SLANG_INCLUDE_DIRS}
     ${IMGUI_INCLUDE_DIRS}
