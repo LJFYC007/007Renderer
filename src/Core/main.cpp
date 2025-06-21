@@ -3,6 +3,7 @@
 #include <vector>
 #include <nvrhi/nvrhi.h>
 #include <nvrhi/d3d12.h>
+#include <spdlog/fmt/fmt.h>
 
 #include "Window.h"
 #include "Buffer.h"
@@ -72,7 +73,6 @@ int main()
     Logger::init();
     auto logger = Logger::get();
     LOG_INFO("Renderer initialized successfully.");
-    auto streamRedirector = Logger::createStreamRedirector();
 
     {
         // -------------------------
@@ -96,7 +96,7 @@ int main()
         bufferMap["result"] = bufOut.getHandle();
 
         ComputePass pass;
-        pass.initialize(nvrhiDevice, "shaders/hello.slang", "computeMain", bufferMap);
+        pass.initialize(nvrhiDevice, std::string(PROJECT_SHADER_DIR) + "/hello.slang", "computeMain", bufferMap);
 
         pass.dispatch(nvrhiDevice, elementCount);
         nvrhiDevice->waitForIdle();
@@ -106,8 +106,10 @@ int main()
         // -------------------------
         auto readResult = bufOut.readback(nvrhiDevice, nvrhiDevice->createCommandList());
         const float* resultData = reinterpret_cast<const float*>(readResult.data());
+        std::string results;
         for (int i = 0; i < elementCount; ++i)
-            std::cout << resultData[i] << " ";
+            results += fmt::format("{:.2f} ", resultData[i]);
+        LOG_INFO("Compute results: {}", results);
 
         // Generate texture
         nvrhi::TextureDesc textureDesc;
@@ -152,5 +154,7 @@ int main()
     window.CleanupResources();
     nvrhiDevice->waitForIdle();
     nvrhiDevice = nullptr;
+    LOG_INFO("Renderer shutdown successfully.");
+    spdlog::shutdown();
     return 0;
 }

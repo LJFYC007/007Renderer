@@ -42,6 +42,7 @@ add_subdirectory(external/nvrhi)
 # ----------------------------------------------------------------------------
 file(GLOB_RECURSE SOURCES src/*.cpp)
 add_executable(007Renderer ${SOURCES})
+add_compile_definitions(PROJECT_SHADER_DIR="${CMAKE_SOURCE_DIR}/shaders")
 
 target_include_directories(007Renderer PRIVATE
     src/
