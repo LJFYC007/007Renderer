@@ -10,8 +10,7 @@ public:
         nvrhi::IDevice* device,
         const std::string& shaderPath,
         const std::string& entryPoint,
-        const std::vector<nvrhi::BindingLayoutItem>& layoutItems,
-        const std::vector<nvrhi::BindingSetItem>& bindings
+        const std::unordered_map<std::string, nvrhi::BufferHandle>& bufferMap
     );
 
     void dispatch(nvrhi::IDevice* device, uint32_t threadX = 1, uint32_t threadY = 1, uint32_t threadZ = 1);

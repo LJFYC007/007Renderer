@@ -85,6 +85,8 @@
         "cstdarg": "cpp",
         "numbers": "cpp",
         "numeric": "cpp",
-        "random": "cpp"
+        "random": "cpp",
+        "any": "cpp",
+        "variant": "cpp"
     }
 }

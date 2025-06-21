@@ -89,23 +89,13 @@ int main()
         // -------------------------
         // 4. Setup shader & dispatch
         // -------------------------
+        std::unordered_map<std::string, nvrhi::BufferHandle> bufferMap;
+        bufferMap["buffer0"] = bufA.getHandle();
+        bufferMap["buffer1"] = bufB.getHandle();
+        bufferMap["result"] = bufOut.getHandle();
 
         ComputePass pass;
-        pass.initialize(
-            nvrhiDevice,
-            "shaders/hello.slang",
-            "computeMain",
-            {
-                nvrhi::BindingLayoutItem::StructuredBuffer_SRV(0),
-                nvrhi::BindingLayoutItem::StructuredBuffer_SRV(1),
-                nvrhi::BindingLayoutItem::StructuredBuffer_UAV(2),
-            },
-            {
-                nvrhi::BindingSetItem::StructuredBuffer_SRV(0, bufA.getHandle()),
-                nvrhi::BindingSetItem::StructuredBuffer_SRV(1, bufB.getHandle()),
-                nvrhi::BindingSetItem::StructuredBuffer_UAV(2, bufOut.getHandle()),
-            }
-        );
+        pass.initialize(nvrhiDevice, "shaders/hello.slang", "computeMain", bufferMap);
 
         pass.dispatch(nvrhiDevice, elementCount);
         nvrhiDevice->waitForIdle();

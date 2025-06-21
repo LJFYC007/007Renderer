@@ -1,20 +1,23 @@
 #include "ComputePass.h"
+#include <iostream>
 
 bool ComputePass::initialize(
     nvrhi::IDevice* device,
     const std::string& shaderPath,
     const std::string& entryPoint,
-    const std::vector<nvrhi::BindingLayoutItem>& layoutItems,
-    const std::vector<nvrhi::BindingSetItem>& bindings
+    const std::unordered_map<std::string, nvrhi::BufferHandle>& bufferMap
 )
 {
     ShaderProgram program;
     if (!program.loadFromFile(device, shaderPath, entryPoint, nvrhi::ShaderType::Compute))
-    {
         return false;
-    }
-
     m_Shader = program.getShader();
+    // program.printReflectionInfo(); DEBUG
+
+    std::vector<nvrhi::BindingLayoutItem> layoutItems;
+    std::vector<nvrhi::BindingSetItem> bindings;
+    if (!program.generateBindingLayout(layoutItems, bindings, bufferMap))
+        return false;
 
     // Create binding layout
     nvrhi::BindingLayoutDesc layoutDesc;
@@ -45,7 +48,6 @@ void ComputePass::dispatch(nvrhi::IDevice* device, uint32_t threadX, uint32_t th
 
     const nvrhi::BindingSetDesc& desc = *m_BindingSet->getDesc();
     for (const nvrhi::BindingSetItem& item : desc.bindings)
-    {
         if (item.type == nvrhi::ResourceType::StructuredBuffer_SRV || item.type == nvrhi::ResourceType::StructuredBuffer_UAV)
         {
             nvrhi::IBuffer* buffer = dynamic_cast<nvrhi::IBuffer*>(item.resourceHandle);
@@ -57,16 +59,15 @@ void ComputePass::dispatch(nvrhi::IDevice* device, uint32_t threadX, uint32_t th
                                                                            : nvrhi::ResourceStates::UnorderedAccess
                 );
             }
+            else
+                std::cout << "[ComputePass] WARNING: No buffer handle for slot " << item.slot << std::endl;
         }
-    }
 
     nvrhi::ComputeState state;
     state.pipeline = m_Pipeline;
     state.bindings = {m_BindingSet};
-
     commandList->setComputeState(state);
     commandList->dispatch(threadX, threadY, threadZ);
-
     commandList->close();
     device->executeCommandList(commandList);
 }

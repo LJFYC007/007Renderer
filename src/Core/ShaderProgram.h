@@ -4,6 +4,7 @@
 #include <slang-com-ptr.h>
 #include <nvrhi/nvrhi.h>
 #include <string>
+#include <unordered_map>
 
 class ShaderProgram
 {
@@ -19,10 +20,38 @@ public:
 
     nvrhi::ShaderHandle getShader() const { return m_Shader; }
 
+    slang::ProgramLayout* getProgramLayout() const { return m_ProgramLayout; }
+
+    void printReflectionInfo() const;
+
+    bool ShaderProgram::generateBindingLayout(
+        std::vector<nvrhi::BindingLayoutItem>& outLayoutItems,
+        std::vector<nvrhi::BindingSetItem>& outBindings,
+        const std::unordered_map<std::string, nvrhi::BufferHandle>& bufferMap
+    );
+
 private:
+    void printVariableLayout(slang::VariableLayoutReflection* varLayout, int indent) const;
+
+    bool processParameterGroup(
+        slang::VariableLayoutReflection* varLayout,
+        std::vector<nvrhi::BindingLayoutItem>& outLayoutItems,
+        std::vector<nvrhi::BindingSetItem>& outBindings,
+        const std::unordered_map<std::string, nvrhi::BufferHandle>& bufferMap
+    );
+
+    bool processParameter(
+        slang::VariableLayoutReflection* varLayout,
+        std::vector<nvrhi::BindingLayoutItem>& outLayoutItems,
+        std::vector<nvrhi::BindingSetItem>& outBindings,
+        const std::unordered_map<std::string, nvrhi::BufferHandle>& bufferMap
+    );
+
     Slang::ComPtr<slang::IGlobalSession> m_GlobalSession;
     Slang::ComPtr<slang::ISession> m_Session;
     Slang::ComPtr<slang::ICompileRequest> m_CompileRequest;
+    Slang::ComPtr<slang::IComponentType> m_LinkedProgram;
+    slang::ProgramLayout* m_ProgramLayout;
 
     nvrhi::ShaderHandle m_Shader;
 };
