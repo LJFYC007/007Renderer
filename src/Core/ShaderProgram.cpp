@@ -1,5 +1,4 @@
 #include "ShaderProgram.h"
-#include <iostream>
 
 ShaderProgram::ShaderProgram() : m_ProgramLayout(nullptr)
 {
@@ -195,7 +194,7 @@ void ShaderProgram::printVariableLayout(slang::VariableLayoutReflection* varLayo
 bool ShaderProgram::generateBindingLayout(
     std::vector<nvrhi::BindingLayoutItem>& outLayoutItems,
     std::vector<nvrhi::BindingSetItem>& outBindings,
-    const std::unordered_map<std::string, nvrhi::BufferHandle>& bufferMap
+    const std::unordered_map<std::string, nvrhi::RefCountPtr<nvrhi::IResource>>& resourceMap
 )
 {
     if (!m_ProgramLayout)
@@ -211,7 +210,7 @@ bool ShaderProgram::generateBindingLayout(
     auto globalScopeLayout = m_ProgramLayout->getGlobalParamsVarLayout();
     if (globalScopeLayout)
     {
-        if (!processParameterGroup(globalScopeLayout, outLayoutItems, outBindings, bufferMap))
+        if (!processParameterGroup(globalScopeLayout, outLayoutItems, outBindings, resourceMap))
             return false;
     }
 
@@ -223,7 +222,7 @@ bool ShaderProgram::generateBindingLayout(
         auto entryPointLayout = entryPoint->getVarLayout();
         if (entryPointLayout)
         {
-            if (!processParameterGroup(entryPointLayout, outLayoutItems, outBindings, bufferMap))
+            if (!processParameterGroup(entryPointLayout, outLayoutItems, outBindings, resourceMap))
                 return false;
         }
     }
@@ -235,7 +234,7 @@ bool ShaderProgram::processParameterGroup(
     slang::VariableLayoutReflection* varLayout,
     std::vector<nvrhi::BindingLayoutItem>& outLayoutItems,
     std::vector<nvrhi::BindingSetItem>& outBindings,
-    const std::unordered_map<std::string, nvrhi::BufferHandle>& bufferMap
+    const std::unordered_map<std::string, nvrhi::RefCountPtr<nvrhi::IResource>>& resourceMap
 )
 {
     if (!varLayout)
@@ -252,12 +251,12 @@ bool ShaderProgram::processParameterGroup(
         for (unsigned int i = 0; i < fieldCount; i++)
         {
             auto fieldLayout = typeLayout->getFieldByIndex(i);
-            if (!processParameter(fieldLayout, outLayoutItems, outBindings, bufferMap))
+            if (!processParameter(fieldLayout, outLayoutItems, outBindings, resourceMap))
                 return false;
         }
     }
     else
-        return processParameter(varLayout, outLayoutItems, outBindings, bufferMap);
+        return processParameter(varLayout, outLayoutItems, outBindings, resourceMap);
 
     return true;
 }
@@ -266,7 +265,7 @@ bool ShaderProgram::processParameter(
     slang::VariableLayoutReflection* varLayout,
     std::vector<nvrhi::BindingLayoutItem>& outLayoutItems,
     std::vector<nvrhi::BindingSetItem>& outBindings,
-    const std::unordered_map<std::string, nvrhi::BufferHandle>& bufferMap
+    const std::unordered_map<std::string, nvrhi::RefCountPtr<nvrhi::IResource>>& resourceMap
 )
 {
     if (!varLayout)
@@ -319,36 +318,61 @@ bool ShaderProgram::processParameter(
     {
         auto resourceShape = typeLayout->getResourceShape();
         auto resourceAccess = typeLayout->getResourceAccess();
-
         switch (resourceShape)
         {
-        case SLANG_STRUCTURED_BUFFER:
-            if (resourceAccess == SLANG_RESOURCE_ACCESS_READ)
+        case SLANG_TEXTURE_1D:
+        case SLANG_TEXTURE_2D:
+        case SLANG_TEXTURE_3D:
+        case SLANG_TEXTURE_CUBE:
+        case SLANG_TEXTURE_BUFFER:
+            if (resourceAccess == SLANG_RESOURCE_ACCESS_READ || resourceAccess)
             {
-                auto bufferIt = bufferMap.find(paramNameStr);
-                if (bufferIt != bufferMap.end())
+                auto resourceIt = resourceMap.find(paramNameStr);
+                if (resourceIt != resourceMap.end())
                 {
-                    layoutItem = nvrhi::BindingLayoutItem::StructuredBuffer_SRV(bindingSlot);
-                    bindingItem = nvrhi::BindingSetItem::StructuredBuffer_SRV(bindingSlot, bufferIt->second);
+                    nvrhi::ITexture* texture = dynamic_cast<nvrhi::ITexture*>(resourceIt->second.Get());
+                    nvrhi::TextureHandle textureHandle = texture;
+                    layoutItem = resourceAccess == SLANG_RESOURCE_ACCESS_READ ? nvrhi::BindingLayoutItem::Texture_SRV(bindingSlot)
+                                                                              : nvrhi::BindingLayoutItem::Texture_UAV(bindingSlot);
+                    bindingItem = resourceAccess == SLANG_RESOURCE_ACCESS_READ
+                                      ? nvrhi::BindingSetItem::Texture_SRV(bindingSlot, textureHandle)
+                                      : nvrhi::BindingSetItem::Texture_UAV(bindingSlot, textureHandle);
                 }
                 else
-                    LOG_WARN("[ShaderBinding] SRV Buffer not found in map: {}", paramNameStr);
+                    LOG_WARN("[ShaderBinding] Texture resource not found in map: {}", paramNameStr);
 
-                LOG_DEBUG("[ShaderBinding] Found SRV structured buffer: {} at slot {}", paramNameStr, bindingSlot);
+                LOG_DEBUG(
+                    "[ShaderBinding] Found {} texture: {} at slot {}",
+                    resourceAccess == SLANG_RESOURCE_ACCESS_READ ? "SRV" : "UAV",
+                    paramNameStr,
+                    bindingSlot
+                );
             }
-            else if (resourceAccess == SLANG_RESOURCE_ACCESS_READ_WRITE)
+            break;
+
+        case SLANG_STRUCTURED_BUFFER:
+            if (resourceAccess == SLANG_RESOURCE_ACCESS_READ || resourceAccess == SLANG_RESOURCE_ACCESS_READ_WRITE)
             {
-                auto bufferIt = bufferMap.find(paramNameStr);
-                if (bufferIt != bufferMap.end())
+                auto resourceIt = resourceMap.find(paramNameStr);
+                if (resourceIt != resourceMap.end())
                 {
-                    bindingItem.resourceHandle = bufferIt->second;
-                    layoutItem = nvrhi::BindingLayoutItem::StructuredBuffer_UAV(bindingSlot);
-                    bindingItem = nvrhi::BindingSetItem::StructuredBuffer_UAV(bindingSlot, bufferIt->second);
+                    nvrhi::IBuffer* buffer = dynamic_cast<nvrhi::IBuffer*>(resourceIt->second.Get());
+                    nvrhi::BufferHandle bufferHandle = buffer;
+                    layoutItem = resourceAccess == SLANG_RESOURCE_ACCESS_READ ? nvrhi::BindingLayoutItem::StructuredBuffer_SRV(bindingSlot)
+                                                                              : nvrhi::BindingLayoutItem::StructuredBuffer_UAV(bindingSlot);
+                    bindingItem = resourceAccess == SLANG_RESOURCE_ACCESS_READ
+                                      ? nvrhi::BindingSetItem::StructuredBuffer_SRV(bindingSlot, bufferHandle)
+                                      : nvrhi::BindingSetItem::StructuredBuffer_UAV(bindingSlot, bufferHandle);
                 }
                 else
-                    LOG_WARN("[ShaderBinding] UAV Buffer not found in map: {}", paramNameStr);
+                    LOG_WARN("[ShaderBinding] Buffer resource not found in map: {}", paramNameStr);
 
-                LOG_DEBUG("[ShaderBinding] Found UAV structured buffer: {} at slot {}", paramNameStr, bindingSlot);
+                LOG_DEBUG(
+                    "[ShaderBinding] Found {} structured buffer: {} at slot {}",
+                    resourceAccess == SLANG_RESOURCE_ACCESS_READ ? "SRV" : "UAV",
+                    paramNameStr,
+                    bindingSlot
+                );
             }
             break;
 

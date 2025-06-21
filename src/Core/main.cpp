@@ -7,6 +7,7 @@
 
 #include "Window.h"
 #include "Buffer.h"
+#include "Texture.h"
 #include "ComputePass.h"
 #include "Utils/Logger.h"
 
@@ -78,74 +79,43 @@ int main()
         // -------------------------
         // 3. Prepare shader buffer data
         // -------------------------
-        const uint32_t elementCount = 8;
-        std::vector<float> inputA(elementCount, 1.0f);
-        std::vector<float> inputB(elementCount, 5.0f);
+        const uint32_t width = 1920;
+        const uint32_t height = 1080;
+        const uint32_t elementCount = width * height;
+        std::vector<float> inputA(elementCount * 3, 0.1f);
+        std::vector<float> inputB(elementCount * 3, 0.5f);
 
-        Buffer bufA, bufB, bufOut;
+        Buffer bufA, bufB;
+        Texture textureOut;
         bufA.initialize(nvrhiDevice, inputA.data(), inputA.size() * sizeof(float), nvrhi::ResourceStates::ShaderResource, false, "BufferA");
         bufB.initialize(nvrhiDevice, inputB.data(), inputB.size() * sizeof(float), nvrhi::ResourceStates::ShaderResource, false, "BufferB");
-        bufOut.initialize(nvrhiDevice, nullptr, inputA.size() * sizeof(float), nvrhi::ResourceStates::UnorderedAccess, true, "BufferOut");
+        textureOut.initialize(
+            nvrhiDevice, width, height, nvrhi::Format::RGBA32_FLOAT, nvrhi::ResourceStates::UnorderedAccess, true, "TextureOut"
+        );
 
         // -------------------------
         // 4. Setup shader & dispatch
         // -------------------------
-        std::unordered_map<std::string, nvrhi::BufferHandle> bufferMap;
-        bufferMap["buffer0"] = bufA.getHandle();
-        bufferMap["buffer1"] = bufB.getHandle();
-        bufferMap["result"] = bufOut.getHandle();
+        std::unordered_map<std::string, nvrhi::RefCountPtr<nvrhi::IResource>> resourceMap;
+        resourceMap["buffer0"] = nvrhi::RefCountPtr<nvrhi::IResource>(bufA.getHandle().operator->());
+        resourceMap["buffer1"] = nvrhi::RefCountPtr<nvrhi::IResource>(bufB.getHandle().operator->());
+        resourceMap["result"] = nvrhi::RefCountPtr<nvrhi::IResource>(textureOut.getHandle().operator->());
 
         ComputePass pass;
-        pass.initialize(nvrhiDevice, std::string(PROJECT_SHADER_DIR) + "/hello.slang", "computeMain", bufferMap);
-
-        pass.dispatch(nvrhiDevice, elementCount);
+        pass.initialize(nvrhiDevice, std::string(PROJECT_SHADER_DIR) + "/hello.slang", "computeMain", resourceMap);
+        pass.dispatchThreads(nvrhiDevice, width, height, 1);
         nvrhiDevice->waitForIdle();
 
         // -------------------------
-        // 5. Read back and print result
-        // -------------------------
-        auto readResult = bufOut.readback(nvrhiDevice, nvrhiDevice->createCommandList());
-        const float* resultData = reinterpret_cast<const float*>(readResult.data());
-        std::string results;
-        for (int i = 0; i < elementCount; ++i)
-            results += fmt::format("{:.2f} ", resultData[i]);
-        LOG_INFO("Compute results: {}", results);
-
-        // Generate texture
-        nvrhi::TextureDesc textureDesc;
-        textureDesc.width = 1920;
-        textureDesc.height = 1080;
-        textureDesc.format = nvrhi::Format::RGBA8_UNORM;
-        textureDesc.isRenderTarget = false;
-        textureDesc.isUAV = true;
-        textureDesc.debugName = "TestDisplayTexture";
-        textureDesc.initialState = nvrhi::ResourceStates::ShaderResource;
-        textureDesc.keepInitialState = true;
-
-        nvrhi::TextureHandle nvrhiTexture = nvrhiDevice->createTexture(textureDesc);
-
-        nvrhi::Color color(0.0f, 0.5f, 1.0f, 1.0f); // Clear color for the texture
-        nvrhi::TextureSubresourceSet allSubresources;
-
-        auto clearCmd = nvrhiDevice->createCommandList();
-        clearCmd->open();
-        clearCmd->beginTrackingTextureState(nvrhiTexture, allSubresources, nvrhi::ResourceStates::ShaderResource);
-        clearCmd->setTextureState(nvrhiTexture, allSubresources, nvrhi::ResourceStates::UnorderedAccess);
-        clearCmd->clearTextureFloat(nvrhiTexture, allSubresources, color);
-        clearCmd->setPermanentTextureState(nvrhiTexture, nvrhi::ResourceStates::ShaderResource);
-        clearCmd->close();
-        nvrhiDevice->executeCommandList(clearCmd);
-        nvrhiDevice->waitForIdle();
-
-        // -------------------------
-        // 6. Imgui
+        // 5. Imgui
         // -------------------------
 
         bool notDone = true;
         while (notDone)
         {
             // Main loop
-            ID3D12Resource* d3d12Texture = static_cast<ID3D12Resource*>(nvrhiTexture->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource));
+            ID3D12Resource* d3d12Texture =
+                static_cast<ID3D12Resource*>(textureOut.getHandle()->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource));
             window.SetDisplayTexture(d3d12Texture);
             notDone = window.Render();
         }

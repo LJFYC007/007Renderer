@@ -25,28 +25,25 @@ public:
     slang::ProgramLayout* getProgramLayout() const { return m_ProgramLayout; }
 
     void printReflectionInfo() const;
-
     bool ShaderProgram::generateBindingLayout(
         std::vector<nvrhi::BindingLayoutItem>& outLayoutItems,
         std::vector<nvrhi::BindingSetItem>& outBindings,
-        const std::unordered_map<std::string, nvrhi::BufferHandle>& bufferMap
+        const std::unordered_map<std::string, nvrhi::RefCountPtr<nvrhi::IResource>>& resourceMap
     );
 
 private:
     void printVariableLayout(slang::VariableLayoutReflection* varLayout, int indent) const;
-
     bool processParameterGroup(
         slang::VariableLayoutReflection* varLayout,
         std::vector<nvrhi::BindingLayoutItem>& outLayoutItems,
         std::vector<nvrhi::BindingSetItem>& outBindings,
-        const std::unordered_map<std::string, nvrhi::BufferHandle>& bufferMap
+        const std::unordered_map<std::string, nvrhi::RefCountPtr<nvrhi::IResource>>& resourceMap
     );
-
     bool processParameter(
         slang::VariableLayoutReflection* varLayout,
         std::vector<nvrhi::BindingLayoutItem>& outLayoutItems,
         std::vector<nvrhi::BindingSetItem>& outBindings,
-        const std::unordered_map<std::string, nvrhi::BufferHandle>& bufferMap
+        const std::unordered_map<std::string, nvrhi::RefCountPtr<nvrhi::IResource>>& resourceMap
     );
 
     Slang::ComPtr<slang::IGlobalSession> m_GlobalSession;
