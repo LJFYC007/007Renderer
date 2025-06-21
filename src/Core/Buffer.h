@@ -15,8 +15,11 @@ public:
         size_t size,
         nvrhi::ResourceStates initState,
         bool isUAV = false,
+        bool isConstantBuffer = false,
         const std::string& debugName = "Buffer"
     );
+
+    void updateData(nvrhi::IDevice* device, const void* data, size_t size);
 
     std::vector<uint8_t> readback(nvrhi::IDevice* device, nvrhi::CommandListHandle commandList) const;
 

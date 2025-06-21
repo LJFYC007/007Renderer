@@ -33,31 +33,23 @@ void CleanupRenderTarget();
 void WaitForLastSubmittedFrame();
 LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
-Window::Window(ComPtr<ID3D12Device> device, ComPtr<ID3D12CommandQueue> commandQueue)
+Window::Window(ComPtr<ID3D12Device> device, ComPtr<ID3D12CommandQueue> commandQueue, const desc& windowDesc)
 {
     // Make process DPI aware and obtain main monitor scale
     ImGui_ImplWin32_EnableDpiAwareness();
     main_scale = ImGui_ImplWin32_GetDpiScaleForMonitor(::MonitorFromPoint(POINT{0, 0}, MONITOR_DEFAULTTOPRIMARY));
+    std::wstring wTitle(windowDesc.title.begin(), windowDesc.title.end());
 
     // Create application window
     wc = {sizeof(wc), CS_CLASSDC, WndProc, 0L, 0L, GetModuleHandle(nullptr), nullptr, nullptr, nullptr, nullptr, L"ImGui Example", nullptr};
     ::RegisterClassExW(&wc);
     hwnd = ::CreateWindowW(
-        wc.lpszClassName,
-        L"Dear ImGui DirectX12 Example",
-        WS_OVERLAPPEDWINDOW,
-        100,
-        100,
-        1920,
-        1080,
-        nullptr,
-        nullptr,
-        wc.hInstance,
-        nullptr
+        wc.lpszClassName, wTitle.c_str(), WS_OVERLAPPEDWINDOW, 100, 100, windowDesc.width, windowDesc.height, nullptr, nullptr, wc.hInstance, nullptr
     );
 
     g_pd3dDevice = device;
     g_pd3dCommandQueue = commandQueue;
+    m_enableVSync = windowDesc.enableVSync;
 
     // Initialize Direct3D
     if (!CreateDeviceD3D(hwnd))
@@ -82,6 +74,10 @@ Window::Window(ComPtr<ID3D12Device> device, ComPtr<ID3D12CommandQueue> commandQu
     // io->ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;       // Enable Multi-Viewport / Platform Windows
     // io->ConfigViewportsNoAutoMerge = true;
     // io->ConfigViewportsNoTaskBarIcon = true;
+
+    const char* fontBasePath = "external/imgui/misc/fonts/";
+    std::string cousineFontPath = std::string(fontBasePath) + "Cousine-Regular.ttf";
+    ImFont* cousineFont = io->Fonts->AddFontFromFileTTF(cousineFontPath.c_str(), 14.0f);
 }
 
 void Window::PrepareResources()
@@ -92,12 +88,12 @@ void Window::PrepareResources()
 
     // Setup scaling
     ImGuiStyle& style = ImGui::GetStyle();
-    style.ScaleAllSizes(main_scale); // Bake a fixed style scale. (until we have a solution for dynamic style scaling, changing this
-                                     // requires resetting Style + calling this again)
-    style.FontScaleDpi = main_scale; // Set initial font scale. (using io->ConfigDpiScaleFonts=true makes this unnecessary. We leave both
-                                     // here for documentation purpose)
-    io->ConfigDpiScaleFonts = true;  // [Experimental] Automatically overwrite style.FontScaleDpi in Begin() when Monitor DPI changes. This
-                                     // will scale fonts but _NOT_ scale sizes/padding for now.
+    style.ScaleAllSizes(main_scale);    // Bake a fixed style scale. (until we have a solution for dynamic style scaling, changing this
+                                        // requires resetting Style + calling this again)
+    style.FontScaleDpi = main_scale;    // Set initial font scale. (using io->ConfigDpiScaleFonts=true makes this unnecessary. We leave both
+                                        // here for documentation purpose)
+    io->ConfigDpiScaleFonts = true;     // [Experimental] Automatically overwrite style.FontScaleDpi in Begin() when Monitor DPI changes. This
+                                        // will scale fonts but _NOT_ scale sizes/padding for now.
     io->ConfigDpiScaleViewports = true; // [Experimental] Scale Dear ImGui and Platform Windows when Monitor DPI changes.
 
     // When viewports are enabled we tweak WindowRounding/WindowBg so platform windows can look identical to regular ones.
@@ -122,8 +118,7 @@ void Window::PrepareResources()
     init_info.SrvDescriptorAllocFn =
         [](ImGui_ImplDX12_InitInfo*, D3D12_CPU_DESCRIPTOR_HANDLE* out_cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE* out_gpu_handle)
     { return g_pd3dSrvDescHeapAlloc.Alloc(out_cpu_handle, out_gpu_handle); };
-    init_info.SrvDescriptorFreeFn =
-        [](ImGui_ImplDX12_InitInfo*, D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle)
+    init_info.SrvDescriptorFreeFn = [](ImGui_ImplDX12_InitInfo*, D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle)
     { return g_pd3dSrvDescHeapAlloc.Free(cpu_handle, gpu_handle); };
     ImGui_ImplDX12_Init(&init_info);
 
@@ -135,11 +130,10 @@ void Window::PrepareResources()
     m_DisplayImGuiHandle = (ImTextureID)(intptr_t)m_DisplaySrvGpuHandle.ptr;
 }
 
-bool Window::Render()
+bool Window::RenderBegin()
 {
     bool done = false;
     // Poll and handle messages (inputs, window resize, etc.)
-    // See the WndProc() function below for our to dispatch events to the Win32 backend.
     MSG msg;
     while (::PeekMessage(&msg, nullptr, 0U, 0U, PM_REMOVE))
     {
@@ -164,28 +158,14 @@ bool Window::Render()
     ImGui_ImplWin32_NewFrame();
     ImGui::NewFrame();
 
+    // Add background image
     ImDrawList* bg = ImGui::GetBackgroundDrawList();
     bg->AddImage(m_DisplayImGuiHandle, ImVec2(0, 0), ImGui::GetIO().DisplaySize);
+    return true;
+}
 
-    {
-        static float f = 0.0f;
-        static int counter = 0;
-
-        ImGui::Begin("Hello, world!"); // Create a window called "Hello, world!" and append into it.
-
-        ImGui::Text("This is some useful text."); // Display some text (you can use a format strings too)
-
-        ImGui::SliderFloat("float", &f, 0.0f, 1.0f); // Edit 1 float using a slider from 0.0f to 1.0f
-
-        if (ImGui::Button("Button")) // Buttons return true when clicked (most widgets return true when edited/activated)
-            counter++;
-        ImGui::SameLine();
-        ImGui::Text("counter = %d", counter);
-
-        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io->Framerate, io->Framerate);
-        ImGui::End();
-    }
-
+void Window::RenderEnd()
+{
     // Rendering
     ImGui::Render();
 
@@ -202,6 +182,8 @@ bool Window::Render()
     barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
     g_pd3dCommandList->Reset(frameCtx->CommandAllocator, nullptr);
     g_pd3dCommandList->ResourceBarrier(1, &barrier);
+    const float clear_color[4] = {0.0f, 0.0f, 0.0f, 1.0f};
+    g_pd3dCommandList->ClearRenderTargetView(g_mainRenderTargetDescriptor[backBufferIdx], clear_color, 0, nullptr);
 
     g_pd3dCommandList->OMSetRenderTargets(1, &g_mainRenderTargetDescriptor[backBufferIdx], FALSE, nullptr);
     g_pd3dCommandList->SetDescriptorHeaps(1, &g_pd3dSrvDescHeap);
@@ -218,19 +200,15 @@ bool Window::Render()
     {
         ImGui::UpdatePlatformWindows();
         ImGui::RenderPlatformWindowsDefault();
-    }
-
-    // Present
-    // HRESULT hr = g_pSwapChain->Present(1, 0);   // Present with vsync
-    HRESULT hr = g_pSwapChain->Present(0, 0); // Present without vsync
+    } // Present
+    UINT syncInterval = m_enableVSync ? 1 : 0;
+    HRESULT hr = g_pSwapChain->Present(syncInterval, 0);
     g_SwapChainOccluded = (hr == DXGI_STATUS_OCCLUDED);
 
     UINT64 fenceValue = g_fenceLastSignaledValue + 1;
     g_pd3dCommandQueue->Signal(g_fence, fenceValue);
     g_fenceLastSignaledValue = fenceValue;
     frameCtx->FenceValue = fenceValue;
-
-    return true;
 }
 
 void Window::SetDisplayTexture(ID3D12Resource* texture)

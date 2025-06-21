@@ -30,34 +30,21 @@ struct FrameContext
 class Window
 {
 public:
-    /**
-     * Window mode
-     */
-    enum class WindowMode
-    {
-        Normal,     ///< Normal window.
-        Minimized,  ///< Minimized window.
-        Fullscreen, ///< Fullscreen window.
-    };
-
-    /**
-     * Window configuration configuration
-     */
+    // Window configuration configuration
     struct desc
     {
-        uint32_t width = 1920;                ///< The width of the client area size.
-        uint32_t height = 1080;               ///< The height of the client area size.
-        std::string title = "Falcor Sample";  ///< Window title.
-        WindowMode mode = WindowMode::Normal; ///< Window mode. In full screen mode, width and height will be ignored.
-        bool resizableWindow = true;          ///< Allow the user to resize the window.
-        bool enableVSync = false;             ///< Controls vertical-sync.
+        uint32_t width = 1920;               ///< The width of the client area size.
+        uint32_t height = 1080;              ///< The height of the client area size.
+        std::string title = "Falcor Sample"; ///< Window title.
+        bool enableVSync = false;            ///< Controls vertical-sync.
     };
 
-    Window(ComPtr<ID3D12Device> device, ComPtr<ID3D12CommandQueue> commandQueue);
+    Window(ComPtr<ID3D12Device> device, ComPtr<ID3D12CommandQueue> commandQueue, const desc& windowDesc);
     ~Window() {};
     void PrepareResources();
     void CleanupResources();
-    bool Render();
+    bool RenderBegin();
+    void RenderEnd();
     void SetDisplayTexture(ID3D12Resource* texture);
 
     // Forward declarations of helper functions
@@ -71,6 +58,7 @@ private:
     HWND hwnd;
     WNDCLASSEXW wc;
     ImGuiIO* io;
+    bool m_enableVSync;
 
     // Display texture and descriptor handles
     ID3D12Resource* m_CurrentDisplayTexture = nullptr;

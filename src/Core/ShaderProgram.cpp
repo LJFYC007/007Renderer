@@ -334,9 +334,8 @@ bool ShaderProgram::processParameter(
                     nvrhi::TextureHandle textureHandle = texture;
                     layoutItem = resourceAccess == SLANG_RESOURCE_ACCESS_READ ? nvrhi::BindingLayoutItem::Texture_SRV(bindingSlot)
                                                                               : nvrhi::BindingLayoutItem::Texture_UAV(bindingSlot);
-                    bindingItem = resourceAccess == SLANG_RESOURCE_ACCESS_READ
-                                      ? nvrhi::BindingSetItem::Texture_SRV(bindingSlot, textureHandle)
-                                      : nvrhi::BindingSetItem::Texture_UAV(bindingSlot, textureHandle);
+                    bindingItem = resourceAccess == SLANG_RESOURCE_ACCESS_READ ? nvrhi::BindingSetItem::Texture_SRV(bindingSlot, textureHandle)
+                                                                               : nvrhi::BindingSetItem::Texture_UAV(bindingSlot, textureHandle);
                 }
                 else
                     LOG_WARN("[ShaderBinding] Texture resource not found in map: {}", paramNameStr);
@@ -380,6 +379,23 @@ bool ShaderProgram::processParameter(
             LOG_WARN("[ShaderBinding] Unknown resource shape for: {} (shape: {})", paramNameStr, static_cast<int>(resourceShape));
             return true;
         }
+    }
+    break;
+
+    case slang::TypeReflection::Kind::ConstantBuffer:
+    case slang::TypeReflection::Kind::ParameterBlock:
+    {
+        auto resourceIt = resourceMap.find(paramNameStr);
+        if (resourceIt != resourceMap.end())
+        {
+            nvrhi::IBuffer* buffer = dynamic_cast<nvrhi::IBuffer*>(resourceIt->second.Get());
+            nvrhi::BufferHandle bufferHandle = buffer;
+            layoutItem = nvrhi::BindingLayoutItem::ConstantBuffer(bindingSlot);
+            bindingItem = nvrhi::BindingSetItem::ConstantBuffer(bindingSlot, bufferHandle);
+        }
+        else
+            LOG_WARN("[ShaderBinding] Constant buffer resource not found in map: {}", paramNameStr);
+        LOG_DEBUG("[ShaderBinding] Found constant buffer: {} at slot {}", paramNameStr, bindingSlot);
     }
     break;
 

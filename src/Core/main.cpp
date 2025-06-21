@@ -65,10 +65,18 @@ int main()
     ComPtr<ID3D12CommandQueue> commandQueue;
     CHECKHR(d3d12Device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&commandQueue)));
     deviceDesc.pGraphicsCommandQueue = commandQueue.Get();
-
     nvrhi::DeviceHandle nvrhiDevice = nvrhi::d3d12::createDevice(deviceDesc);
 
-    Window window(d3d12Device, commandQueue);
+    const uint32_t width = 1920;
+    const uint32_t height = 1080;
+    // Create window with configuration
+    Window::desc windowDesc;
+    windowDesc.width = width;
+    windowDesc.height = height;
+    windowDesc.title = "007Renderer";
+    windowDesc.enableVSync = false;
+
+    Window window(d3d12Device, commandQueue, windowDesc);
     window.PrepareResources();
 
     Logger::init();
@@ -79,19 +87,23 @@ int main()
         // -------------------------
         // 3. Prepare shader buffer data
         // -------------------------
-        const uint32_t width = 1920;
-        const uint32_t height = 1080;
         const uint32_t elementCount = width * height;
         std::vector<float> inputA(elementCount * 3, 0.1f);
         std::vector<float> inputB(elementCount * 3, 0.5f);
 
-        Buffer bufA, bufB;
+        struct PerFrameCB
+        {
+            uint32_t gWidth;
+            uint32_t gHeight;
+            float gColor;
+        } perFrameData;
+
+        Buffer bufA, bufB, cbPerFrame;
         Texture textureOut;
-        bufA.initialize(nvrhiDevice, inputA.data(), inputA.size() * sizeof(float), nvrhi::ResourceStates::ShaderResource, false, "BufferA");
-        bufB.initialize(nvrhiDevice, inputB.data(), inputB.size() * sizeof(float), nvrhi::ResourceStates::ShaderResource, false, "BufferB");
-        textureOut.initialize(
-            nvrhiDevice, width, height, nvrhi::Format::RGBA32_FLOAT, nvrhi::ResourceStates::UnorderedAccess, true, "TextureOut"
-        );
+        bufA.initialize(nvrhiDevice, inputA.data(), inputA.size() * sizeof(float), nvrhi::ResourceStates::ShaderResource, false, false, "BufferA");
+        bufB.initialize(nvrhiDevice, inputB.data(), inputB.size() * sizeof(float), nvrhi::ResourceStates::ShaderResource, false, false, "BufferB");
+        cbPerFrame.initialize(nvrhiDevice, &perFrameData, sizeof(PerFrameCB), nvrhi::ResourceStates::ConstantBuffer, false, true, "PerFrameCB");
+        textureOut.initialize(nvrhiDevice, width, height, nvrhi::Format::RGBA32_FLOAT, nvrhi::ResourceStates::UnorderedAccess, true, "TextureOut");
 
         // -------------------------
         // 4. Setup shader & dispatch
@@ -100,24 +112,57 @@ int main()
         resourceMap["buffer0"] = nvrhi::RefCountPtr<nvrhi::IResource>(bufA.getHandle().operator->());
         resourceMap["buffer1"] = nvrhi::RefCountPtr<nvrhi::IResource>(bufB.getHandle().operator->());
         resourceMap["result"] = nvrhi::RefCountPtr<nvrhi::IResource>(textureOut.getHandle().operator->());
-
+        resourceMap["PerFrameCB"] = nvrhi::RefCountPtr<nvrhi::IResource>(cbPerFrame.getHandle().operator->());
         ComputePass pass;
         pass.initialize(nvrhiDevice, std::string(PROJECT_SHADER_DIR) + "/hello.slang", "computeMain", resourceMap);
-        pass.dispatchThreads(nvrhiDevice, width, height, 1);
-        nvrhiDevice->waitForIdle();
 
         // -------------------------
-        // 5. Imgui
+        // 5. Imgui with real-time compute
         // -------------------------
 
         bool notDone = true;
+        static float gColorSlider = 0.0f; // UI slider value
+        static int counter = 0;
+
         while (notDone)
         {
-            // Main loop
-            ID3D12Resource* d3d12Texture =
-                static_cast<ID3D12Resource*>(textureOut.getHandle()->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource));
+            nvrhiDevice->runGarbageCollection();
+
+            perFrameData.gWidth = width;
+            perFrameData.gHeight = height;
+            perFrameData.gColor = gColorSlider;
+            cbPerFrame.updateData(nvrhiDevice, &perFrameData, sizeof(PerFrameCB));
+
+            // Dispatch compute shader
+            pass.dispatchThreads(nvrhiDevice, width, height, 1);
+
+            // Set texture for display
+            ID3D12Resource* d3d12Texture = static_cast<ID3D12Resource*>(textureOut.getHandle()->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource));
             window.SetDisplayTexture(d3d12Texture);
-            notDone = window.Render();
+
+            // Custom ImGui content before window render
+            bool renderResult = window.RenderBegin();
+            if (!renderResult)
+            {
+                notDone = false;
+                break;
+            }
+
+            ImGuiIO& io = ImGui::GetIO();
+            ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Once);
+            ImGui::SetNextWindowSize(ImVec2(io.DisplaySize.x * 0.3f, io.DisplaySize.y * 0.5f), ImGuiCond_Once);
+            ImGui::Begin("Settings");
+            ImGui::Text("This is some useful text.");
+            ImGui::SliderFloat("gColor", &gColorSlider, 0.0f, 1.0f);
+            if (ImGui::Button("Button"))
+                counter++;
+            ImGui::SameLine();
+            ImGui::Text("counter = %d", counter);
+            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+            ImGui::End();
+
+            // Finish rendering
+            window.RenderEnd();
         }
     }
 

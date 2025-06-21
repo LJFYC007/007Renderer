@@ -3,7 +3,7 @@
 Language: Cpp
 BasedOnStyle: Chromium
 IndentWidth: 4
-ColumnLimit: 140
+ColumnLimit: 150
 AccessModifierOffset: -4
 SortIncludes: false
 SortUsingDeclarations: false

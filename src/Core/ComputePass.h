@@ -13,11 +13,11 @@ public:
         const std::unordered_map<std::string, nvrhi::RefCountPtr<nvrhi::IResource>>& resourceMap
     );
 
-    void dispatch(nvrhi::IDevice* device, uint32_t threadGroupX, uint32_t threadGroupY, uint32_t threadGroupZ);
-
     void dispatchThreads(nvrhi::IDevice* device, uint32_t totalThreadsX, uint32_t totalThreadsY, uint32_t totalThreadsZ);
 
 private:
+    void dispatch(nvrhi::IDevice* device, uint32_t threadGroupX, uint32_t threadGroupY, uint32_t threadGroupZ);
+
     nvrhi::ComputePipelineHandle m_Pipeline;
     nvrhi::BindingSetHandle m_BindingSet;
     nvrhi::BindingLayoutHandle m_BindingLayout;

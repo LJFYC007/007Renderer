@@ -11,7 +11,7 @@ bool ComputePass::initialize(
     if (!program.loadFromFile(device, shaderPath, entryPoint, nvrhi::ShaderType::Compute))
         return false;
     m_Shader = program.getShader();
-    program.printReflectionInfo();
+    // program.printReflectionInfo();
 
     auto programLayout = program.getProgramLayout();
     if (programLayout && programLayout->getEntryPointCount() > 0)
@@ -65,13 +65,11 @@ void ComputePass::dispatch(nvrhi::IDevice* device, uint32_t threadGroupX, uint32
         {
             nvrhi::IBuffer* buffer = dynamic_cast<nvrhi::IBuffer*>(item.resourceHandle);
             if (buffer)
-            {
                 commandList->beginTrackingBufferState(
                     buffer,
                     item.type == nvrhi::ResourceType::StructuredBuffer_SRV ? nvrhi::ResourceStates::ShaderResource
                                                                            : nvrhi::ResourceStates::UnorderedAccess
                 );
-            }
             else
                 LOG_WARN("[ComputePass] WARNING: Resource handle for slot {} is not a buffer", item.slot);
         }
@@ -84,12 +82,19 @@ void ComputePass::dispatch(nvrhi::IDevice* device, uint32_t threadGroupX, uint32
                 commandList->beginTrackingTextureState(
                     texture,
                     allSubresources,
-                    item.type == nvrhi::ResourceType::Texture_SRV ? nvrhi::ResourceStates::ShaderResource
-                                                                  : nvrhi::ResourceStates::UnorderedAccess
+                    item.type == nvrhi::ResourceType::Texture_SRV ? nvrhi::ResourceStates::ShaderResource : nvrhi::ResourceStates::UnorderedAccess
                 );
             }
             else
                 LOG_WARN("[ComputePass] WARNING: Resource handle for slot {} is not a texture", item.slot);
+        }
+        else if (item.type == nvrhi::ResourceType::ConstantBuffer)
+        {
+            nvrhi::IBuffer* buffer = dynamic_cast<nvrhi::IBuffer*>(item.resourceHandle);
+            if (buffer)
+                commandList->beginTrackingBufferState(buffer, nvrhi::ResourceStates::ConstantBuffer);
+            else
+                LOG_WARN("[ComputePass] WARNING: Resource handle for slot {} is not a constant buffer", item.slot);
         }
         else
             LOG_WARN("[ComputePass] WARNING: Unsupported resource type for slot {}", item.slot);
@@ -110,7 +115,7 @@ void ComputePass::dispatchThreads(nvrhi::IDevice* device, uint32_t totalThreadsX
     uint32_t threadGroupY = (totalThreadsY + m_WorkGroupSizeY - 1) / m_WorkGroupSizeY;
     uint32_t threadGroupZ = (totalThreadsZ + m_WorkGroupSizeZ - 1) / m_WorkGroupSizeZ;
 
-    LOG_DEBUG(
+    LOG_TRACE(
         "[ComputePass] Total threads: {}x{}x{}, Thread groups: {}x{}x{}",
         totalThreadsX,
         totalThreadsY,

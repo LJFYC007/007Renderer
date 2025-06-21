@@ -8,6 +8,7 @@ bool Buffer::initialize(
     size_t size,
     nvrhi::ResourceStates initState,
     bool isUAV,
+    bool isConstantBuffer,
     const std::string& name
 )
 {
@@ -20,6 +21,7 @@ bool Buffer::initialize(
     desc.initialState = initState;
     desc.cpuAccess = nvrhi::CpuAccessMode::None;
     desc.canHaveUAVs = isUAV;
+    desc.isConstantBuffer = isConstantBuffer;
 
     buffer = device->createBuffer(desc);
 
@@ -40,6 +42,14 @@ void Buffer::upload(nvrhi::IDevice* device, const void* data, size_t size)
     uploadCmd->writeBuffer(buffer, data, size);
     uploadCmd->close();
     device->executeCommandList(uploadCmd);
+}
+
+void Buffer::updateData(nvrhi::IDevice* device, const void* data, size_t size)
+{
+    if (!buffer || !data)
+        return;
+
+    upload(device, data, size);
 }
 
 Buffer Buffer::createReadback(nvrhi::IDevice* device, size_t size)
