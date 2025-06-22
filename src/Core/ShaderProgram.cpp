@@ -4,10 +4,26 @@ ShaderProgram::ShaderProgram() : m_ProgramLayout(nullptr)
 {
     slang::createGlobalSession(m_GlobalSession.writeRef());
 
+#ifdef _DEBUG
+    LOG_DEBUG("[ShaderProgram] Using DEBUG compilation options");
+    slang::CompilerOptionEntry debugOptions[] = {
+        {slang::CompilerOptionName::DebugInformation, {slang::CompilerOptionValueKind::Int, SLANG_DEBUG_INFO_LEVEL_MAXIMAL, 0, nullptr, nullptr}},
+        {slang::CompilerOptionName::Optimization, {slang::CompilerOptionValueKind::Int, SLANG_OPTIMIZATION_LEVEL_NONE, 0, nullptr, nullptr}},
+    };
+#else
+    LOG_INFO("[ShaderProgram] Using RELEASE compilation options");
+    slang::CompilerOptionEntry debugOptions[] = {
+        {slang::CompilerOptionName::DebugInformation, {slang::CompilerOptionValueKind::Int, SLANG_DEBUG_INFO_LEVEL_MINIMAL, 0, nullptr, nullptr}},
+        {slang::CompilerOptionName::Optimization, {slang::CompilerOptionValueKind::Int, SLANG_OPTIMIZATION_LEVEL_HIGH, 0, nullptr, nullptr}},
+    };
+#endif
+    const int optionCount = 2;
+
     slang::TargetDesc targetDesc = {};
     targetDesc.format = SLANG_DXIL;
     targetDesc.profile = m_GlobalSession->findProfile("cs_6_2");
-    targetDesc.flags = SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY;
+    targetDesc.compilerOptionEntries = debugOptions;
+    targetDesc.compilerOptionEntryCount = optionCount;
 
     const char* searchPaths[] = {PROJECT_SHADER_DIR, PROJECT_SRC_DIR};
 
@@ -71,8 +87,11 @@ bool ShaderProgram::loadFromFile(
     }
 
     Slang::ComPtr<slang::IBlob> shaderBlob;
-    if (SLANG_FAILED(m_LinkedProgram->getTargetCode(0, shaderBlob.writeRef())))
+    Slang::ComPtr<slang::IBlob> targetDiagnostics;
+    if (SLANG_FAILED(m_LinkedProgram->getTargetCode(0, shaderBlob.writeRef(), targetDiagnostics.writeRef())))
     {
+        if (targetDiagnostics && targetDiagnostics->getBufferSize() > 0)
+            LOG_ERROR("[Slang] Target code diagnostics: {}", (const char*)targetDiagnostics->getBufferPointer());
         LOG_ERROR("[Slang] Failed to get target code");
         return false;
     }

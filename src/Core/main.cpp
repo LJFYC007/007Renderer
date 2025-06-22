@@ -88,15 +88,12 @@ int main()
         // -------------------------
         // 3. Prepare shader buffer data
         // -------------------------
-        const uint32_t elementCount = width * height;
-        std::vector<float> inputA(elementCount * 3, 0.1f);
-        std::vector<float> inputB(elementCount * 3, 0.5f);
-
         struct PerFrameCB
         {
             uint32_t gWidth;
             uint32_t gHeight;
             float gColor;
+            float _padding;
         } perFrameData;
 
         Camera camera;
@@ -104,8 +101,6 @@ int main()
         Texture textureOut;
         cbPerFrame.initialize(nvrhiDevice, &perFrameData, sizeof(PerFrameCB), nvrhi::ResourceStates::ConstantBuffer, false, true, "PerFrameCB");
         textureOut.initialize(nvrhiDevice, width, height, nvrhi::Format::RGBA32_FLOAT, nvrhi::ResourceStates::UnorderedAccess, true, "TextureOut");
-
-        // Initialize camera buffer with camera data
         cbCamera.initialize(nvrhiDevice, &camera, sizeof(Camera), nvrhi::ResourceStates::ConstantBuffer, false, true, "Camera");
 
         // -------------------------
@@ -121,7 +116,6 @@ int main()
         // -------------------------
         // 5. Imgui with real-time compute
         // -------------------------
-
         bool notDone = true;
         static float gColorSlider = 0.0f; // UI slider value
         static int counter = 0;

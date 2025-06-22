@@ -77,6 +77,8 @@ target_link_libraries(007Renderer PRIVATE
 target_compile_definitions(007Renderer PRIVATE
     $<$<CONFIG:Debug>:SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_DEBUG>
     $<$<CONFIG:Release>:SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_INFO>
+    $<$<CONFIG:Debug>:_DEBUG>
+    $<$<CONFIG:Release>:NDEBUG>
 )
 
 # ----------------------------------------------------------------------------
