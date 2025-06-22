@@ -30,6 +30,14 @@ set(SPDLOG_FMT_EXTERNAL OFF CACHE BOOL "" FORCE)
 add_subdirectory(external/spdlog)
 
 # ----------------------------------------------------------------------------
+# GLM support
+# ----------------------------------------------------------------------------
+set(GLM_ENABLE_EXPERIMENTAL ON CACHE BOOL "Enable GLM experimental features")
+set(GLM_FORCE_RADIANS ON CACHE BOOL "Use radians in GLM")
+set(GLM_ROOT_DIR "${CMAKE_SOURCE_DIR}/external/glm")
+add_subdirectory(${GLM_ROOT_DIR} EXCLUDE_FROM_ALL)
+
+# ----------------------------------------------------------------------------
 # NVRHI (D3D12 only)
 # ----------------------------------------------------------------------------
 set(NVRHI_WITH_VULKAN OFF CACHE BOOL "")
@@ -43,6 +51,8 @@ add_subdirectory(external/nvrhi)
 file(GLOB_RECURSE SOURCES src/*.cpp)
 add_executable(007Renderer ${SOURCES})
 add_compile_definitions(PROJECT_SHADER_DIR="${CMAKE_SOURCE_DIR}/shaders")
+add_compile_definitions(PROJECT_SRC_DIR="${CMAKE_SOURCE_DIR}/src")
+add_compile_definitions(PROJECT_EXTERNAL_DIR="${CMAKE_SOURCE_DIR}/external")
 
 target_include_directories(007Renderer PRIVATE
     src/
@@ -58,6 +68,7 @@ target_link_libraries(007Renderer PRIVATE
     ${SLANG_LIBRARIES}
     ${IMGUI_LIBRARIES}
     spdlog::spdlog
+    glm::glm
 )
 
 # ----------------------------------------------------------------------------

@@ -75,8 +75,7 @@ Window::Window(ComPtr<ID3D12Device> device, ComPtr<ID3D12CommandQueue> commandQu
     // io->ConfigViewportsNoAutoMerge = true;
     // io->ConfigViewportsNoTaskBarIcon = true;
 
-    const char* fontBasePath = "external/imgui/misc/fonts/";
-    std::string cousineFontPath = std::string(fontBasePath) + "Cousine-Regular.ttf";
+    std::string cousineFontPath = std::string(PROJECT_EXTERNAL_DIR) + "/imgui/misc/fonts/Cousine-Regular.ttf";
     ImFont* cousineFont = io->Fonts->AddFontFromFileTTF(cousineFontPath.c_str(), 14.0f);
 }
 

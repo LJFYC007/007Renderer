@@ -10,6 +10,7 @@
 #include "Texture.h"
 #include "ComputePass.h"
 #include "Utils/Logger.h"
+#include "Scene/Camera/Camera.h"
 
 #ifdef _DEBUG
 #define DX12_ENABLE_DEBUG_LAYER
@@ -98,21 +99,22 @@ int main()
             float gColor;
         } perFrameData;
 
-        Buffer bufA, bufB, cbPerFrame;
+        Camera camera;
+        Buffer cbPerFrame, cbCamera;
         Texture textureOut;
-        bufA.initialize(nvrhiDevice, inputA.data(), inputA.size() * sizeof(float), nvrhi::ResourceStates::ShaderResource, false, false, "BufferA");
-        bufB.initialize(nvrhiDevice, inputB.data(), inputB.size() * sizeof(float), nvrhi::ResourceStates::ShaderResource, false, false, "BufferB");
         cbPerFrame.initialize(nvrhiDevice, &perFrameData, sizeof(PerFrameCB), nvrhi::ResourceStates::ConstantBuffer, false, true, "PerFrameCB");
         textureOut.initialize(nvrhiDevice, width, height, nvrhi::Format::RGBA32_FLOAT, nvrhi::ResourceStates::UnorderedAccess, true, "TextureOut");
+
+        // Initialize camera buffer with camera data
+        cbCamera.initialize(nvrhiDevice, &camera, sizeof(Camera), nvrhi::ResourceStates::ConstantBuffer, false, true, "Camera");
 
         // -------------------------
         // 4. Setup shader & dispatch
         // -------------------------
         std::unordered_map<std::string, nvrhi::RefCountPtr<nvrhi::IResource>> resourceMap;
-        resourceMap["buffer0"] = nvrhi::RefCountPtr<nvrhi::IResource>(bufA.getHandle().operator->());
-        resourceMap["buffer1"] = nvrhi::RefCountPtr<nvrhi::IResource>(bufB.getHandle().operator->());
         resourceMap["result"] = nvrhi::RefCountPtr<nvrhi::IResource>(textureOut.getHandle().operator->());
         resourceMap["PerFrameCB"] = nvrhi::RefCountPtr<nvrhi::IResource>(cbPerFrame.getHandle().operator->());
+        resourceMap["gCamera"] = nvrhi::RefCountPtr<nvrhi::IResource>(cbCamera.getHandle().operator->());
         ComputePass pass;
         pass.initialize(nvrhiDevice, std::string(PROJECT_SHADER_DIR) + "/hello.slang", "computeMain", resourceMap);
 

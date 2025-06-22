@@ -9,9 +9,13 @@ ShaderProgram::ShaderProgram() : m_ProgramLayout(nullptr)
     targetDesc.profile = m_GlobalSession->findProfile("cs_6_2");
     targetDesc.flags = SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY;
 
+    const char* searchPaths[] = {PROJECT_SHADER_DIR, PROJECT_SRC_DIR};
+
     slang::SessionDesc sessionDesc = {};
     sessionDesc.targets = &targetDesc;
     sessionDesc.targetCount = 1;
+    sessionDesc.searchPaths = searchPaths;
+    sessionDesc.searchPathCount = 2;
 
     m_GlobalSession->createSession(sessionDesc, m_Session.writeRef());
 }
@@ -293,8 +297,7 @@ bool ShaderProgram::processParameter(
         else if (resourceAccess == SLANG_RESOURCE_ACCESS_READ_WRITE)
             bindingSlot = varLayout->getOffset(slang::ParameterCategory::UnorderedAccess);
     }
-    else if (typeLayout->getKind() == slang::TypeReflection::Kind::ConstantBuffer ||
-             typeLayout->getKind() == slang::TypeReflection::Kind::ParameterBlock)
+    else if (typeLayout->getKind() == slang::TypeReflection::Kind::ConstantBuffer)
         bindingSlot = varLayout->getOffset(slang::ParameterCategory::ConstantBuffer);
     else if (typeLayout->getKind() == slang::TypeReflection::Kind::SamplerState)
         bindingSlot = varLayout->getOffset(slang::ParameterCategory::SamplerState);
@@ -379,11 +382,10 @@ bool ShaderProgram::processParameter(
             LOG_WARN("[ShaderBinding] Unknown resource shape for: {} (shape: {})", paramNameStr, static_cast<int>(resourceShape));
             return true;
         }
+        break;
     }
-    break;
 
     case slang::TypeReflection::Kind::ConstantBuffer:
-    case slang::TypeReflection::Kind::ParameterBlock:
     {
         auto resourceIt = resourceMap.find(paramNameStr);
         if (resourceIt != resourceMap.end())
@@ -396,8 +398,8 @@ bool ShaderProgram::processParameter(
         else
             LOG_WARN("[ShaderBinding] Constant buffer resource not found in map: {}", paramNameStr);
         LOG_DEBUG("[ShaderBinding] Found constant buffer: {} at slot {}", paramNameStr, bindingSlot);
+        break;
     }
-    break;
 
     default:
         return true;
