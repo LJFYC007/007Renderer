@@ -1,1 +1,2 @@
-# ![Build](https://github.com/LJFYC007/007Renderer/actions/workflows/windows-build.yml/badge.svg) 007Renderer
+# 007Renderer
+![Build](https://github.com/LJFYC007/007Renderer/actions/workflows/windows-test.yml/badge.svg)

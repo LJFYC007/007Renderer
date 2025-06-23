@@ -6,4 +6,4 @@ repos:
         entry: python run-clang-format.py
         language: system
         types: [file]
-        files: ^src/.*\.(cpp|cc|cxx|h|hpp|hh)$
+        files: ^src/.*\.(cpp|cc|cxx|h|hpp|hh|slang|slangh)$

@@ -4,10 +4,10 @@
 #include <nvrhi/d3d12.h>
 #include <spdlog/fmt/fmt.h>
 
-#include "Window.h"
-#include "Buffer.h"
-#include "Texture.h"
-#include "ComputePass.h"
+#include "Core/Window.h"
+#include "Core/Buffer.h"
+#include "Core/Texture.h"
+#include "Core/ComputePass.h"
 #include "Utils/Math/Math.h"
 #include "Utils/Logger.h"
 #include "Utils/GUI.h"

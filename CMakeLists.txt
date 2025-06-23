@@ -38,6 +38,13 @@ set(GLM_ROOT_DIR "${CMAKE_SOURCE_DIR}/external/glm")
 add_subdirectory(${GLM_ROOT_DIR} EXCLUDE_FROM_ALL)
 
 # ----------------------------------------------------------------------------
+# GoogleTest support
+# ----------------------------------------------------------------------------
+option(BUILD_GTEST ON)
+option(INSTALL_GTEST OFF)
+add_subdirectory(external/googletest)
+
+# ----------------------------------------------------------------------------
 # NVRHI (D3D12 only)
 # ----------------------------------------------------------------------------
 set(NVRHI_WITH_VULKAN OFF CACHE BOOL "")
@@ -46,23 +53,32 @@ set(NVRHI_WITH_DX11 OFF CACHE BOOL "")
 add_subdirectory(external/nvrhi)
 
 # ----------------------------------------------------------------------------
-# Executable target
+# Library target for shared code
 # ----------------------------------------------------------------------------
-file(GLOB_RECURSE SOURCES src/*.cpp src/*.h)
-add_executable(007Renderer ${SOURCES})
-add_compile_definitions(PROJECT_SHADER_DIR="${CMAKE_SOURCE_DIR}/shaders")
-add_compile_definitions(PROJECT_SRC_DIR="${CMAKE_SOURCE_DIR}/src")
-add_compile_definitions(PROJECT_EXTERNAL_DIR="${CMAKE_SOURCE_DIR}/external")
-add_compile_definitions(PROJECT_LOG_DIR="${CMAKE_SOURCE_DIR}/logs")
+file(GLOB_RECURSE LIB_SOURCES 
+    src/*.cpp 
+    src/*.h
+)
+# Remove main.cpp from library sources
+list(FILTER LIB_SOURCES EXCLUDE REGEX ".*main\\.cpp$")
 
-target_include_directories(007Renderer PRIVATE
+add_library(007RendererLib STATIC ${LIB_SOURCES})
+
+target_compile_definitions(007RendererLib PUBLIC
+    PROJECT_SHADER_DIR="${CMAKE_SOURCE_DIR}/shaders"
+    PROJECT_SRC_DIR="${CMAKE_SOURCE_DIR}/src"
+    PROJECT_EXTERNAL_DIR="${CMAKE_SOURCE_DIR}/external"
+    PROJECT_LOG_DIR="${CMAKE_SOURCE_DIR}/logs"
+)
+
+target_include_directories(007RendererLib PUBLIC
     src/
     external/nvrhi/include
     ${SLANG_INCLUDE_DIRS}
     ${IMGUI_INCLUDE_DIRS}
 )
 
-target_link_libraries(007Renderer PRIVATE
+target_link_libraries(007RendererLib PUBLIC
     nvrhi
     nvrhi_d3d12
     d3d12 dxgi dxguid
@@ -73,9 +89,18 @@ target_link_libraries(007Renderer PRIVATE
 )
 
 # ----------------------------------------------------------------------------
+# Executable target
+# ----------------------------------------------------------------------------
+add_executable(007Renderer src/main.cpp)
+
+target_link_libraries(007Renderer PRIVATE
+    007RendererLib
+)
+
+# ----------------------------------------------------------------------------
 # Debug/Release configuration macros
 # ----------------------------------------------------------------------------
-target_compile_definitions(007Renderer PRIVATE
+target_compile_definitions(007RendererLib PUBLIC
     $<$<CONFIG:Debug>:SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_DEBUG>
     $<$<CONFIG:Release>:SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_INFO>
     $<$<CONFIG:Debug>:_DEBUG>
@@ -103,3 +128,19 @@ add_custom_command(TARGET 007Renderer POST_BUILD
         "${DXC_DLL_DIR}/dxil.dll"
         $<TARGET_FILE_DIR:007Renderer>
 )
+
+# ----------------------------------------------------------------------------
+# GoogleTest configuration
+# ----------------------------------------------------------------------------
+enable_testing()
+file(GLOB_RECURSE Tests tests/*.cpp tests/*.h)
+add_executable(007RendererTests ${Tests})
+
+target_link_libraries(007RendererTests PRIVATE
+    007RendererLib
+    gtest_main
+    gtest
+)
+
+include(GoogleTest)
+gtest_discover_tests(007RendererTests)
