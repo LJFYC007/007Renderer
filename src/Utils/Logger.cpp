@@ -13,15 +13,14 @@ void Logger::init()
 {
     spdlog::init_thread_pool(8192, 1);
     auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
-    auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>("logs/007Renderer.log", true);
+    auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(std::string(PROJECT_LOG_DIR) + "/007Renderer.log", true);
 
     console_sink->set_pattern("[%T] [%^%l%$] %v");
     file_sink->set_pattern("[%H:%M:%S.%e] [%l] %v");
     std::vector<spdlog::sink_ptr> sinks{console_sink, file_sink};
 
-    s_Logger = std::make_shared<spdlog::async_logger>(
-        "loggername", sinks.begin(), sinks.end(), spdlog::thread_pool(), spdlog::async_overflow_policy::block
-    );
+    s_Logger =
+        std::make_shared<spdlog::async_logger>("loggername", sinks.begin(), sinks.end(), spdlog::thread_pool(), spdlog::async_overflow_policy::block);
 
     spdlog::register_logger(s_Logger);
     s_Logger->set_level(spdlog::level::debug);

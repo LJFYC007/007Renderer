@@ -53,6 +53,7 @@ add_executable(007Renderer ${SOURCES})
 add_compile_definitions(PROJECT_SHADER_DIR="${CMAKE_SOURCE_DIR}/shaders")
 add_compile_definitions(PROJECT_SRC_DIR="${CMAKE_SOURCE_DIR}/src")
 add_compile_definitions(PROJECT_EXTERNAL_DIR="${CMAKE_SOURCE_DIR}/external")
+add_compile_definitions(PROJECT_LOG_DIR="${CMAKE_SOURCE_DIR}/logs")
 
 target_include_directories(007Renderer PRIVATE
     src/

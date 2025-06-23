@@ -87,6 +87,9 @@
         "numeric": "cpp",
         "random": "cpp",
         "any": "cpp",
-        "variant": "cpp"
+        "variant": "cpp",
+        "complex": "cpp",
+        "coroutine": "cpp",
+        "source_location": "cpp"
     }
 }
