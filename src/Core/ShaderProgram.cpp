@@ -36,13 +36,7 @@ ShaderProgram::ShaderProgram() : m_ProgramLayout(nullptr)
     m_GlobalSession->createSession(sessionDesc, m_Session.writeRef());
 }
 
-bool ShaderProgram::loadFromFile(
-    nvrhi::IDevice* device,
-    const std::string& filePath,
-    const std::string& entryPoint,
-    nvrhi::ShaderType shaderType,
-    const std::string& profile
-)
+bool ShaderProgram::loadFromFile(nvrhi::IDevice* device, const std::string& filePath, const std::string& entryPoint, nvrhi::ShaderType shaderType)
 {
     Slang::ComPtr<slang::IModule> module;
     module = m_Session->loadModule(filePath.c_str());

@@ -1,4 +1,3 @@
-#pragma once
 #include <iostream>
 #include <vector>
 #include <nvrhi/nvrhi.h>
@@ -34,6 +33,9 @@ public:
 
 int main()
 {
+    Logger::init();
+    auto logger = Logger::get();
+
     // -------------------------
     // 1. Init D3D12 Device
     // ------------------------
@@ -41,16 +43,61 @@ int main()
     ID3D12Debug* pdx12Debug = nullptr;
     if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&pdx12Debug))))
         pdx12Debug->EnableDebugLayer();
-#endif -
+#endif
 
     ComPtr<IDXGIFactory4> dxgiFactory;
     CHECKHR(CreateDXGIFactory1(IID_PPV_ARGS(&dxgiFactory)));
 
     ComPtr<IDXGIAdapter1> adapter;
-    CHECKHR(dxgiFactory->EnumAdapters1(0, &adapter));
-
     ComPtr<ID3D12Device> d3d12Device;
-    CHECKHR(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_12_0, IID_PPV_ARGS(&d3d12Device)));
+
+    // Try to find a hardware adapter first
+    bool deviceCreated = false;
+    for (UINT adapterIndex = 0;; ++adapterIndex)
+    {
+        if (FAILED(dxgiFactory->EnumAdapters1(adapterIndex, &adapter)))
+            break;
+
+        DXGI_ADAPTER_DESC1 desc;
+        adapter->GetDesc1(&desc);
+
+        // Skip software adapters
+        if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
+            continue;
+
+        // Try to create device with this adapter
+        if (SUCCEEDED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_12_0, IID_PPV_ARGS(&d3d12Device))))
+        {
+            // Convert wide string to regular string for logging
+            std::wstring wstr(desc.Description);
+            int size_needed = WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), (int)wstr.size(), NULL, 0, NULL, NULL);
+            std::string str(size_needed, 0);
+            WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), (int)wstr.size(), &str[0], size_needed, NULL, NULL);
+            LOG_INFO("Using hardware adapter: {}", str);
+            deviceCreated = true;
+            break;
+        }
+
+        adapter.Reset();
+    }
+
+    // If no hardware adapter worked, try WARP (software renderer)
+    if (!deviceCreated)
+    {
+        LOG_WARN("No hardware adapter found, trying WARP (software renderer)...");
+        if (SUCCEEDED(dxgiFactory->EnumWarpAdapter(IID_PPV_ARGS(&adapter))))
+        {
+            CHECKHR(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_12_0, IID_PPV_ARGS(&d3d12Device)));
+            LOG_INFO("Using WARP software adapter");
+            deviceCreated = true;
+        }
+    }
+
+    if (!deviceCreated)
+    {
+        LOG_ERROR("Failed to create D3D12 device with any adapter!");
+        exit(1);
+    }
 
     // -------------------------
     // 2. Create NVRHI Device
@@ -79,9 +126,6 @@ int main()
 
     Window window(d3d12Device, commandQueue, windowDesc);
     window.PrepareResources();
-
-    Logger::init();
-    auto logger = Logger::get();
     LOG_INFO("Renderer initialized successfully.");
 
     {
@@ -96,7 +140,7 @@ int main()
             float _padding;
         } perFrameData;
 
-        Camera camera;
+        Camera camera(width, height);
         Buffer cbPerFrame, cbCamera;
         Texture textureOut;
         cbPerFrame.initialize(nvrhiDevice, &perFrameData, sizeof(PerFrameCB), nvrhi::ResourceStates::ConstantBuffer, false, true, "PerFrameCB");
@@ -122,6 +166,21 @@ int main()
 
         while (notDone)
         {
+            HRESULT deviceRemovedReason = d3d12Device->GetDeviceRemovedReason();
+            if (FAILED(deviceRemovedReason))
+            {
+                LOG_ERROR("Device removed: 0x{:08X}", static_cast<uint32_t>(deviceRemovedReason));
+
+                // If in RDP environment, log additional info
+                if (deviceRemovedReason == DXGI_ERROR_DEVICE_REMOVED)
+                {
+                    LOG_ERROR("This error commonly occurs in RDP environments. Consider using software rendering.");
+                    LOG_ERROR("The application will now exit. Try running locally or use a different remote desktop solution.");
+                }
+
+                notDone = false;
+                break;
+            }
             nvrhiDevice->runGarbageCollection();
 
             perFrameData.gWidth = width;

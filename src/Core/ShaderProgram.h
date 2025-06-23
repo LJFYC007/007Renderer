@@ -12,13 +12,7 @@ class ShaderProgram
 {
 public:
     ShaderProgram();
-    bool loadFromFile(
-        nvrhi::IDevice* device,
-        const std::string& filePath,
-        const std::string& entryPoint,
-        nvrhi::ShaderType shaderType,
-        const std::string& profile = "cs_6_2"
-    );
+    bool loadFromFile(nvrhi::IDevice* device, const std::string& filePath, const std::string& entryPoint, nvrhi::ShaderType shaderType);
 
     nvrhi::ShaderHandle getShader() const { return m_Shader; }
 
