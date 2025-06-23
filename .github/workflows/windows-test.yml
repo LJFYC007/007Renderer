@@ -41,16 +41,6 @@ jobs:
       run: |
         .\setup.ps1
 
-    - name: Cache CMake build files
-      uses: actions/cache@v4
-      with:
-        path: |
-          build/
-          !build/bin/
-        key: ${{ runner.os }}-cmake-${{ hashFiles('CMakeLists.txt', 'cmake/**') }}
-        restore-keys: |
-          ${{ runner.os }}-cmake-
-
     - name: Configure CMake
       run: |
         cmake -S . -B build -G "Visual Studio 17 2022" -A x64 `
@@ -77,4 +67,4 @@ jobs:
         if (!(Test-Path -Path $reportDir)) {
           New-Item -ItemType Directory -Path $reportDir | Out-Null
         }
-        .\build\bin\${{ matrix.build_type }}\007RendererTests.exe --gtest_output=xml:build/test-reports/results.xml
+        .\build\bin\${{ matrix.build_type }}\007Tests.exe --gtest_output=xml:build/test-reports/results.xml
