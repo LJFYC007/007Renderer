@@ -56,24 +56,7 @@ jobs:
         }
         Write-Host "✅ Successfully built ${{ matrix.build_type }} version"
 
-    - name: Run tests
+    - name: Run tests and generate report
       run: |
-        cd build
-        Write-Host "Running CTest..."
-        ctest --output-on-failure --config ${{ matrix.build_type }} --parallel 4 --verbose
-
-    - name: Run tests
-      run: |
-        cd build
-        Write-Host "Running CTest..."
-        ctest --output-on-failure --config ${{ matrix.build_type }} --parallel 4 --verbose
-
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
-      if: success()
-      with:
-        name: 007Renderer-${{ matrix.build_type }}-${{ github.sha }}
-        path: |
-          build/bin/${{ matrix.build_type }}/
-          !build/bin/${{ matrix.build_type }}/**/*.pdb
-        retention-days: 7
+        mkdir -p build/test-reports
+        .\build\bin\${{ matrix.build_type }}\007RendererTests.exe --gtest_output=xml:build/test-reports/results.xml

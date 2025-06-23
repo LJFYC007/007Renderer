@@ -40,8 +40,10 @@ add_subdirectory(${GLM_ROOT_DIR} EXCLUDE_FROM_ALL)
 # ----------------------------------------------------------------------------
 # GoogleTest support
 # ----------------------------------------------------------------------------
-option(BUILD_GTEST ON)
-option(INSTALL_GTEST OFF)
+option(BUILD_TESTING "Build tests" ON)
+set(BUILD_GTEST ON CACHE BOOL "" FORCE)
+set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
+set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 add_subdirectory(external/googletest)
 
 # ----------------------------------------------------------------------------
@@ -132,15 +134,37 @@ add_custom_command(TARGET 007Renderer POST_BUILD
 # ----------------------------------------------------------------------------
 # GoogleTest configuration
 # ----------------------------------------------------------------------------
-enable_testing()
-file(GLOB_RECURSE Tests tests/*.cpp tests/*.h)
-add_executable(007RendererTests ${Tests})
-
-target_link_libraries(007RendererTests PRIVATE
-    007RendererLib
-    gtest_main
-    gtest
-)
-
-include(GoogleTest)
-gtest_discover_tests(007RendererTests)
+if(BUILD_TESTING)
+    enable_testing()
+    
+    file(GLOB_RECURSE Tests tests/*.cpp tests/*.h)
+    add_executable(007RendererTests ${Tests})
+    
+    target_link_libraries(007RendererTests PRIVATE
+        007RendererLib
+        gtest_main
+        gtest
+    )
+    
+    target_include_directories(007RendererTests PRIVATE
+        src/
+        external/googletest/googletest/include
+    )
+    
+    # Set output directory for test executable
+    set_target_properties(007RendererTests PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/bin/Debug
+        RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}/bin/Release
+    )
+    
+    include(GoogleTest)
+    gtest_discover_tests(007RendererTests)
+    
+    # Add custom test target that works with both single and multi-config generators
+    add_custom_target(run_tests
+        COMMAND ${CMAKE_CTEST_COMMAND} --verbose --output-on-failure
+        DEPENDS 007RendererTests
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+        COMMENT "Running all tests"
+    )
+endif()
