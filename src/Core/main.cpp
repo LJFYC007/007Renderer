@@ -8,6 +8,7 @@
 #include "Buffer.h"
 #include "Texture.h"
 #include "ComputePass.h"
+#include "Utils/Math/Math.h"
 #include "Utils/Logger.h"
 #include "Utils/GUI.h"
 #include "Scene/Camera/Camera.h"
@@ -141,7 +142,7 @@ int main()
             float _padding;
         } perFrameData;
 
-        Camera camera(width, height, glm::vec3(0.f, 0.f, 1.f), glm::vec3(0.f, 0.f, 0.f), glm::vec3(0.f, 1.f, 0.f), glm::radians(45.0f));
+        Camera camera(width, height, float3(0.f, 0.f, 1.f), float3(0.f, 0.f, 0.f), float3(0.f, 1.f, 0.f), glm::radians(45.0f));
         Buffer cbPerFrame, cbCamera;
         Texture textureOut;
         cbPerFrame.initialize(nvrhiDevice, &perFrameData, sizeof(PerFrameCB), nvrhi::ResourceStates::ConstantBuffer, false, true, "PerFrameCB");
@@ -219,7 +220,11 @@ int main()
             GUI::Text("counter = %d", counter);
             GUI::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / GUI::GetIO().Framerate, GUI::GetIO().Framerate);
             camera.renderUI();
+            camera.handleInput();
             GUI::End();
+
+            if (GUI::IsKeyPressed(ImGuiKey_Escape))
+                notDone = false; // Exit on Escape key
 
             // Finish rendering
             window.RenderEnd();

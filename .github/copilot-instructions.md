@@ -7,3 +7,5 @@ For the comments, I hope to use English comments entirely, keeping only some com
 For the answers, I hope you can provide detailed Chinese explanations, especially for complex topics. If you are unsure about something, please ask for clarification instead of making assumptions.
 
 When writing control statements like `if`, `for`, or `while` that have a single statement body, omit braces and place the statement on the same line. Use concise one-liners where possible to improve readability.
+
+Remember I'm using Windows, so if you are using terminal/powershell commands, ensure they are compatible with Windows. Avoid using Unix-specific commands or paths.

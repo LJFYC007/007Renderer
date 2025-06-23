@@ -21,7 +21,16 @@ bool hitSphere(Ray ray)
     float b = 2.0 * dot(oc, ray.dir);
     float c = dot(oc, oc) - radius * radius;
     float discriminant = b * b - 4.0 * a * c;
-    return (discriminant >= 0);
+    
+    if (discriminant < 0) return false;
+    
+    // Calculate both intersection points
+    float sqrtDiscriminant = sqrt(discriminant);
+    float t1 = (-b - sqrtDiscriminant) / (2.0 * a);
+    float t2 = (-b + sqrtDiscriminant) / (2.0 * a);
+    
+    // Only hit if at least one intersection is in front of the ray (t > 0)
+    return (t1 > ray.tMin || t2 > ray.tMin);
 }
 
 float3 rayColor(Ray ray)
