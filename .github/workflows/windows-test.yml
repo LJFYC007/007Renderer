@@ -1,4 +1,4 @@
-name: Windows CMake Build
+name: Windows Test Workflow
 
 on:
   push:
