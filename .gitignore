@@ -30,6 +30,7 @@
 *.app
 
 /build
-/external
+/external/slang
+/external/dxc
 /logs
 imgui.ini
