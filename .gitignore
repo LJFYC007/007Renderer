@@ -30,6 +30,6 @@
 *.app
 
 /build
-/external/nvrhi
+/external
 /logs
 imgui.ini
