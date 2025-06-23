@@ -5,7 +5,7 @@ ShaderProgram::ShaderProgram() : m_ProgramLayout(nullptr)
     slang::createGlobalSession(m_GlobalSession.writeRef());
 
 #ifdef _DEBUG
-    LOG_DEBUG("[ShaderProgram] Using DEBUG compilation options");
+    LOG_INFO("[ShaderProgram] Using DEBUG compilation options");
     slang::CompilerOptionEntry debugOptions[] = {
         {slang::CompilerOptionName::DebugInformation, {slang::CompilerOptionValueKind::Int, SLANG_DEBUG_INFO_LEVEL_MAXIMAL, 0, nullptr, nullptr}},
         {slang::CompilerOptionName::Optimization, {slang::CompilerOptionValueKind::Int, SLANG_OPTIMIZATION_LEVEL_NONE, 0, nullptr, nullptr}},

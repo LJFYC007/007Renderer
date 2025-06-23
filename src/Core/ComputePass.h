@@ -10,7 +10,7 @@ public:
         nvrhi::IDevice* device,
         const std::string& shaderPath,
         const std::string& entryPoint,
-        const std::unordered_map<std::string, nvrhi::RefCountPtr<nvrhi::IResource>>& resourceMap
+        const std::unordered_map<std::string, nvrhi::ResourceHandle>& resourceMap
     );
 
     void dispatchThreads(nvrhi::IDevice* device, uint32_t totalThreadsX, uint32_t totalThreadsY, uint32_t totalThreadsZ);

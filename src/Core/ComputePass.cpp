@@ -4,7 +4,7 @@ bool ComputePass::initialize(
     nvrhi::IDevice* device,
     const std::string& shaderPath,
     const std::string& entryPoint,
-    const std::unordered_map<std::string, nvrhi::RefCountPtr<nvrhi::IResource>>& resourceMap
+    const std::unordered_map<std::string, nvrhi::ResourceHandle>& resourceMap
 )
 {
     ShaderProgram program;

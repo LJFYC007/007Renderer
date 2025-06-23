@@ -41,7 +41,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         return;
     uint id = pixelCoord.y * gWidth + pixelCoord.x;
 
-    float3 pixel = gCamera.data.pixelCenter + pixelCoord.x * gCamera.data.cameraU + pixelCoord.y * gCamera.data.cameraV;
+    float3 pixel = gCamera.data.pixel00 + pixelCoord.x * gCamera.data.cameraU + pixelCoord.y * gCamera.data.cameraV;
 
     Ray ray = Ray(gCamera.data.posW, pixel - gCamera.data.posW);
     result[pixelCoord] = float4(rayColor(ray), 1.f);

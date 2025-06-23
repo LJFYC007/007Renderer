@@ -91,5 +91,7 @@
         "complex": "cpp",
         "coroutine": "cpp",
         "source_location": "cpp"
-    }
+    },
+    "cmake.configureOnOpen": true,
+    "cmake.configureOnEdit": true
 }

@@ -9,6 +9,7 @@
 #include "Texture.h"
 #include "ComputePass.h"
 #include "Utils/Logger.h"
+#include "Utils/GUI.h"
 #include "Scene/Camera/Camera.h"
 
 #ifdef _DEBUG
@@ -140,28 +141,29 @@ int main()
             float _padding;
         } perFrameData;
 
-        Camera camera(width, height);
+        Camera camera(width, height, glm::vec3(0.f, 0.f, 1.f), glm::vec3(0.f, 0.f, 0.f), glm::vec3(0.f, 1.f, 0.f), glm::radians(45.0f));
         Buffer cbPerFrame, cbCamera;
         Texture textureOut;
         cbPerFrame.initialize(nvrhiDevice, &perFrameData, sizeof(PerFrameCB), nvrhi::ResourceStates::ConstantBuffer, false, true, "PerFrameCB");
         textureOut.initialize(nvrhiDevice, width, height, nvrhi::Format::RGBA32_FLOAT, nvrhi::ResourceStates::UnorderedAccess, true, "TextureOut");
-        cbCamera.initialize(nvrhiDevice, &camera, sizeof(Camera), nvrhi::ResourceStates::ConstantBuffer, false, true, "Camera");
+        cbCamera.initialize(nvrhiDevice, &camera.getCameraData(), sizeof(CameraData), nvrhi::ResourceStates::ConstantBuffer, false, true, "Camera");
 
         // -------------------------
         // 4. Setup shader & dispatch
         // -------------------------
         std::unordered_map<std::string, nvrhi::RefCountPtr<nvrhi::IResource>> resourceMap;
-        resourceMap["result"] = nvrhi::RefCountPtr<nvrhi::IResource>(textureOut.getHandle().operator->());
-        resourceMap["PerFrameCB"] = nvrhi::RefCountPtr<nvrhi::IResource>(cbPerFrame.getHandle().operator->());
-        resourceMap["gCamera"] = nvrhi::RefCountPtr<nvrhi::IResource>(cbCamera.getHandle().operator->());
+        resourceMap["result"] = nvrhi::ResourceHandle(textureOut.getHandle().operator->());
+        resourceMap["PerFrameCB"] = nvrhi::ResourceHandle(cbPerFrame.getHandle().operator->());
+        resourceMap["gCamera"] = nvrhi::ResourceHandle(cbCamera.getHandle().operator->());
+
         ComputePass pass;
         pass.initialize(nvrhiDevice, std::string(PROJECT_SHADER_DIR) + "/hello.slang", "computeMain", resourceMap);
 
         // -------------------------
-        // 5. Imgui with real-time compute
+        // 5. Setup GUI with original ImGui
         // -------------------------
         bool notDone = true;
-        static float gColorSlider = 0.0f; // UI slider value
+        static float gColorSlider = 0.5f; // UI slider value
         static int counter = 0;
 
         while (notDone)
@@ -187,6 +189,7 @@ int main()
             perFrameData.gHeight = height;
             perFrameData.gColor = gColorSlider;
             cbPerFrame.updateData(nvrhiDevice, &perFrameData, sizeof(PerFrameCB));
+            cbCamera.updateData(nvrhiDevice, &camera.getCameraData(), sizeof(CameraData));
 
             // Dispatch compute shader
             pass.dispatchThreads(nvrhiDevice, width, height, 1);
@@ -203,18 +206,20 @@ int main()
                 break;
             }
 
-            ImGuiIO& io = ImGui::GetIO();
-            ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Once);
-            ImGui::SetNextWindowSize(ImVec2(io.DisplaySize.x * 0.3f, io.DisplaySize.y * 0.5f), ImGuiCond_Once);
-            ImGui::Begin("Settings");
-            ImGui::Text("This is some useful text.");
-            ImGui::SliderFloat("gColor", &gColorSlider, 0.0f, 1.0f);
-            if (ImGui::Button("Button"))
+            ImGuiIO& io = GUI::GetIO();
+            GUI::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Once);
+            GUI::SetNextWindowSize(ImVec2(io.DisplaySize.x * 0.3f, io.DisplaySize.y * 0.5f), ImGuiCond_Once);
+
+            GUI::Begin("Settings");
+            GUI::Text("This is some useful text.");
+            GUI::SliderFloat("gColor", &gColorSlider, 0.0f, 1.0f);
+            if (GUI::Button("Button"))
                 counter++;
-            ImGui::SameLine();
-            ImGui::Text("counter = %d", counter);
-            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-            ImGui::End();
+            GUI::SameLine();
+            GUI::Text("counter = %d", counter);
+            GUI::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / GUI::GetIO().Framerate, GUI::GetIO().Framerate);
+            camera.renderUI();
+            GUI::End();
 
             // Finish rendering
             window.RenderEnd();
