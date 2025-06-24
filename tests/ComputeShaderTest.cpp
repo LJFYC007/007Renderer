@@ -23,7 +23,7 @@ protected:
 
 TEST_F(ComputeShaderTest, Basic)
 {
-    const uint32_t elementCount = 1000;
+    const uint32_t elementCount = 1000; 
     std::vector<float> inputA(elementCount, 0.1f);
     std::vector<float> inputB(elementCount, 0.5f);
 
