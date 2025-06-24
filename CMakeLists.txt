@@ -22,6 +22,7 @@ find_package(SLANG REQUIRED COMPONENTS slang slang-rt gfx)
 # ----------------------------------------------------------------------------
 set(IMGUI_ROOT_DIR "${CMAKE_SOURCE_DIR}/external/imgui")
 find_package(ImGui REQUIRED)
+set_target_properties(imgui PROPERTIES FOLDER "External")
 
 # ----------------------------------------------------------------------------
 # Spdlog support
@@ -86,6 +87,7 @@ list(FILTER LIB_SOURCES EXCLUDE REGEX ".*main\\.cpp$")
 add_library(007Core STATIC ${LIB_SOURCES})
 
 target_compile_definitions(007Core PUBLIC
+    PROJECT_DIR="${CMAKE_SOURCE_DIR}"
     PROJECT_SHADER_DIR="${CMAKE_SOURCE_DIR}/shaders"
     PROJECT_SRC_DIR="${CMAKE_SOURCE_DIR}/src"
     PROJECT_EXTERNAL_DIR="${CMAKE_SOURCE_DIR}/external"
@@ -194,8 +196,3 @@ endif()
 # Hide CMake auxiliary targets in CMake folder
 # ----------------------------------------------------------------------------
 set_property(GLOBAL PROPERTY PREDEFINED_TARGETS_FOLDER "CMake")
-
-# Hide ImGui target if it exists
-if(TARGET imgui)
-    set_target_properties(imgui PROPERTIES FOLDER "External")
-endif()

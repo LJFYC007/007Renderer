@@ -91,7 +91,7 @@ void Camera::handleInput()
             // Rotate around right vector (pitch) - vertical mouse movement
             if (abs(delta.y) > 0.001f)
             {
-                float anglePitch = -delta.y * sensitivity;
+                float anglePitch = delta.y * sensitivity;
                 glm::mat4 pitchRotation = glm::rotate(glm::mat4(1.0f), anglePitch, mData.right);
                 offset = glm::vec3(pitchRotation * glm::vec4(offset, 1.0f));
             }
@@ -120,10 +120,10 @@ void Camera::calculateCameraParameters()
 
     // Calculate camera U and V vectors (pixel step vectors)
     mData.cameraU = mData.right * (viewportWidth / mData.frameWidth);
-    mData.cameraV = mData.up * (viewportHeight / mData.frameHeight);
+    mData.cameraV = -mData.up * (viewportHeight / mData.frameHeight);
 
     // Calculate the center of the first pixel
     float3 viewportCenter = mData.posW + mData.forward * mData.focalLength;
-    float3 viewportCorner = viewportCenter - 0.5f * viewportWidth * mData.right - 0.5f * viewportHeight * mData.up;
+    float3 viewportCorner = viewportCenter - 0.5f * viewportWidth * mData.right + 0.5f * viewportHeight * mData.up;
     mData.pixel00 = viewportCorner + 0.5f * (mData.cameraU + mData.cameraV);
 }

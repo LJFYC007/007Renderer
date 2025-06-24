@@ -72,7 +72,7 @@ int main()
         resourceMap["PerFrameCB"] = nvrhi::ResourceHandle(cbPerFrame.getHandle().operator->());
         resourceMap["gCamera"] = nvrhi::ResourceHandle(cbCamera.getHandle().operator->());
         ComputePass pass;
-        pass.initialize(device.getDevice(), std::string(PROJECT_SHADER_DIR) + "/hello.slang", "computeMain", resourceMap);
+        pass.initialize(device.getDevice(), "/shaders/hello.slang", "computeMain", resourceMap);
 
         // -------------------------
         // 5. Setup GUI with original ImGui
