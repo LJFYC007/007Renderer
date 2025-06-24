@@ -3,7 +3,7 @@
 struct CameraData
 {
     float3 posW;
-    float focalLength; 
+    float focalLength;
     float3 pixel00;
     float aspectRatio;
     float3 cameraU;

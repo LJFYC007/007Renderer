@@ -23,20 +23,26 @@ protected:
 
 TEST_F(ComputeShaderTest, Basic)
 {
-    const uint32_t elementCount = 1000; 
+    const uint32_t elementCount = 1000;
     std::vector<float> inputA(elementCount, 0.1f);
     std::vector<float> inputB(elementCount, 0.5f);
 
     Buffer bufA, bufB, bufResult;
-    bufA.initialize(device->getDevice(), inputA.data(), inputA.size() * sizeof(float), nvrhi::ResourceStates::ShaderResource, false, false, "BufferA");
-    bufB.initialize(device->getDevice(), inputB.data(), inputB.size() * sizeof(float), nvrhi::ResourceStates::ShaderResource, false, false, "BufferB");
-    bufResult.initialize(device->getDevice(), nullptr, inputA.size() * sizeof(float), nvrhi::ResourceStates::UnorderedAccess, true, false, "BufferResult");
+    bufA.initialize(
+        device->getDevice(), inputA.data(), inputA.size() * sizeof(float), nvrhi::ResourceStates::ShaderResource, false, false, "BufferA"
+    );
+    bufB.initialize(
+        device->getDevice(), inputB.data(), inputB.size() * sizeof(float), nvrhi::ResourceStates::ShaderResource, false, false, "BufferB"
+    );
+    bufResult.initialize(
+        device->getDevice(), nullptr, inputA.size() * sizeof(float), nvrhi::ResourceStates::UnorderedAccess, true, false, "BufferResult"
+    );
 
     std::unordered_map<std::string, nvrhi::ResourceHandle> resourceMap;
     resourceMap["BufferA"] = bufA.getHandle();
     resourceMap["BufferB"] = bufB.getHandle();
     resourceMap["BufferResult"] = bufResult.getHandle();
-    
+
     ComputePass pass;
     pass.initialize(device->getDevice(), "/tests/ComputeShaderTest.slang", "computeMain", resourceMap);
     pass.dispatchThreads(device->getDevice(), elementCount, 1, 1);

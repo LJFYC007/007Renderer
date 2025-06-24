@@ -12,7 +12,8 @@ public:
         Logger::init();
         Logger::get()->set_level(spdlog::level::off); // Disable logging for tests
         device = std::make_unique<Device>();
-        if (!device->initialize()) FAIL() << "Failed to initialize device for Buffer tests";
+        if (!device->initialize())
+            FAIL() << "Failed to initialize device for Buffer tests";
     }
 
     void TearDown() override
