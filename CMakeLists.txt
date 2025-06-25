@@ -131,28 +131,6 @@ target_compile_definitions(007Core PUBLIC
 )
 
 # ----------------------------------------------------------------------------
-# Post-build: Copy Slang runtime DLLs
-# ----------------------------------------------------------------------------
-add_custom_command(TARGET 007Renderer POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${SLANG_ROOT_DIR}/bin/slang.dll"
-        "${SLANG_ROOT_DIR}/bin/gfx.dll"
-        $<TARGET_FILE_DIR:007Renderer>
-)
-
-# ----------------------------------------------------------------------------
-# Post-build: Copy DXC runtime DLLs
-# ----------------------------------------------------------------------------
-set(DXC_DLL_DIR "${CMAKE_SOURCE_DIR}/external/dxc/bin/x64")
-
-add_custom_command(TARGET 007Renderer POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${DXC_DLL_DIR}/dxcompiler.dll"
-        "${DXC_DLL_DIR}/dxil.dll"
-        $<TARGET_FILE_DIR:007Renderer>
-)
-
-# ----------------------------------------------------------------------------
 # GoogleTest configuration
 # ----------------------------------------------------------------------------
 if(BUILD_TESTING)
@@ -187,7 +165,7 @@ if(BUILD_TESTING)
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
         COMMENT "Running all tests"
     )
-    
+
     # Hide auxiliary test target
     set_target_properties(run_tests PROPERTIES FOLDER "Utilities")
 endif()
@@ -196,3 +174,45 @@ endif()
 # Hide CMake auxiliary targets in CMake folder
 # ----------------------------------------------------------------------------
 set_property(GLOBAL PROPERTY PREDEFINED_TARGETS_FOLDER "CMake")
+
+# ----------------------------------------------------------------------------
+# Post-build: Copy Slang runtime DLLs
+# ----------------------------------------------------------------------------
+add_custom_command(TARGET 007Renderer POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${SLANG_ROOT_DIR}/bin/slang.dll"
+        "${SLANG_ROOT_DIR}/bin/gfx.dll"
+        $<TARGET_FILE_DIR:007Renderer>
+)
+
+# Copy Slang DLLs for test executable
+if(BUILD_TESTING)
+    add_custom_command(TARGET 007Tests POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${SLANG_ROOT_DIR}/bin/slang.dll"
+            "${SLANG_ROOT_DIR}/bin/gfx.dll"
+            $<TARGET_FILE_DIR:007Tests>
+    )
+endif()
+
+# ----------------------------------------------------------------------------
+# Post-build: Copy DXC runtime DLLs
+# ----------------------------------------------------------------------------
+set(DXC_DLL_DIR "${CMAKE_SOURCE_DIR}/external/dxc/bin/x64")
+
+add_custom_command(TARGET 007Renderer POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${DXC_DLL_DIR}/dxcompiler.dll"
+        "${DXC_DLL_DIR}/dxil.dll"
+        $<TARGET_FILE_DIR:007Renderer>
+)
+
+# Copy DXC DLLs for test executable
+if(BUILD_TESTING)
+    add_custom_command(TARGET 007Tests POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${DXC_DLL_DIR}/dxcompiler.dll"
+            "${DXC_DLL_DIR}/dxil.dll"
+            $<TARGET_FILE_DIR:007Tests>
+    )
+endif()
