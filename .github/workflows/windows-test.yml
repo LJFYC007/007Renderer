@@ -43,13 +43,12 @@ jobs:
 
     - name: Configure CMake
       run: |
-        cmake -S . -B build -G "Visual Studio 17 2022" -A x64 `
+        cmake -S . -B build/${{ matrix.build_type }} -G Ninja `
           -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} `
-          -DCMAKE_CONFIGURATION_TYPES="${{ matrix.build_type }}"
 
     - name: Build ${{ matrix.build_type }}
       run: |
-        cmake --build build --config ${{ matrix.build_type }} --parallel 4
+        cmake --build build/${{ matrix.build_type }} --config ${{ matrix.build_type }} --parallel 4
 
     - name: Verify executable exists
       run: |

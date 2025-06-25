@@ -20,7 +20,7 @@ public:
     slang::ProgramLayout* getProgramLayout() const { return m_ProgramLayout; }
 
     void printReflectionInfo() const;
-    bool ShaderProgram::generateBindingLayout(
+    bool generateBindingLayout(
         std::vector<nvrhi::BindingLayoutItem>& outLayoutItems,
         std::vector<nvrhi::BindingSetItem>& outBindings,
         const std::unordered_map<std::string, nvrhi::RefCountPtr<nvrhi::IResource>>& resourceMap
