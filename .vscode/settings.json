@@ -92,7 +92,8 @@
         "coroutine": "cpp",
         "source_location": "cpp",
         "future": "cpp",
-        "stack": "cpp"
+        "stack": "cpp",
+        "codecvt": "cpp"
     },
     "cmake.generator": "Ninja",
     "cmake.buildDirectory": "${workspaceFolder}/build/${buildType}",

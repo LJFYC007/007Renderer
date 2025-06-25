@@ -48,7 +48,9 @@ void ShaderProgram::initializeForShaderType(nvrhi::ShaderType primaryShaderType)
     sessionDesc.searchPaths = searchPaths;
     sessionDesc.searchPathCount = 2;
 
-    m_GlobalSession->createSession(sessionDesc, m_Session.writeRef());
+    auto sessionResult = m_GlobalSession->createSession(sessionDesc, m_Session.writeRef());
+    if (SLANG_FAILED(sessionResult))
+        LOG_ERROR("[Slang] Failed to create session with result: {}", sessionResult);
 }
 
 bool ShaderProgram::loadFromFile(

@@ -7,6 +7,7 @@
 #include "Core/Buffer.h"
 #include "Core/Texture.h"
 #include "Core/ComputePass.h"
+#include "Core/RayTracingPass.h"
 #include "Utils/Math/Math.h"
 #include "Utils/Logger.h"
 #include "Utils/GUI.h"
@@ -73,6 +74,9 @@ int main()
         resourceMap["gCamera"] = nvrhi::ResourceHandle(cbCamera.getHandle().operator->());
         ComputePass pass;
         pass.initialize(device.getDevice(), "/shaders/hello.slang", "computeMain", resourceMap);
+
+        // RayTracingPass pass;
+        // pass.initialize(device.getDevice(), "/shaders/raytracing.slang", {"rayGenMain", "missMain", "closestHitMain"}, resourceMap);
 
         // -------------------------
         // 5. Setup GUI with original ImGui
