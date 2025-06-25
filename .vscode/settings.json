@@ -95,6 +95,7 @@
         "stack": "cpp"
     },
     "cmake.generator": "Ninja",
+    "cmake.buildDirectory": "${workspaceFolder}/build/${buildType}",
     "cmake.configureOnOpen": true,
     "cmake.configureOnEdit": true
 }

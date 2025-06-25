@@ -53,7 +53,7 @@ jobs:
 
     - name: Verify executable exists
       run: |
-        $executablePath = "build/bin/${{ matrix.build_type }}/007Renderer.exe"
+        $executablePath = "build/${{ matrix.build_type }}/bin/${{ matrix.build_type }}/007Renderer.exe"
         if (!(Test-Path -Path $executablePath)) {
           Write-Error "Executable not found at: $executablePath"
           Get-ChildItem -Path "build" -Recurse -Name "*.exe" | ForEach-Object { Write-Host "Found executable: $_" }
@@ -67,4 +67,4 @@ jobs:
         if (!(Test-Path -Path $reportDir)) {
           New-Item -ItemType Directory -Path $reportDir | Out-Null
         }
-        .\build\bin\${{ matrix.build_type }}\007Tests.exe --gtest_output=xml:build/test-reports/results.xml
+        .\build\${{ matrix.build_type }}\bin\${{ matrix.build_type }}\007Tests.exe --gtest_output=xml:build/test-reports/results.xml
