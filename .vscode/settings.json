@@ -90,8 +90,11 @@
         "variant": "cpp",
         "complex": "cpp",
         "coroutine": "cpp",
-        "source_location": "cpp"
+        "source_location": "cpp",
+        "future": "cpp",
+        "stack": "cpp"
     },
+    "cmake.generator": "Ninja",
     "cmake.configureOnOpen": true,
     "cmake.configureOnEdit": true
 }

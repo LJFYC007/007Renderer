@@ -8,9 +8,9 @@ bool ComputePass::initialize(
 )
 {
     ShaderProgram program;
-    if (!program.loadFromFile(device, std::string(PROJECT_DIR) + shaderPath, entryPoint, nvrhi::ShaderType::Compute))
+    if (!program.loadFromFile(device, std::string(PROJECT_DIR) + shaderPath, {entryPoint}, nvrhi::ShaderType::Compute))
         return false;
-    m_Shader = program.getShader();
+    m_Shader = program.getShader(entryPoint);
     // program.printReflectionInfo();
 
     auto programLayout = program.getProgramLayout();

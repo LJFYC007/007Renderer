@@ -1,17 +1,32 @@
 #include "ShaderProgram.h"
 
-ShaderProgram::ShaderProgram() : m_ProgramLayout(nullptr)
+ShaderProgram::ShaderProgram() : m_ProgramLayout(nullptr) {}
+
+void ShaderProgram::initializeForShaderType(nvrhi::ShaderType primaryShaderType)
 {
+    const char* profile;
+    switch (primaryShaderType)
+    {
+    case nvrhi::ShaderType::Compute:
+        profile = "cs_6_2";
+        break;
+    case nvrhi::ShaderType::AllRayTracing:
+        profile = "lib_6_3";
+        break;
+    default:
+        LOG_WARN("[ShaderProgram] Unknown shader type, using library profile");
+        break;
+    }
     slang::createGlobalSession(m_GlobalSession.writeRef());
 
 #ifdef _DEBUG
-    LOG_INFO("[ShaderProgram] Using DEBUG compilation options");
+    LOG_INFO("[ShaderProgram] Using DEBUG compilation options with profile: {}", profile);
     slang::CompilerOptionEntry debugOptions[] = {
         {slang::CompilerOptionName::DebugInformation, {slang::CompilerOptionValueKind::Int, SLANG_DEBUG_INFO_LEVEL_MAXIMAL, 0, nullptr, nullptr}},
         {slang::CompilerOptionName::Optimization, {slang::CompilerOptionValueKind::Int, SLANG_OPTIMIZATION_LEVEL_NONE, 0, nullptr, nullptr}},
     };
 #else
-    LOG_INFO("[ShaderProgram] Using RELEASE compilation options");
+    LOG_INFO("[ShaderProgram] Using RELEASE compilation options with profile: {}", profile);
     slang::CompilerOptionEntry debugOptions[] = {
         {slang::CompilerOptionName::DebugInformation, {slang::CompilerOptionValueKind::Int, SLANG_DEBUG_INFO_LEVEL_MINIMAL, 0, nullptr, nullptr}},
         {slang::CompilerOptionName::Optimization, {slang::CompilerOptionValueKind::Int, SLANG_OPTIMIZATION_LEVEL_HIGH, 0, nullptr, nullptr}},
@@ -21,7 +36,7 @@ ShaderProgram::ShaderProgram() : m_ProgramLayout(nullptr)
 
     slang::TargetDesc targetDesc = {};
     targetDesc.format = SLANG_DXIL;
-    targetDesc.profile = m_GlobalSession->findProfile("cs_6_2");
+    targetDesc.profile = m_GlobalSession->findProfile(profile);
     targetDesc.compilerOptionEntries = debugOptions;
     targetDesc.compilerOptionEntryCount = optionCount;
 
@@ -36,8 +51,23 @@ ShaderProgram::ShaderProgram() : m_ProgramLayout(nullptr)
     m_GlobalSession->createSession(sessionDesc, m_Session.writeRef());
 }
 
-bool ShaderProgram::loadFromFile(nvrhi::IDevice* device, const std::string& filePath, const std::string& entryPoint, nvrhi::ShaderType shaderType)
+bool ShaderProgram::loadFromFile(
+    nvrhi::IDevice* device,
+    const std::string& filePath,
+    const std::vector<std::string>& entryPoints,
+    nvrhi::ShaderType shaderType
+)
 {
+    if (entryPoints.empty())
+    {
+        LOG_ERROR("[ShaderProgram] No entry points provided");
+        return false;
+    }
+
+    // Initialize session for the specific shader type
+    initializeForShaderType(shaderType);
+
+    // Load module
     Slang::ComPtr<slang::IModule> module;
     module = m_Session->loadModule(filePath.c_str());
     if (!module)
@@ -46,30 +76,43 @@ bool ShaderProgram::loadFromFile(nvrhi::IDevice* device, const std::string& file
         return false;
     }
 
-    Slang::ComPtr<slang::IEntryPoint> slangEntryPoint;
-    if (SLANG_FAILED(module->findEntryPointByName(entryPoint.c_str(), slangEntryPoint.writeRef())))
+    // Create entry points and collect them
+    std::vector<Slang::ComPtr<slang::IEntryPoint>> slangEntryPoints;
+    slangEntryPoints.reserve(entryPoints.size());
+
+    for (const std::string& entryPoint : entryPoints)
     {
-        LOG_ERROR("[Slang] Failed to find entry point: {}", entryPoint);
+        Slang::ComPtr<slang::IEntryPoint> slangEntryPoint;
+        if (SLANG_FAILED(module->findEntryPointByName(entryPoint.c_str(), slangEntryPoint.writeRef())))
+        {
+            LOG_ERROR("[Slang] Failed to find entry point: {}", entryPoint);
+            return false;
+        }
+        slangEntryPoints.push_back(slangEntryPoint);
+    }
+
+    // Create composite component type with module and all entry points
+    std::vector<slang::IComponentType*> components;
+    components.reserve(1 + slangEntryPoints.size());
+    components.push_back(module);
+    for (auto& entryPoint : slangEntryPoints)
+        components.push_back(entryPoint);
+
+    Slang::ComPtr<slang::IComponentType> program;
+    if (SLANG_FAILED(m_Session->createCompositeComponentType(components.data(), static_cast<SlangInt>(components.size()), program.writeRef())))
+    {
+        LOG_ERROR("[Slang] Failed to create composite component type");
         return false;
     }
 
-    Slang::ComPtr<slang::IComponentType> program;
-    {
-        slang::IComponentType* components[] = {module, slangEntryPoint};
-        if (SLANG_FAILED(m_Session->createCompositeComponentType(components, 2, program.writeRef())))
-        {
-            LOG_ERROR("[Slang] Failed to create composite component type");
-            return false;
-        }
-    }
-
+    // Link program
     if (SLANG_FAILED(program->link(m_LinkedProgram.writeRef())))
     {
         LOG_ERROR("[Slang] Failed to link program");
         return false;
     }
 
-    // Get program layout first with diagnostics
+    // Get program layout with diagnostics
     Slang::ComPtr<slang::IBlob> diagnostics;
     m_ProgramLayout = m_LinkedProgram->getLayout(0, diagnostics.writeRef());
     if (diagnostics && diagnostics->getBufferSize() > 0)
@@ -80,6 +123,7 @@ bool ShaderProgram::loadFromFile(nvrhi::IDevice* device, const std::string& file
         return false;
     }
 
+    // Get target code
     Slang::ComPtr<slang::IBlob> shaderBlob;
     Slang::ComPtr<slang::IBlob> targetDiagnostics;
     if (SLANG_FAILED(m_LinkedProgram->getTargetCode(0, shaderBlob.writeRef(), targetDiagnostics.writeRef())))
@@ -90,12 +134,30 @@ bool ShaderProgram::loadFromFile(nvrhi::IDevice* device, const std::string& file
         return false;
     }
 
-    nvrhi::ShaderDesc desc;
-    desc.entryName = entryPoint.c_str();
-    desc.shaderType = shaderType;
-    m_Shader = device->createShader(desc, shaderBlob->getBufferPointer(), shaderBlob->getBufferSize());
+    // Create shaders for each entry point
+    m_Shaders.clear();
+    m_Shaders.reserve(entryPoints.size());
+    m_EntryPointToShaderIndex.clear();
 
-    return m_Shader != nullptr;
+    for (size_t i = 0; i < entryPoints.size(); ++i)
+    {
+        nvrhi::ShaderDesc desc;
+        desc.entryName = entryPoints[i].c_str();
+        desc.shaderType = shaderType;
+
+        auto shader = device->createShader(desc, shaderBlob->getBufferPointer(), shaderBlob->getBufferSize());
+        if (!shader)
+        {
+            LOG_ERROR("[ShaderProgram] Failed to create shader for entry point: {}", entryPoints[i]);
+            return false;
+        }
+
+        m_Shaders.push_back(shader);
+        m_EntryPointToShaderIndex[entryPoints[i]] = i;
+    }
+
+    LOG_DEBUG("[ShaderProgram] Successfully loaded shader with {} entry points from: {}", entryPoints.size(), filePath);
+    return true;
 }
 
 void ShaderProgram::printReflectionInfo() const
@@ -421,4 +483,14 @@ bool ShaderProgram::processParameter(
     outLayoutItems.push_back(layoutItem);
     outBindings.push_back(bindingItem);
     return true;
+}
+
+nvrhi::ShaderHandle ShaderProgram::getShader(const std::string& entryPoint) const
+{
+    auto it = m_EntryPointToShaderIndex.find(entryPoint);
+    if (it != m_EntryPointToShaderIndex.end())
+        return m_Shaders[it->second];
+
+    LOG_WARN("[ShaderProgram] Entry point '{}' not found", entryPoint);
+    return nullptr;
 }
