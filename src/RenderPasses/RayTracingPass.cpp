@@ -27,7 +27,7 @@ bool RayTracingPass::initialize(
     layoutDesc.bindings = layoutItems;
     m_BindingLayout = device->createBindingLayout(layoutDesc);
 
-    // Create binding set    // Create binding set
+    // Create binding set
     nvrhi::BindingSetDesc bindingSetDesc;
     bindingSetDesc.bindings = bindings;
     m_BindingSet = device->createBindingSet(bindingSetDesc, m_BindingLayout);
@@ -43,62 +43,41 @@ bool RayTracingPass::initialize(
 
     // Add shaders with correct export names matching the shader
     pipelineDesc.addShader(nvrhi::rt::PipelineShaderDesc().setShader(m_RayGenShader).setExportName("rayGenMain"));
-
     pipelineDesc.addShader(nvrhi::rt::PipelineShaderDesc().setShader(m_MissShader).setExportName("missMain"));
-
     pipelineDesc.addHitGroup(
         nvrhi::rt::PipelineHitGroupDesc().setClosestHitShader(m_ClosestHitShader).setExportName("closestHitMain").setIsProceduralPrimitive(false)
     ); // Set to true if using intersection shaders
 
-    // Validate shaders before creating pipeline
-    if (!m_RayGenShader || !m_MissShader || !m_ClosestHitShader)
-    {
-        LOG_ERROR("[RayTracingPass] One or more shaders failed to load");
-        return false;
-    }
-
-    LOG_INFO(
+    LOG_DEBUG(
         "[RayTracingPass] Creating ray tracing pipeline with {} payload, {} attributes, {} recursion depth",
         pipelineDesc.maxPayloadSize,
         pipelineDesc.maxAttributeSize,
         pipelineDesc.maxRecursionDepth
     );
-
     m_Pipeline = device->createRayTracingPipeline(pipelineDesc);
-
     if (!m_Pipeline)
     {
-        LOG_ERROR("[RayTracingPass] Failed to create ray tracing pipeline - this may indicate:");
-        LOG_ERROR("  1. Shader compilation errors");
-        LOG_ERROR("  2. Incorrect pipeline configuration");
-        LOG_ERROR("  3. Driver/hardware compatibility issues");
-        LOG_ERROR("  4. Export name mismatches");
+        LOG_ERROR("[RayTracingPass] Failed to create ray tracing pipeline");
         return false;
     }
+    LOG_DEBUG("[RayTracingPass] Ray tracing pipeline created successfully");
 
-    LOG_INFO("[RayTracingPass] Ray tracing pipeline created successfully");
-    return m_Pipeline != nullptr;
+    // Create shader table with matching export names
+    m_ShaderTable = m_Pipeline->createShaderTable();
+    m_ShaderTable->setRayGenerationShader("rayGenMain");
+    m_ShaderTable->addMissShader("missMain");
+    m_ShaderTable->addHitGroup("closestHitMain");
+
+    m_rtState.setShaderTable(m_ShaderTable);
+    m_rtState.addBindingSet(m_BindingSet);
+
+    return true;
 }
 
 void RayTracingPass::dispatch(nvrhi::ICommandList* commandList, uint32_t width, uint32_t height, uint32_t depth)
 {
-    if (!m_Pipeline || !m_BindingSet)
-        return;
-
-    // Create shader table with matching export names
-    auto shaderTable = m_Pipeline->createShaderTable();
-    shaderTable->setRayGenerationShader("rayGenMain");
-    shaderTable->addMissShader("missMain");
-    shaderTable->addHitGroup("closestHitMain");
-
-    nvrhi::rt::State rtState;
-    rtState.setShaderTable(shaderTable);
-    rtState.addBindingSet(m_BindingSet);
-
-    commandList->setRayTracingState(rtState);
-
+    commandList->setRayTracingState(m_rtState);
     nvrhi::rt::DispatchRaysArguments args;
     args.setDimensions(width, height, depth);
-
     commandList->dispatchRays(args);
 }

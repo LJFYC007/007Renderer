@@ -2,7 +2,7 @@
 #include <nvrhi/nvrhi.h>
 #include <vector>
 
-#include "ShaderProgram.h"
+#include "Core/ShaderProgram.h"
 
 class RayTracingPass
 {
@@ -23,4 +23,6 @@ private:
     nvrhi::ShaderHandle m_RayGenShader;
     nvrhi::ShaderHandle m_MissShader;
     nvrhi::ShaderHandle m_ClosestHitShader;
+    nvrhi::rt::State m_rtState;
+    nvrhi::rt::ShaderTableHandle m_ShaderTable;
 };

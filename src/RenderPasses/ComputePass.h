@@ -1,7 +1,7 @@
 #pragma once
 #include <nvrhi/nvrhi.h>
 
-#include "ShaderProgram.h"
+#include "Core/ShaderProgram.h"
 
 class ComputePass
 {
@@ -13,6 +13,7 @@ public:
         const std::unordered_map<std::string, nvrhi::ResourceHandle>& resourceMap
     );
 
+    // Dispatch the compute shader with the specified number of threads
     void dispatchThreads(nvrhi::IDevice* device, uint32_t totalThreadsX, uint32_t totalThreadsY, uint32_t totalThreadsZ);
 
 private:
