@@ -125,17 +125,6 @@ bool ShaderProgram::loadFromFile(
         return false;
     }
 
-    // Get target code
-    Slang::ComPtr<slang::IBlob> shaderBlob;
-    Slang::ComPtr<slang::IBlob> targetDiagnostics;
-    if (SLANG_FAILED(m_LinkedProgram->getTargetCode(0, shaderBlob.writeRef(), targetDiagnostics.writeRef())))
-    {
-        if (targetDiagnostics && targetDiagnostics->getBufferSize() > 0)
-            LOG_ERROR("[Slang] Target code diagnostics: {}", (const char*)targetDiagnostics->getBufferPointer());
-        LOG_ERROR("[Slang] Failed to get target code");
-        return false;
-    }
-
     // Create shaders for each entry point
     m_Shaders.clear();
     m_Shaders.reserve(entryPoints.size());
@@ -143,11 +132,41 @@ bool ShaderProgram::loadFromFile(
 
     for (size_t i = 0; i < entryPoints.size(); ++i)
     {
+        Slang::ComPtr<slang::IBlob> kernelBlob;
+        Slang::ComPtr<slang::IBlob> diagnosticBlob;
+
+        if (SLANG_FAILED(m_LinkedProgram->getEntryPointCode(i, 0, kernelBlob.writeRef(), diagnosticBlob.writeRef())))
+        {
+            if (diagnosticBlob && diagnosticBlob->getBufferSize() > 0)
+                LOG_ERROR("[Slang] Entry point diagnostics for {}: {}", entryPoints[i], (const char*)diagnosticBlob->getBufferPointer());
+            LOG_ERROR("[Slang] Failed to get entry point code for {}", entryPoints[i]);
+            return false;
+        }
+
+        LOG_DEBUG("[ShaderProgram] Compiled entry point {}: {} bytes", entryPoints[i], kernelBlob->getBufferSize());
+
         nvrhi::ShaderDesc desc;
-        desc.entryName = entryPoints[i].c_str();
+        desc.entryName = entryPoints[i].c_str(); // Determine shader type based on entry point name
+        nvrhi::ShaderType shaderType;
+        if (entryPoints[i] == "rayGenMain")
+            shaderType = nvrhi::ShaderType::RayGeneration;
+        else if (entryPoints[i] == "missMain")
+            shaderType = nvrhi::ShaderType::Miss;
+        else if (entryPoints[i] == "closestHitMain")
+            shaderType = nvrhi::ShaderType::ClosestHit;
+        else if (entryPoints[i] == "anyHitMain")
+            shaderType = nvrhi::ShaderType::AnyHit;
+        else if (entryPoints[i] == "intersectionMain")
+            shaderType = nvrhi::ShaderType::Intersection;
+        else
+        {
+            LOG_WARN("[ShaderProgram] Unknown ray tracing entry point: {}, defaulting to RayGeneration", entryPoints[i]);
+            shaderType = nvrhi::ShaderType::RayGeneration;
+        }
+
         desc.shaderType = shaderType;
 
-        auto shader = device->createShader(desc, shaderBlob->getBufferPointer(), shaderBlob->getBufferSize());
+        auto shader = device->createShader(desc, kernelBlob->getBufferPointer(), kernelBlob->getBufferSize());
         if (!shader)
         {
             LOG_ERROR("[ShaderProgram] Failed to create shader for entry point: {}", entryPoints[i]);
@@ -405,7 +424,7 @@ bool ShaderProgram::processParameter(
         case SLANG_TEXTURE_3D:
         case SLANG_TEXTURE_CUBE:
         case SLANG_TEXTURE_BUFFER:
-            if (resourceAccess == SLANG_RESOURCE_ACCESS_READ || resourceAccess)
+            if (resourceAccess == SLANG_RESOURCE_ACCESS_READ || resourceAccess == SLANG_RESOURCE_ACCESS_READ_WRITE)
             {
                 auto resourceIt = resourceMap.find(paramNameStr);
                 if (resourceIt != resourceMap.end())
@@ -452,6 +471,31 @@ bool ShaderProgram::processParameter(
                     paramNameStr,
                     bindingSlot
                 );
+            }
+            break;
+
+        case SLANG_ACCELERATION_STRUCTURE:
+            if (resourceAccess == SLANG_RESOURCE_ACCESS_READ || resourceAccess == SLANG_RESOURCE_ACCESS_READ_WRITE)
+            {
+                auto resourceIt = resourceMap.find(paramNameStr);
+                if (resourceIt != resourceMap.end())
+                {
+                    nvrhi::rt::IAccelStruct* accelStruct = dynamic_cast<nvrhi::rt::IAccelStruct*>(resourceIt->second.Get());
+                    if (accelStruct)
+                    {
+                        layoutItem = nvrhi::BindingLayoutItem::RayTracingAccelStruct(bindingSlot);
+                        bindingItem = nvrhi::BindingSetItem::RayTracingAccelStruct(bindingSlot, accelStruct);
+                    }
+                    else
+                    {
+                        LOG_ERROR("[ShaderBinding] Failed to cast resource to IAccelStruct: {}", paramNameStr);
+                        return false;
+                    }
+                }
+                else
+                    LOG_WARN("[ShaderBinding] Acceleration structure resource not found in map: {}", paramNameStr);
+
+                LOG_DEBUG("[ShaderBinding] Found ray tracing acceleration structure: {} at slot {}", paramNameStr, bindingSlot);
             }
             break;
 

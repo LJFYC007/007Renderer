@@ -8,6 +8,7 @@
 #include <dxgi1_6.h>
 #include <nvrhi/nvrhi.h>
 #include <nvrhi/d3d12.h>
+#include <nvrhi/validation.h>
 
 using Microsoft::WRL::ComPtr;
 
@@ -57,5 +58,6 @@ private:
 
 #ifdef _DEBUG
     ID3D12Debug* m_pdx12Debug = nullptr;
+    ID3D12InfoQueue* m_infoQueue = nullptr;
 #endif
 };

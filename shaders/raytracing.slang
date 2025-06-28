@@ -56,7 +56,7 @@ void missMain(inout Payload payload)
 }
 
 [shader("closesthit")]
-void closestHitMain(inout Payload payload)
+void closestHitMain(inout Payload payload, BuiltInTriangleIntersectionAttributes attribs)
 {
     payload.color = float3(0, 1, 0); 
 }
