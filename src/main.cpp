@@ -55,7 +55,7 @@ int main()
             float _padding;
         } perFrameData;
 
-        Camera camera(width, height, float3(0.f, 0.f, 1.f), float3(0.f, 0.f, 0.f), float3(0.f, 1.f, 0.f), glm::radians(45.0f));
+        Camera camera(width, height, float3(0.f, 0.f, 2.f), float3(0.f, 0.f, 0.f), float3(0.f, 1.f, 0.f), glm::radians(45.0f));
         Buffer cbPerFrame, cbCamera;
         Texture textureOut;
         cbPerFrame.initialize(
@@ -69,21 +69,102 @@ int main()
         );
 
         // -------------------------
-        // 4. Setup shader & dispatch
+        // 4. Setup triangle geometry for ray tracing
         // -------------------------
-        std::unordered_map<std::string, nvrhi::RefCountPtr<nvrhi::IResource>> resourceMap;
-        resourceMap["result"] = nvrhi::ResourceHandle(textureOut.getHandle().operator->());
-        resourceMap["PerFrameCB"] = nvrhi::ResourceHandle(cbPerFrame.getHandle().operator->());
-        resourceMap["gCamera"] = nvrhi::ResourceHandle(cbCamera.getHandle().operator->());
+        // Define triangle vertices (world space coordinates)
+        struct Vertex
+        {
+            float position[3];
+            float texCoord[2];
+        };
 
-        nvrhi::rt::AccelStructDesc asDesc;
-        nvrhi::rt::AccelStructHandle accelStruct = device.getDevice()->createAccelStruct(asDesc);
-        resourceMap["gScene"] = nvrhi::ResourceHandle(accelStruct.operator->());
-        // ComputePass pass;
-        // pass.initialize(device.getDevice(), "/shaders/hello.slang", "computeMain", resourceMap);
+        static const Vertex triangleVertices[] = {
+            //  position          texCoord
+            {{0.f, 0.5f, -0.5f}, {0.5f, 0.f}},
+            {{-0.5f, -0.5f, -0.5f}, {0.f, 1.f}},
+            {{0.5f, -0.5f, -0.5f}, {1.f, 1.f}}
+        };
+
+        // Define triangle indices
+        static const uint32_t triangleIndices[] = {0, 1, 2};
+        // Create vertex buffer for acceleration structure build input
+        nvrhi::BufferDesc vertexBufferDesc = nvrhi::BufferDesc()
+                                                 .setByteSize(sizeof(triangleVertices))
+                                                 .setIsVertexBuffer(true)
+                                                 .setInitialState(nvrhi::ResourceStates::VertexBuffer)
+                                                 .setKeepInitialState(true) // enable fully automatic state tracking
+                                                 .setDebugName("Vertex Buffer")
+                                                 .setCanHaveRawViews(true)
+                                                 .setIsAccelStructBuildInput(true);
+        nvrhi::BufferHandle vertexBuffer = device.getDevice()->createBuffer(vertexBufferDesc);
+
+        // Create index buffer for acceleration structure build input
+        nvrhi::BufferDesc indexBufferDesc = nvrhi::BufferDesc()
+                                                .setByteSize(sizeof(triangleIndices))
+                                                .setIsIndexBuffer(true)
+                                                .setInitialState(nvrhi::ResourceStates::IndexBuffer)
+                                                .setKeepInitialState(true) // enable fully automatic state tracking
+                                                .setDebugName("Index Buffer")
+                                                .setCanHaveRawViews(true)
+                                                .setIsAccelStructBuildInput(true);
+        nvrhi::BufferHandle indexBuffer = device.getDevice()->createBuffer(indexBufferDesc);
+
+        // Geometry descriptor
+        auto triangles = nvrhi::rt::GeometryTriangles()
+                             .setVertexBuffer(vertexBuffer)
+                             .setVertexFormat(nvrhi::Format::RGB32_FLOAT)
+                             .setVertexCount(std::size(triangleVertices))
+                             .setVertexStride(sizeof(Vertex))
+                             .setIndexBuffer(indexBuffer)
+                             .setIndexFormat(nvrhi::Format::R32_UINT)
+                             .setIndexCount(std::size(triangleIndices)); // BLAS descriptor with proper geometry flags
+        auto blasDesc = nvrhi::rt::AccelStructDesc().setDebugName("BLAS").setIsTopLevel(false).addBottomLevelGeometry(
+            nvrhi::rt::GeometryDesc().setTriangles(triangles).setFlags(nvrhi::rt::GeometryFlags::Opaque)
+        );
+
+        nvrhi::rt::AccelStructHandle blas = device.getDevice()->createAccelStruct(blasDesc);
+
+        auto tlasDesc = nvrhi::rt::AccelStructDesc().setDebugName("TLAS").setIsTopLevel(true).setTopLevelMaxInstances(1);
+
+        nvrhi::rt::AccelStructHandle tlas = device.getDevice()->createAccelStruct(tlasDesc);
+        commandList->open();
+
+        // Upload the vertex and index data
+        commandList->writeBuffer(vertexBuffer, triangleVertices, sizeof(triangleVertices));
+        commandList->writeBuffer(indexBuffer, triangleIndices, sizeof(triangleIndices));
+
+        // Build the BLAS using the geometry array populated earlier.
+        // It's also possible to obtain the descriptor from the BLAS object using getDesc()
+        // and write the vertex and index buffer references into that descriptor again
+        // because NVRHI erases those when it creates the AS object.
+        commandList->buildBottomLevelAccelStruct(blas, blasDesc.bottomLevelGeometries.data(), blasDesc.bottomLevelGeometries.size()); // Build the
+                                                                                                                                      // TLAS with one
+                                                                                                                                      // instance
+                                                                                                                                      // using
+                                                                                                                                      // identity
+                                                                                                                                      // transform
+        auto instanceDesc = nvrhi::rt::InstanceDesc()
+                                .setBLAS(blas)
+                                .setFlags(nvrhi::rt::InstanceFlags::TriangleCullDisable)
+                                .setTransform(nvrhi::rt::c_IdentityTransform)
+                                .setInstanceMask(0xFF);
+
+        commandList->buildTopLevelAccelStruct(tlas, &instanceDesc, 1);
+
+        commandList->close();
+        device.getDevice()->executeCommandList(commandList); // -------------------------
+        // 5. Setup shader & dispatch
+        // -------------------------
+        std::unordered_map<std::string, nvrhi::ResourceHandle> resourceMap;
+        resourceMap["result"] = textureOut.getHandle().operator->();
+        resourceMap["PerFrameCB"] = cbPerFrame.getHandle().operator->();
+        resourceMap["gCamera"] = cbCamera.getHandle().operator->();
+
+        std::unordered_map<std::string, nvrhi::rt::AccelStructHandle> accelStructMap;
+        accelStructMap["gScene"] = tlas;
 
         RayTracingPass pass;
-        pass.initialize(device.getDevice(), "/shaders/raytracing.slang", {"rayGenMain", "missMain", "closestHitMain"}, resourceMap);
+        pass.initialize(device.getDevice(), "/shaders/raytracing.slang", {"rayGenMain", "missMain", "closestHitMain"}, resourceMap, accelStructMap);
 
         // -------------------------
         // 5. Setup GUI with original ImGui

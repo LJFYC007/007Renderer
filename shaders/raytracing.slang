@@ -16,6 +16,7 @@ RaytracingAccelerationStructure gScene;
 struct Payload
 {
     float3 color;
+    float2 pixel;
 };
 
 [shader("raygeneration")]
@@ -23,13 +24,12 @@ void rayGenMain()
 {
     uint2 launchID = DispatchRaysIndex().xy;
     if (launchID.x >= gWidth || launchID.y >= gHeight)
-        return;
-
-    float3 pixel = gCamera.data.pixel00 + launchID.x * gCamera.data.cameraU + launchID.y * gCamera.data.cameraV;
+        return;    float3 pixel = gCamera.data.pixel00 + launchID.x * gCamera.data.cameraU + launchID.y * gCamera.data.cameraV;
     Ray ray = Ray(gCamera.data.posW, normalize(pixel - gCamera.data.posW));
 
     Payload payload;
-    payload.color = float3(0, 0, 0); // default
+    payload.color = float3(0, 0, 0); // Initialize to black
+    payload.pixel = float2(float(launchID.x) / float(gWidth), float(launchID.y) / float(gHeight)); // Store normalized pixel coordinates
 
     RayDesc rayDesc;
     rayDesc.Origin = ray.origin;
@@ -52,11 +52,16 @@ void rayGenMain()
 [shader("miss")]
 void missMain(inout Payload payload)
 {
-    payload.color = float3(gColor, gColor, gColor); 
+    // Create a gradient based on ray direction for visual debugging
+    payload.color = float3(payload.pixel.x, payload.pixel.y, gColor); 
 }
 
 [shader("closesthit")]
 void closestHitMain(inout Payload payload, BuiltInTriangleIntersectionAttributes attribs)
 {
-    payload.color = float3(0, 1, 0); 
+    // Use barycentric coordinates to create a color pattern
+    float u = attribs.barycentrics.x;
+    float v = attribs.barycentrics.y;
+    float w = 1.0f - u - v;
+    payload.color = float3(u, v, w); // RGB based on barycentric coordinates
 }

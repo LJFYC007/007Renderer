@@ -4,7 +4,8 @@ bool RayTracingPass::initialize(
     nvrhi::IDevice* device,
     const std::string& shaderPath,
     const std::vector<std::string>& entryPoints,
-    const std::unordered_map<std::string, nvrhi::ResourceHandle>& resourceMap
+    const std::unordered_map<std::string, nvrhi::ResourceHandle>& resourceMap,
+    const std::unordered_map<std::string, nvrhi::rt::AccelStructHandle>& accelStructMap
 )
 {
     ShaderProgram program;
@@ -14,11 +15,11 @@ bool RayTracingPass::initialize(
     m_RayGenShader = program.getShader("rayGenMain");
     m_MissShader = program.getShader("missMain");
     m_ClosestHitShader = program.getShader("closestHitMain");
-    // program.printReflectionInfo();
+    program.printReflectionInfo();
 
     std::vector<nvrhi::BindingLayoutItem> layoutItems;
     std::vector<nvrhi::BindingSetItem> bindings;
-    if (!program.generateBindingLayout(layoutItems, bindings, resourceMap))
+    if (!program.generateBindingLayout(layoutItems, bindings, resourceMap, accelStructMap))
         return false;
 
     // Create binding layout

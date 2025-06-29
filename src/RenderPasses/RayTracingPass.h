@@ -11,7 +11,8 @@ public:
         nvrhi::IDevice* device,
         const std::string& shaderPath,
         const std::vector<std::string>& entryPoints,
-        const std::unordered_map<std::string, nvrhi::ResourceHandle>& resourceMap
+        const std::unordered_map<std::string, nvrhi::ResourceHandle>& resourceMap,
+        const std::unordered_map<std::string, nvrhi::rt::AccelStructHandle>& accelStructMap = {}
     );
 
     void dispatch(nvrhi::ICommandList* commandList, uint32_t width, uint32_t height, uint32_t depth = 1);

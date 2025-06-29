@@ -23,7 +23,8 @@ public:
     bool generateBindingLayout(
         std::vector<nvrhi::BindingLayoutItem>& outLayoutItems,
         std::vector<nvrhi::BindingSetItem>& outBindings,
-        const std::unordered_map<std::string, nvrhi::RefCountPtr<nvrhi::IResource>>& resourceMap
+        const std::unordered_map<std::string, nvrhi::RefCountPtr<nvrhi::IResource>>& resourceMap,
+        const std::unordered_map<std::string, nvrhi::rt::AccelStructHandle>& accelStructMap = {}
     );
 
 private:
@@ -31,19 +32,20 @@ private:
     void initializeForShaderType(nvrhi::ShaderType primaryShaderType);
 
     void printVariableLayout(slang::VariableLayoutReflection* varLayout, int indent) const;
-
     bool processParameterGroup(
         slang::VariableLayoutReflection* varLayout,
         std::vector<nvrhi::BindingLayoutItem>& outLayoutItems,
         std::vector<nvrhi::BindingSetItem>& outBindings,
-        const std::unordered_map<std::string, nvrhi::RefCountPtr<nvrhi::IResource>>& resourceMap
+        const std::unordered_map<std::string, nvrhi::RefCountPtr<nvrhi::IResource>>& resourceMap,
+        const std::unordered_map<std::string, nvrhi::rt::AccelStructHandle>& accelStructMap
     );
 
     bool processParameter(
         slang::VariableLayoutReflection* varLayout,
         std::vector<nvrhi::BindingLayoutItem>& outLayoutItems,
         std::vector<nvrhi::BindingSetItem>& outBindings,
-        const std::unordered_map<std::string, nvrhi::RefCountPtr<nvrhi::IResource>>& resourceMap
+        const std::unordered_map<std::string, nvrhi::RefCountPtr<nvrhi::IResource>>& resourceMap,
+        const std::unordered_map<std::string, nvrhi::rt::AccelStructHandle>& accelStructMap
     );
 
     Slang::ComPtr<slang::IGlobalSession> m_GlobalSession;

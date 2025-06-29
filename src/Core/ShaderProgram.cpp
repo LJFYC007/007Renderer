@@ -294,7 +294,8 @@ void ShaderProgram::printVariableLayout(slang::VariableLayoutReflection* varLayo
 bool ShaderProgram::generateBindingLayout(
     std::vector<nvrhi::BindingLayoutItem>& outLayoutItems,
     std::vector<nvrhi::BindingSetItem>& outBindings,
-    const std::unordered_map<std::string, nvrhi::RefCountPtr<nvrhi::IResource>>& resourceMap
+    const std::unordered_map<std::string, nvrhi::RefCountPtr<nvrhi::IResource>>& resourceMap,
+    const std::unordered_map<std::string, nvrhi::rt::AccelStructHandle>& accelStructMap
 )
 {
     if (!m_ProgramLayout)
@@ -310,7 +311,7 @@ bool ShaderProgram::generateBindingLayout(
     auto globalScopeLayout = m_ProgramLayout->getGlobalParamsVarLayout();
     if (globalScopeLayout)
     {
-        if (!processParameterGroup(globalScopeLayout, outLayoutItems, outBindings, resourceMap))
+        if (!processParameterGroup(globalScopeLayout, outLayoutItems, outBindings, resourceMap, accelStructMap))
             return false;
     }
 
@@ -322,7 +323,7 @@ bool ShaderProgram::generateBindingLayout(
         auto entryPointLayout = entryPoint->getVarLayout();
         if (entryPointLayout)
         {
-            if (!processParameterGroup(entryPointLayout, outLayoutItems, outBindings, resourceMap))
+            if (!processParameterGroup(entryPointLayout, outLayoutItems, outBindings, resourceMap, accelStructMap))
                 return false;
         }
     }
@@ -334,7 +335,8 @@ bool ShaderProgram::processParameterGroup(
     slang::VariableLayoutReflection* varLayout,
     std::vector<nvrhi::BindingLayoutItem>& outLayoutItems,
     std::vector<nvrhi::BindingSetItem>& outBindings,
-    const std::unordered_map<std::string, nvrhi::RefCountPtr<nvrhi::IResource>>& resourceMap
+    const std::unordered_map<std::string, nvrhi::RefCountPtr<nvrhi::IResource>>& resourceMap,
+    const std::unordered_map<std::string, nvrhi::rt::AccelStructHandle>& accelStructMap
 )
 {
     if (!varLayout)
@@ -351,12 +353,12 @@ bool ShaderProgram::processParameterGroup(
         for (unsigned int i = 0; i < fieldCount; i++)
         {
             auto fieldLayout = typeLayout->getFieldByIndex(i);
-            if (!processParameter(fieldLayout, outLayoutItems, outBindings, resourceMap))
+            if (!processParameter(fieldLayout, outLayoutItems, outBindings, resourceMap, accelStructMap))
                 return false;
         }
     }
     else
-        return processParameter(varLayout, outLayoutItems, outBindings, resourceMap);
+        return processParameter(varLayout, outLayoutItems, outBindings, resourceMap, accelStructMap);
 
     return true;
 }
@@ -365,7 +367,8 @@ bool ShaderProgram::processParameter(
     slang::VariableLayoutReflection* varLayout,
     std::vector<nvrhi::BindingLayoutItem>& outLayoutItems,
     std::vector<nvrhi::BindingSetItem>& outBindings,
-    const std::unordered_map<std::string, nvrhi::RefCountPtr<nvrhi::IResource>>& resourceMap
+    const std::unordered_map<std::string, nvrhi::RefCountPtr<nvrhi::IResource>>& resourceMap,
+    const std::unordered_map<std::string, nvrhi::rt::AccelStructHandle>& accelStructMap
 )
 {
     if (!varLayout)
@@ -473,24 +476,14 @@ bool ShaderProgram::processParameter(
                 );
             }
             break;
-
         case SLANG_ACCELERATION_STRUCTURE:
             if (resourceAccess == SLANG_RESOURCE_ACCESS_READ || resourceAccess == SLANG_RESOURCE_ACCESS_READ_WRITE)
             {
-                auto resourceIt = resourceMap.find(paramNameStr);
-                if (resourceIt != resourceMap.end())
+                auto accelStructIt = accelStructMap.find(paramNameStr);
+                if (accelStructIt != accelStructMap.end())
                 {
-                    nvrhi::rt::IAccelStruct* accelStruct = dynamic_cast<nvrhi::rt::IAccelStruct*>(resourceIt->second.Get());
-                    if (accelStruct)
-                    {
-                        layoutItem = nvrhi::BindingLayoutItem::RayTracingAccelStruct(bindingSlot);
-                        bindingItem = nvrhi::BindingSetItem::RayTracingAccelStruct(bindingSlot, accelStruct);
-                    }
-                    else
-                    {
-                        LOG_ERROR("[ShaderBinding] Failed to cast resource to IAccelStruct: {}", paramNameStr);
-                        return false;
-                    }
+                    layoutItem = nvrhi::BindingLayoutItem::RayTracingAccelStruct(bindingSlot);
+                    bindingItem = nvrhi::BindingSetItem::RayTracingAccelStruct(bindingSlot, accelStructIt->second);
                 }
                 else
                     LOG_WARN("[ShaderBinding] Acceleration structure resource not found in map: {}", paramNameStr);
