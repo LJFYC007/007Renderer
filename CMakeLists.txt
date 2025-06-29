@@ -155,9 +155,13 @@ if(BUILD_TESTING)
         RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/bin/Debug
         RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}/bin/Release
     )
-    
     include(GoogleTest)
-    gtest_discover_tests(007Tests)
+    # Use PRE_TEST discovery mode to avoid running executable during configure
+    if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.18")
+        gtest_discover_tests(007Tests DISCOVERY_MODE PRE_TEST)
+    else()
+        gtest_discover_tests(007Tests)
+    endif()
       # Add custom test target that works with both single and multi-config generators
     add_custom_target(run_tests
         COMMAND ${CMAKE_CTEST_COMMAND} --verbose --output-on-failure

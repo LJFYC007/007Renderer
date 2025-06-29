@@ -31,6 +31,17 @@ jobs:
       with:
         arch: x64
 
+    - name: Set GPU timeout registry for CI
+      run: |
+        # Increase GPU timeout for CI environment to prevent TDR (Timeout Detection and Recovery)
+        try {
+          reg add "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\GraphicsDrivers" /v TdrDelay /t REG_DWORD /d 60 /f
+          reg add "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\GraphicsDrivers" /v TdrDdiDelay /t REG_DWORD /d 60 /f
+          Write-Host "✅ GPU timeout settings configured for CI"
+        } catch {
+          Write-Host "⚠️ Could not modify GPU timeout settings (this is expected in some CI environments)"
+        }
+
     - name: Cache Slang and DXC
       uses: actions/cache@v4
       with:
@@ -50,6 +61,7 @@ jobs:
       run: |
         cmake -S . -B build/${{ matrix.build_type }} -G Ninja `
           -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} `
+          -DGTEST_DISCOVER_TESTS_DISCOVERY_MODE=PRE_TEST
 
     - name: Build ${{ matrix.build_type }}
       run: |
