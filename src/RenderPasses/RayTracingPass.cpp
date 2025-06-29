@@ -15,7 +15,7 @@ bool RayTracingPass::initialize(
     m_RayGenShader = program.getShader("rayGenMain");
     m_MissShader = program.getShader("missMain");
     m_ClosestHitShader = program.getShader("closestHitMain");
-    program.printReflectionInfo();
+    // program.printReflectionInfo();
 
     std::vector<nvrhi::BindingLayoutItem> layoutItems;
     std::vector<nvrhi::BindingSetItem> bindings;

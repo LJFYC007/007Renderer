@@ -2,17 +2,23 @@
 #include "Utils/GUI.h"
 
 #include <glm/ext.hpp>
+#include <glm/gtc/constants.hpp>
 
-void Camera::setCamera(const uint32_t width, const uint32_t height, const float3& posW, const float3& target, const float3& up, float fovY)
+void Camera::setCamera(const uint32_t width, const uint32_t height, const float3& posW, const float3& target, float fovY)
 {
     mData.frameWidth = width;
     mData.frameHeight = height;
     mData.posW = posW;
     mData.aspectRatio = static_cast<float>(width) / static_cast<float>(height);
     mData.target = target;
-    mData.up = up;
+    mData.up = float3(0.0f, 1.0f, 0.0f); // Fixed up vector for first-person camera
     mData.fovY = fovY;
     mData.moveSpeed = 1.0f; // Default move speed in units per second
+
+    // Initialize yaw and pitch from initial forward direction
+    float3 initialForward = glm::normalize(target - posW);
+    mYaw = atan2(initialForward.z, initialForward.x);
+    mPitch = asin(initialForward.y);
 
     calculateCameraParameters();
 }
@@ -57,13 +63,9 @@ void Camera::handleInput()
     float deltaTime = GUI::GetIO().DeltaTime;
     movement *= mData.moveSpeed * deltaTime;
     mData.posW += movement;
-    mData.target += movement;
 
-    // ----------------------------
-    // Mouse drag for orbit rotation
-    // ----------------------------
-
-    if (GUI::IsMouseDown(0)) // Left mouse button
+    // Only handle mouse input if ImGui is not using it
+    if (GUI::IsMouseDown(0) && !GUI::GetIO().WantCaptureMouse) // Left mouse button
     {
         float2 currentMousePos(GUI::GetMousePos().x, GUI::GetMousePos().y);
         if (mFirstMouseInput)
@@ -72,46 +74,42 @@ void Camera::handleInput()
             mFirstMouseInput = false;
         }
 
-        float2 delta = mLastMousePos - currentMousePos;
-        if (glm::length(delta) > 0.001f) // Only process if there's meaningful movement
+        float2 delta = currentMousePos - mLastMousePos;
+        if (glm::length(delta) > 0.001f)
         {
-            float sensitivity = 0.005f;
-            float3 offset = mData.target - mData.posW;
-            float distance = glm::length(offset);
-            offset = glm::normalize(offset);
+            float sensitivity = 0.002f;
 
-            // Rotate around up vector (yaw) - horizontal mouse movement
-            if (abs(delta.x) > 0.001f)
-            {
-                float angleYaw = delta.x * sensitivity;
-                glm::mat4 yawRotation = glm::rotate(glm::mat4(1.0f), angleYaw, mData.up);
-                offset = glm::vec3(yawRotation * glm::vec4(offset, 1.0f));
-            }
+            // Update yaw (horizontal rotation) and pitch (vertical rotation)
+            mYaw += delta.x * sensitivity;
+            mPitch -= delta.y * sensitivity; // Invert Y for natural feel
 
-            // Rotate around right vector (pitch) - vertical mouse movement
-            if (abs(delta.y) > 0.001f)
-            {
-                float anglePitch = delta.y * sensitivity;
-                glm::mat4 pitchRotation = glm::rotate(glm::mat4(1.0f), anglePitch, mData.right);
-                offset = glm::vec3(pitchRotation * glm::vec4(offset, 1.0f));
-            }
+            // Clamp pitch to prevent camera flipping
+            const float maxPitch = glm::radians(89.0f);
+            mPitch = glm::clamp(mPitch, -maxPitch, maxPitch);
 
-            mData.target = mData.posW + offset * distance;
+            // Calculate new forward direction from yaw and pitch
+            float3 newForward;
+            newForward.x = cos(mYaw) * cos(mPitch);
+            newForward.y = sin(mPitch);
+            newForward.z = sin(mYaw) * cos(mPitch);
+            mData.forward = glm::normalize(newForward);
+
+            // Update target to reflect new direction
+            mData.target = mData.posW + mData.forward;
         }
         mLastMousePos = currentMousePos;
     }
     else
-        mFirstMouseInput = true; // Reset for next mouse drag session
+        mFirstMouseInput = true;
 
     calculateCameraParameters();
 }
 
 void Camera::calculateCameraParameters()
 {
-    // Calculate camera basis vectors
-    mData.forward = glm::normalize(mData.target - mData.posW);
+    // For first-person camera, forward is already calculated from yaw/pitch
+    // Keep world up vector fixed to maintain stability
     mData.right = glm::normalize(glm::cross(mData.forward, mData.up));
-    mData.up = glm::normalize(glm::cross(mData.right, mData.forward));
 
     // Calculate viewport dimensions based on FOV
     float viewportHeight = 2.0f;

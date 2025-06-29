@@ -16,7 +16,6 @@ RaytracingAccelerationStructure gScene;
 struct Payload
 {
     float3 color;
-    float2 pixel;
 };
 
 [shader("raygeneration")]
@@ -24,12 +23,13 @@ void rayGenMain()
 {
     uint2 launchID = DispatchRaysIndex().xy;
     if (launchID.x >= gWidth || launchID.y >= gHeight)
-        return;    float3 pixel = gCamera.data.pixel00 + launchID.x * gCamera.data.cameraU + launchID.y * gCamera.data.cameraV;
-    Ray ray = Ray(gCamera.data.posW, normalize(pixel - gCamera.data.posW));
+        return;    
+    
+    float3 pixel = gCamera.data.pixel00 + launchID.x * gCamera.data.cameraU + launchID.y * gCamera.data.cameraV;
+    Ray ray = Ray(gCamera.data.posW, pixel - gCamera.data.posW);
 
     Payload payload;
-    payload.color = float3(0, 0, 0); // Initialize to black
-    payload.pixel = float2(float(launchID.x) / float(gWidth), float(launchID.y) / float(gHeight)); // Store normalized pixel coordinates
+    payload.color = float3(0, 0, 0);
 
     RayDesc rayDesc;
     rayDesc.Origin = ray.origin;
@@ -53,7 +53,7 @@ void rayGenMain()
 void missMain(inout Payload payload)
 {
     // Create a gradient based on ray direction for visual debugging
-    payload.color = float3(payload.pixel.x, payload.pixel.y, gColor); 
+    payload.color = float3(gColor); 
 }
 
 [shader("closesthit")]

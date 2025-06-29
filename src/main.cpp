@@ -55,7 +55,7 @@ int main()
             float _padding;
         } perFrameData;
 
-        Camera camera(width, height, float3(0.f, 0.f, 2.f), float3(0.f, 0.f, 0.f), float3(0.f, 1.f, 0.f), glm::radians(45.0f));
+        Camera camera(width, height, float3(0.f, 0.f, 2.f), float3(0.f, 0.f, 0.f), glm::radians(45.0f));
         Buffer cbPerFrame, cbCamera;
         Texture textureOut;
         cbPerFrame.initialize(
@@ -137,12 +137,7 @@ int main()
         // It's also possible to obtain the descriptor from the BLAS object using getDesc()
         // and write the vertex and index buffer references into that descriptor again
         // because NVRHI erases those when it creates the AS object.
-        commandList->buildBottomLevelAccelStruct(blas, blasDesc.bottomLevelGeometries.data(), blasDesc.bottomLevelGeometries.size()); // Build the
-                                                                                                                                      // TLAS with one
-                                                                                                                                      // instance
-                                                                                                                                      // using
-                                                                                                                                      // identity
-                                                                                                                                      // transform
+        commandList->buildBottomLevelAccelStruct(blas, blasDesc.bottomLevelGeometries.data(), blasDesc.bottomLevelGeometries.size());
         auto instanceDesc = nvrhi::rt::InstanceDesc()
                                 .setBLAS(blas)
                                 .setFlags(nvrhi::rt::InstanceFlags::TriangleCullDisable)
@@ -152,7 +147,9 @@ int main()
         commandList->buildTopLevelAccelStruct(tlas, &instanceDesc, 1);
 
         commandList->close();
-        device.getDevice()->executeCommandList(commandList); // -------------------------
+        device.getDevice()->executeCommandList(commandList);
+
+        // -------------------------
         // 5. Setup shader & dispatch
         // -------------------------
         std::unordered_map<std::string, nvrhi::ResourceHandle> resourceMap;
