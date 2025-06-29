@@ -10,7 +10,7 @@ public:
     bool initialize(
         nvrhi::IDevice* device,
         const std::string& shaderPath,
-        const std::vector<std::string>& entryPoints,
+        const std::unordered_map<std::string, nvrhi::ShaderType>& entryPoints,
         const std::unordered_map<std::string, nvrhi::ResourceHandle>& resourceMap,
         const std::unordered_map<std::string, nvrhi::rt::AccelStructHandle>& accelStructMap = {}
     );

@@ -1,22 +1,7 @@
 #include "ShaderProgram.h"
 
-ShaderProgram::ShaderProgram() : m_ProgramLayout(nullptr) {}
-
-void ShaderProgram::initializeForShaderType(nvrhi::ShaderType primaryShaderType)
+void ShaderProgram::initializeSession(const std::string& profile)
 {
-    const char* profile;
-    switch (primaryShaderType)
-    {
-    case nvrhi::ShaderType::Compute:
-        profile = "cs_6_2";
-        break;
-    case nvrhi::ShaderType::AllRayTracing:
-        profile = "lib_6_3";
-        break;
-    default:
-        LOG_WARN("[ShaderProgram] Unknown shader type, using library profile");
-        break;
-    }
     slang::createGlobalSession(m_GlobalSession.writeRef());
 
 #ifdef _DEBUG
@@ -36,7 +21,7 @@ void ShaderProgram::initializeForShaderType(nvrhi::ShaderType primaryShaderType)
 
     slang::TargetDesc targetDesc = {};
     targetDesc.format = SLANG_DXIL;
-    targetDesc.profile = m_GlobalSession->findProfile(profile);
+    targetDesc.profile = m_GlobalSession->findProfile(profile.c_str());
     targetDesc.compilerOptionEntries = debugOptions;
     targetDesc.compilerOptionEntryCount = optionCount;
 
@@ -53,43 +38,32 @@ void ShaderProgram::initializeForShaderType(nvrhi::ShaderType primaryShaderType)
         LOG_ERROR("[Slang] Failed to create session with result: {}", sessionResult);
 }
 
-bool ShaderProgram::loadFromFile(
+ShaderProgram::ShaderProgram(
     nvrhi::IDevice* device,
     const std::string& filePath,
-    const std::vector<std::string>& entryPoints,
-    nvrhi::ShaderType shaderType
+    const std::unordered_map<std::string, nvrhi::ShaderType>& entryPoints,
+    const std::string& profile
 )
 {
     if (entryPoints.empty())
-    {
-        LOG_ERROR("[ShaderProgram] No entry points provided");
-        return false;
-    }
-
-    // Initialize session for the specific shader type
-    initializeForShaderType(shaderType);
+        LOG_ERROR_RETURN("[ShaderProgram] No entry points provided");
+    initializeSession(profile);
 
     // Load module
     Slang::ComPtr<slang::IModule> module;
     module = m_Session->loadModule(filePath.c_str());
     if (!module)
-    {
-        LOG_ERROR("[Slang] Failed to load module: {}", filePath);
-        return false;
-    }
+        LOG_ERROR_RETURN("[Slang] Failed to load module: {}", filePath);
 
     // Create entry points and collect them
     std::vector<Slang::ComPtr<slang::IEntryPoint>> slangEntryPoints;
     slangEntryPoints.reserve(entryPoints.size());
 
-    for (const std::string& entryPoint : entryPoints)
+    for (const std::pair<std::string, nvrhi::ShaderType>& entryPoint : entryPoints)
     {
         Slang::ComPtr<slang::IEntryPoint> slangEntryPoint;
-        if (SLANG_FAILED(module->findEntryPointByName(entryPoint.c_str(), slangEntryPoint.writeRef())))
-        {
-            LOG_ERROR("[Slang] Failed to find entry point: {}", entryPoint);
-            return false;
-        }
+        if (SLANG_FAILED(module->findEntryPointByName(entryPoint.first.c_str(), slangEntryPoint.writeRef())))
+            LOG_ERROR_RETURN("[Slang] Failed to find entry point: {}", entryPoint.first);
         slangEntryPoints.push_back(slangEntryPoint);
     }
 
@@ -102,27 +76,20 @@ bool ShaderProgram::loadFromFile(
 
     Slang::ComPtr<slang::IComponentType> program;
     if (SLANG_FAILED(m_Session->createCompositeComponentType(components.data(), static_cast<SlangInt>(components.size()), program.writeRef())))
-    {
-        LOG_ERROR("[Slang] Failed to create composite component type");
-        return false;
-    }
+        LOG_ERROR_RETURN("[Slang] Failed to create composite component type");
 
     // Link program
     if (SLANG_FAILED(program->link(m_LinkedProgram.writeRef())))
-    {
-        LOG_ERROR("[Slang] Failed to link program");
-        return false;
-    }
+        LOG_ERROR_RETURN("[Slang] Failed to link program");
 
     // Get program layout with diagnostics
     Slang::ComPtr<slang::IBlob> diagnostics;
     m_ProgramLayout = m_LinkedProgram->getLayout(0, diagnostics.writeRef());
-    if (diagnostics && diagnostics->getBufferSize() > 0)
-        LOG_ERROR("[Slang] Program layout diagnostics: {}", (const char*)diagnostics->getBufferPointer());
     if (!m_ProgramLayout)
     {
-        LOG_ERROR("[Slang] Failed to get program layout");
-        return false;
+        if (diagnostics && diagnostics->getBufferSize() > 0)
+            LOG_ERROR("[Slang] Program layout diagnostics: {}", (const char*)diagnostics->getBufferPointer());
+        LOG_ERROR_RETURN("[Slang] Failed to get program layout");
     }
 
     // Create shaders for each entry point
@@ -130,64 +97,43 @@ bool ShaderProgram::loadFromFile(
     m_Shaders.reserve(entryPoints.size());
     m_EntryPointToShaderIndex.clear();
 
-    for (size_t i = 0; i < entryPoints.size(); ++i)
+    uint32_t entryPointIndex = 0;
+    for (const auto& entryPoint : entryPoints)
     {
+        const auto& entryPointName = entryPoint.first;
+        const auto& entryPointType = entryPoint.second;
+
         Slang::ComPtr<slang::IBlob> kernelBlob;
         Slang::ComPtr<slang::IBlob> diagnosticBlob;
 
-        if (SLANG_FAILED(m_LinkedProgram->getEntryPointCode(i, 0, kernelBlob.writeRef(), diagnosticBlob.writeRef())))
+        if (SLANG_FAILED(m_LinkedProgram->getEntryPointCode(entryPointIndex, 0, kernelBlob.writeRef(), diagnosticBlob.writeRef())))
         {
             if (diagnosticBlob && diagnosticBlob->getBufferSize() > 0)
-                LOG_ERROR("[Slang] Entry point diagnostics for {}: {}", entryPoints[i], (const char*)diagnosticBlob->getBufferPointer());
-            LOG_ERROR("[Slang] Failed to get entry point code for {}", entryPoints[i]);
-            return false;
+                LOG_ERROR("[Slang] Entry point diagnostics for {}: {}", entryPointName, (const char*)diagnosticBlob->getBufferPointer());
+            LOG_ERROR_RETURN("[Slang] Failed to get entry point code for {}", entryPointName);
         }
 
-        LOG_DEBUG("[ShaderProgram] Compiled entry point {}: {} bytes", entryPoints[i], kernelBlob->getBufferSize());
+        LOG_DEBUG("[ShaderProgram] Compiled entry point {}: {} bytes", entryPointName, kernelBlob->getBufferSize());
 
         nvrhi::ShaderDesc desc;
-        desc.entryName = entryPoints[i].c_str(); // Determine shader type based on entry point name
-        nvrhi::ShaderType shaderType;
-        if (entryPoints[i] == "rayGenMain")
-            shaderType = nvrhi::ShaderType::RayGeneration;
-        else if (entryPoints[i] == "missMain")
-            shaderType = nvrhi::ShaderType::Miss;
-        else if (entryPoints[i] == "closestHitMain")
-            shaderType = nvrhi::ShaderType::ClosestHit;
-        else if (entryPoints[i] == "anyHitMain")
-            shaderType = nvrhi::ShaderType::AnyHit;
-        else if (entryPoints[i] == "intersectionMain")
-            shaderType = nvrhi::ShaderType::Intersection;
-        else
-        {
-            LOG_WARN("[ShaderProgram] Unknown ray tracing entry point: {}, defaulting to RayGeneration", entryPoints[i]);
-            shaderType = nvrhi::ShaderType::RayGeneration;
-        }
-
-        desc.shaderType = shaderType;
-
+        desc.entryName = entryPointName.c_str(); // Determine shader type based on entry point name
+        desc.shaderType = entryPointType;
         auto shader = device->createShader(desc, kernelBlob->getBufferPointer(), kernelBlob->getBufferSize());
         if (!shader)
-        {
-            LOG_ERROR("[ShaderProgram] Failed to create shader for entry point: {}", entryPoints[i]);
-            return false;
-        }
+            LOG_ERROR_RETURN("[ShaderProgram] Failed to create shader for entry point: {}", entryPointName);
 
         m_Shaders.push_back(shader);
-        m_EntryPointToShaderIndex[entryPoints[i]] = i;
+        m_EntryPointToShaderIndex[entryPointName] = entryPointIndex;
+        entryPointIndex++;
     }
 
     LOG_DEBUG("[ShaderProgram] Successfully loaded shader with {} entry points from: {}", entryPoints.size(), filePath);
-    return true;
 }
 
 void ShaderProgram::printReflectionInfo() const
 {
     if (!m_ProgramLayout)
-    {
-        LOG_DEBUG("[ShaderProgram] No program layout available for reflection");
-        return;
-    }
+        LOG_DEBUG_RETURN("[ShaderProgram] No program layout available for reflection");
     LOG_DEBUG("[ShaderProgram] Printing shader reflection information");
 
     auto globalScopeLayout = m_ProgramLayout->getGlobalParamsVarLayout();
@@ -222,13 +168,10 @@ void ShaderProgram::printVariableLayout(slang::VariableLayoutReflection* varLayo
     const char* typeName = nullptr;
     if (typeLayout)
         typeName = typeLayout->getName();
+    else
+        LOG_WARN_RETURN("{}No type layout available for variable '{}'", indentStr, varLayout->getName() ? varLayout->getName() : "Unknown");
     LOG_DEBUG("{}Type: {}", indentStr, typeName ? typeName : "Unknown");
 
-    if (!typeLayout)
-    {
-        LOG_WARN("{}No type layout available", indentStr);
-        return;
-    }
     switch (typeLayout->getKind())
     {
     case slang::TypeReflection::Kind::Struct:
@@ -292,9 +235,7 @@ void ShaderProgram::printVariableLayout(slang::VariableLayoutReflection* varLayo
 }
 
 bool ShaderProgram::generateBindingLayout(
-    std::vector<nvrhi::BindingLayoutItem>& outLayoutItems,
-    std::vector<nvrhi::BindingSetItem>& outBindings,
-    const std::unordered_map<std::string, nvrhi::RefCountPtr<nvrhi::IResource>>& resourceMap,
+    const std::unordered_map<std::string, nvrhi::ResourceHandle>& resourceMap,
     const std::unordered_map<std::string, nvrhi::rt::AccelStructHandle>& accelStructMap
 )
 {
@@ -304,16 +245,15 @@ bool ShaderProgram::generateBindingLayout(
         return false;
     }
 
-    outLayoutItems.clear();
-    outBindings.clear();
+    m_BindingLayoutItems.clear();
+    m_BindingSetItems.clear();
+    m_ResourceMap = resourceMap;
+    m_AccelStructMap = accelStructMap;
 
     // Process global parameters
     auto globalScopeLayout = m_ProgramLayout->getGlobalParamsVarLayout();
-    if (globalScopeLayout)
-    {
-        if (!processParameterGroup(globalScopeLayout, outLayoutItems, outBindings, resourceMap, accelStructMap))
-            return false;
-    }
+    if (!processParameterGroup(globalScopeLayout))
+        return false;
 
     // Process entry point parameters
     auto entryPointCount = m_ProgramLayout->getEntryPointCount();
@@ -321,27 +261,16 @@ bool ShaderProgram::generateBindingLayout(
     {
         auto entryPoint = m_ProgramLayout->getEntryPointByIndex(i);
         auto entryPointLayout = entryPoint->getVarLayout();
-        if (entryPointLayout)
-        {
-            if (!processParameterGroup(entryPointLayout, outLayoutItems, outBindings, resourceMap, accelStructMap))
-                return false;
-        }
+        if (!processParameterGroup(entryPointLayout))
+            return false;
     }
-
     return true;
 }
 
-bool ShaderProgram::processParameterGroup(
-    slang::VariableLayoutReflection* varLayout,
-    std::vector<nvrhi::BindingLayoutItem>& outLayoutItems,
-    std::vector<nvrhi::BindingSetItem>& outBindings,
-    const std::unordered_map<std::string, nvrhi::RefCountPtr<nvrhi::IResource>>& resourceMap,
-    const std::unordered_map<std::string, nvrhi::rt::AccelStructHandle>& accelStructMap
-)
+bool ShaderProgram::processParameterGroup(slang::VariableLayoutReflection* varLayout)
 {
     if (!varLayout)
         return true;
-
     auto typeLayout = varLayout->getTypeLayout();
     if (!typeLayout)
         return true;
@@ -353,27 +282,19 @@ bool ShaderProgram::processParameterGroup(
         for (unsigned int i = 0; i < fieldCount; i++)
         {
             auto fieldLayout = typeLayout->getFieldByIndex(i);
-            if (!processParameter(fieldLayout, outLayoutItems, outBindings, resourceMap, accelStructMap))
+            if (!processParameter(fieldLayout))
                 return false;
         }
     }
     else
-        return processParameter(varLayout, outLayoutItems, outBindings, resourceMap, accelStructMap);
-
+        return processParameter(varLayout);
     return true;
 }
 
-bool ShaderProgram::processParameter(
-    slang::VariableLayoutReflection* varLayout,
-    std::vector<nvrhi::BindingLayoutItem>& outLayoutItems,
-    std::vector<nvrhi::BindingSetItem>& outBindings,
-    const std::unordered_map<std::string, nvrhi::RefCountPtr<nvrhi::IResource>>& resourceMap,
-    const std::unordered_map<std::string, nvrhi::rt::AccelStructHandle>& accelStructMap
-)
+bool ShaderProgram::processParameter(slang::VariableLayoutReflection* varLayout)
 {
     if (!varLayout)
         return true;
-
     auto typeLayout = varLayout->getTypeLayout();
     if (!typeLayout)
         return true;
@@ -381,34 +302,8 @@ bool ShaderProgram::processParameter(
     const char* paramName = varLayout->getName();
     if (!paramName)
         return true;
-
     std::string paramNameStr(paramName);
-    // Get binding slot information - use appropriate parameter category based on resource type
-    auto bindingSlot = ~0u;
-    auto bindingSpace = varLayout->getOffset(slang::ParameterCategory::RegisterSpace);
-
-    // Determine the correct parameter category based on resource type
-    if (typeLayout->getKind() == slang::TypeReflection::Kind::Resource)
-    {
-        auto resourceAccess = typeLayout->getResourceAccess();
-        if (resourceAccess == SLANG_RESOURCE_ACCESS_READ)
-            bindingSlot = varLayout->getOffset(slang::ParameterCategory::ShaderResource);
-        else if (resourceAccess == SLANG_RESOURCE_ACCESS_READ_WRITE)
-            bindingSlot = varLayout->getOffset(slang::ParameterCategory::UnorderedAccess);
-    }
-    else if (typeLayout->getKind() == slang::TypeReflection::Kind::ConstantBuffer)
-        bindingSlot = varLayout->getOffset(slang::ParameterCategory::ConstantBuffer);
-    else if (typeLayout->getKind() == slang::TypeReflection::Kind::SamplerState)
-        bindingSlot = varLayout->getOffset(slang::ParameterCategory::SamplerState);
-    else
-        bindingSlot = varLayout->getOffset(slang::ParameterCategory::DescriptorTableSlot);
-
-    // If no binding slot is available, skip this parameter
-    if (bindingSlot == ~0u)
-    {
-        LOG_WARN("[ShaderBinding] No binding slot for parameter: {}", paramNameStr);
-        return true;
-    }
+    auto bindingSlot = varLayout->getBindingIndex();
 
     // Create binding layout item based on resource type
     nvrhi::BindingLayoutItem layoutItem;
@@ -429,8 +324,8 @@ bool ShaderProgram::processParameter(
         case SLANG_TEXTURE_BUFFER:
             if (resourceAccess == SLANG_RESOURCE_ACCESS_READ || resourceAccess == SLANG_RESOURCE_ACCESS_READ_WRITE)
             {
-                auto resourceIt = resourceMap.find(paramNameStr);
-                if (resourceIt != resourceMap.end())
+                auto resourceIt = m_ResourceMap.find(paramNameStr);
+                if (resourceIt != m_ResourceMap.end())
                 {
                     nvrhi::ITexture* texture = dynamic_cast<nvrhi::ITexture*>(resourceIt->second.Get());
                     nvrhi::TextureHandle textureHandle = texture;
@@ -454,8 +349,8 @@ bool ShaderProgram::processParameter(
         case SLANG_STRUCTURED_BUFFER:
             if (resourceAccess == SLANG_RESOURCE_ACCESS_READ || resourceAccess == SLANG_RESOURCE_ACCESS_READ_WRITE)
             {
-                auto resourceIt = resourceMap.find(paramNameStr);
-                if (resourceIt != resourceMap.end())
+                auto resourceIt = m_ResourceMap.find(paramNameStr);
+                if (resourceIt != m_ResourceMap.end())
                 {
                     nvrhi::IBuffer* buffer = dynamic_cast<nvrhi::IBuffer*>(resourceIt->second.Get());
                     nvrhi::BufferHandle bufferHandle = buffer;
@@ -479,8 +374,8 @@ bool ShaderProgram::processParameter(
         case SLANG_ACCELERATION_STRUCTURE:
             if (resourceAccess == SLANG_RESOURCE_ACCESS_READ || resourceAccess == SLANG_RESOURCE_ACCESS_READ_WRITE)
             {
-                auto accelStructIt = accelStructMap.find(paramNameStr);
-                if (accelStructIt != accelStructMap.end())
+                auto accelStructIt = m_AccelStructMap.find(paramNameStr);
+                if (accelStructIt != m_AccelStructMap.end())
                 {
                     layoutItem = nvrhi::BindingLayoutItem::RayTracingAccelStruct(bindingSlot);
                     bindingItem = nvrhi::BindingSetItem::RayTracingAccelStruct(bindingSlot, accelStructIt->second);
@@ -501,8 +396,8 @@ bool ShaderProgram::processParameter(
 
     case slang::TypeReflection::Kind::ConstantBuffer:
     {
-        auto resourceIt = resourceMap.find(paramNameStr);
-        if (resourceIt != resourceMap.end())
+        auto resourceIt = m_ResourceMap.find(paramNameStr);
+        if (resourceIt != m_ResourceMap.end())
         {
             nvrhi::IBuffer* buffer = dynamic_cast<nvrhi::IBuffer*>(resourceIt->second.Get());
             nvrhi::BufferHandle bufferHandle = buffer;
@@ -519,8 +414,8 @@ bool ShaderProgram::processParameter(
         return true;
     }
 
-    outLayoutItems.push_back(layoutItem);
-    outBindings.push_back(bindingItem);
+    m_BindingLayoutItems.push_back(layoutItem);
+    m_BindingSetItems.push_back(bindingItem);
     return true;
 }
 

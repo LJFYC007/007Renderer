@@ -3,24 +3,22 @@
 bool RayTracingPass::initialize(
     nvrhi::IDevice* device,
     const std::string& shaderPath,
-    const std::vector<std::string>& entryPoints,
+    const std::unordered_map<std::string, nvrhi::ShaderType>& entryPoints,
     const std::unordered_map<std::string, nvrhi::ResourceHandle>& resourceMap,
     const std::unordered_map<std::string, nvrhi::rt::AccelStructHandle>& accelStructMap
 )
 {
-    ShaderProgram program;
-    if (!program.loadFromFile(device, std::string(PROJECT_DIR) + shaderPath, entryPoints, nvrhi::ShaderType::AllRayTracing))
-        return false;
+    ShaderProgram program(device, std::string(PROJECT_DIR) + shaderPath, entryPoints, "lib_6_3");
 
     m_RayGenShader = program.getShader("rayGenMain");
     m_MissShader = program.getShader("missMain");
     m_ClosestHitShader = program.getShader("closestHitMain");
     // program.printReflectionInfo();
 
-    std::vector<nvrhi::BindingLayoutItem> layoutItems;
-    std::vector<nvrhi::BindingSetItem> bindings;
-    if (!program.generateBindingLayout(layoutItems, bindings, resourceMap, accelStructMap))
+    if (!program.generateBindingLayout(resourceMap, accelStructMap))
         return false;
+    std::vector<nvrhi::BindingLayoutItem> layoutItems = program.getBindingLayoutItems();
+    std::vector<nvrhi::BindingSetItem> bindings = program.getBindingSetItems();
 
     // Create binding layout
     nvrhi::BindingLayoutDesc layoutDesc;

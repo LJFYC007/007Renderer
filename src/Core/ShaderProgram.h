@@ -11,42 +11,37 @@
 class ShaderProgram
 {
 public:
-    ShaderProgram();
-    bool loadFromFile(nvrhi::IDevice* device, const std::string& filePath, const std::vector<std::string>& entryPoints, nvrhi::ShaderType shaderType);
+    ShaderProgram(
+        nvrhi::IDevice* device,
+        const std::string& filePath,
+        const std::unordered_map<std::string, nvrhi::ShaderType>& entryPoints,
+        const std::string& profile
+    );
 
     nvrhi::ShaderHandle getShader(const std::string& entryPoint) const;
-    const std::vector<nvrhi::ShaderHandle>& getAllShaders() const { return m_Shaders; }
 
     slang::ProgramLayout* getProgramLayout() const { return m_ProgramLayout; }
+    const std::vector<nvrhi::ShaderHandle>& getShaders() const { return m_Shaders; }
+    const std::vector<nvrhi::BindingLayoutItem>& getBindingLayoutItems() const { return m_BindingLayoutItems; }
+    const std::vector<nvrhi::BindingSetItem>& getBindingSetItems() const { return m_BindingSetItems; }
 
+    // Debugging utility to print reflection information
     void printReflectionInfo() const;
+
     bool generateBindingLayout(
-        std::vector<nvrhi::BindingLayoutItem>& outLayoutItems,
-        std::vector<nvrhi::BindingSetItem>& outBindings,
-        const std::unordered_map<std::string, nvrhi::RefCountPtr<nvrhi::IResource>>& resourceMap,
+        const std::unordered_map<std::string, nvrhi::ResourceHandle>& resourceMap,
         const std::unordered_map<std::string, nvrhi::rt::AccelStructHandle>& accelStructMap = {}
     );
 
 private:
-    // Initialize with specific shader type support
-    void initializeForShaderType(nvrhi::ShaderType primaryShaderType);
+    // Initialize session for Slang compilation
+    void initializeSession(const std::string& profile);
 
     void printVariableLayout(slang::VariableLayoutReflection* varLayout, int indent) const;
-    bool processParameterGroup(
-        slang::VariableLayoutReflection* varLayout,
-        std::vector<nvrhi::BindingLayoutItem>& outLayoutItems,
-        std::vector<nvrhi::BindingSetItem>& outBindings,
-        const std::unordered_map<std::string, nvrhi::RefCountPtr<nvrhi::IResource>>& resourceMap,
-        const std::unordered_map<std::string, nvrhi::rt::AccelStructHandle>& accelStructMap
-    );
 
-    bool processParameter(
-        slang::VariableLayoutReflection* varLayout,
-        std::vector<nvrhi::BindingLayoutItem>& outLayoutItems,
-        std::vector<nvrhi::BindingSetItem>& outBindings,
-        const std::unordered_map<std::string, nvrhi::RefCountPtr<nvrhi::IResource>>& resourceMap,
-        const std::unordered_map<std::string, nvrhi::rt::AccelStructHandle>& accelStructMap
-    );
+    bool processParameterGroup(slang::VariableLayoutReflection* varLayout);
+
+    bool processParameter(slang::VariableLayoutReflection* varLayout);
 
     Slang::ComPtr<slang::IGlobalSession> m_GlobalSession;
     Slang::ComPtr<slang::ISession> m_Session;
@@ -56,4 +51,8 @@ private:
 
     std::vector<nvrhi::ShaderHandle> m_Shaders;                        // All shaders
     std::unordered_map<std::string, size_t> m_EntryPointToShaderIndex; // Map entry point names to shader indices
+    std::vector<nvrhi::BindingLayoutItem> m_BindingLayoutItems;        // Binding layout items
+    std::vector<nvrhi::BindingSetItem> m_BindingSetItems;              // Binding set items
+    std::unordered_map<std::string, nvrhi::ResourceHandle> m_ResourceMap;
+    std::unordered_map<std::string, nvrhi::rt::AccelStructHandle> m_AccelStructMap;
 };

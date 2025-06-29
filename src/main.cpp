@@ -161,7 +161,10 @@ int main()
         accelStructMap["gScene"] = tlas;
 
         RayTracingPass pass;
-        pass.initialize(device.getDevice(), "/shaders/raytracing.slang", {"rayGenMain", "missMain", "closestHitMain"}, resourceMap, accelStructMap);
+        std::unordered_map<std::string, nvrhi::ShaderType> entryPoints = {
+            {"rayGenMain", nvrhi::ShaderType::RayGeneration}, {"missMain", nvrhi::ShaderType::Miss}, {"closestHitMain", nvrhi::ShaderType::ClosestHit}
+        };
+        pass.initialize(device.getDevice(), "/shaders/raytracing.slang", entryPoints, resourceMap, accelStructMap);
 
         // -------------------------
         // 5. Setup GUI with original ImGui

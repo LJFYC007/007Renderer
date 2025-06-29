@@ -7,9 +7,9 @@ bool ComputePass::initialize(
     const std::unordered_map<std::string, nvrhi::ResourceHandle>& resourceMap
 )
 {
-    ShaderProgram program;
-    if (!program.loadFromFile(device, std::string(PROJECT_DIR) + shaderPath, {entryPoint}, nvrhi::ShaderType::Compute))
-        return false;
+    std::unordered_map<std::string, nvrhi::ShaderType> entryPoints;
+    entryPoints[entryPoint] = nvrhi::ShaderType::Compute;
+    ShaderProgram program(device, std::string(PROJECT_DIR) + shaderPath, entryPoints, "cs_6_2");
     m_Shader = program.getShader(entryPoint);
     // program.printReflectionInfo();
 
@@ -29,10 +29,10 @@ bool ComputePass::initialize(
         }
     }
 
-    std::vector<nvrhi::BindingLayoutItem> layoutItems;
-    std::vector<nvrhi::BindingSetItem> bindings;
-    if (!program.generateBindingLayout(layoutItems, bindings, resourceMap))
+    if (!program.generateBindingLayout(resourceMap))
         return false;
+    std::vector<nvrhi::BindingLayoutItem> layoutItems = program.getBindingLayoutItems();
+    std::vector<nvrhi::BindingSetItem> bindings = program.getBindingSetItems();
 
     // Create binding layout
     nvrhi::BindingLayoutDesc layoutDesc;
