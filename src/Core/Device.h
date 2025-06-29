@@ -36,6 +36,7 @@ public:
     // Getters
     ComPtr<ID3D12Device> getD3D12Device() const { return m_d3d12Device; }
     ComPtr<ID3D12CommandQueue> getCommandQueue() const { return m_commandQueue; }
+    nvrhi::CommandListHandle getCommandList() const { return m_CommandList; }
     nvrhi::DeviceHandle getDevice() const { return m_nvrhiDevice; }
 
     // Check if device is valid
@@ -49,9 +50,11 @@ private:
 
     ComPtr<ID3D12Device> m_d3d12Device;
     ComPtr<ID3D12CommandQueue> m_commandQueue;
+    nvrhi::CommandListHandle m_CommandList;
     ComPtr<IDXGIFactory4> m_dxgiFactory;
     ComPtr<IDXGIAdapter1> m_adapter;
     nvrhi::DeviceHandle m_nvrhiDevice;
+    nvrhi::CommandListParameters m_CmdParams;
 
     std::unique_ptr<MessageCallback> m_messageCallback;
     bool m_isInitialized = false;

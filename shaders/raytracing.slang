@@ -26,25 +26,19 @@ void rayGenMain()
         return;    
     
     float3 pixel = gCamera.data.pixel00 + launchID.x * gCamera.data.cameraU + launchID.y * gCamera.data.cameraV;
-    Ray ray = Ray(gCamera.data.posW, pixel - gCamera.data.posW);
+    Ray ray = Ray(gCamera.data.posW, normalize(pixel - gCamera.data.posW));
 
     Payload payload;
     payload.color = float3(0, 0, 0);
-
-    RayDesc rayDesc;
-    rayDesc.Origin = ray.origin;
-    rayDesc.Direction = ray.dir;
-    rayDesc.TMin = 0.001;
-    rayDesc.TMax = 10000.0;
-
     TraceRay(gScene,
         RAY_FLAG_NONE,
         0xFF,
         0,
         0,
         0,
-        rayDesc,
-        payload);
+        ray.toRayDesc(),
+        payload
+    );
 
     result[launchID] = float4(payload.color, 1.0);
 }

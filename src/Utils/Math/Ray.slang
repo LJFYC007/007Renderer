@@ -16,4 +16,6 @@ struct Ray
     }
 
     float3 eval(float t) { return origin + t * dir; }
+
+    RayDesc toRayDesc() { return RayDesc(origin, tMin, dir, tMax); }
 }

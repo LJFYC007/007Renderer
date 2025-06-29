@@ -38,6 +38,7 @@ bool Device::initialize()
         return false;
     if (!createNVRHIDevice())
         return false;
+    m_CommandList = m_nvrhiDevice->createCommandList(m_CmdParams);
 
     m_isInitialized = true;
     LOG_INFO("Device initialization completed successfully");
@@ -60,7 +61,6 @@ void Device::shutdown()
     m_commandQueue.Reset();
     m_adapter.Reset();
     m_d3d12Device.Reset();
-    m_dxgiFactory.Reset();
 
 #ifdef _DEBUG
     if (m_pdx12Debug)

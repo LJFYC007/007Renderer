@@ -9,6 +9,7 @@ void Camera::setCamera(const uint32_t width, const uint32_t height, const float3
     mData.frameWidth = width;
     mData.frameHeight = height;
     mData.posW = posW;
+    mData.forward = glm::normalize(target - posW);
     mData.aspectRatio = static_cast<float>(width) / static_cast<float>(height);
     mData.target = target;
     mData.up = float3(0.0f, 1.0f, 0.0f); // Fixed up vector for first-person camera

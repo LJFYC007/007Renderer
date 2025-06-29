@@ -3,19 +3,20 @@
 #include <vector>
 
 #include "Core/ShaderProgram.h"
+#include "Core/Device.h"
 
 class RayTracingPass
 {
 public:
     bool initialize(
-        nvrhi::IDevice* device,
+        Device& device,
         const std::string& shaderPath,
         const std::unordered_map<std::string, nvrhi::ShaderType>& entryPoints,
         const std::unordered_map<std::string, nvrhi::ResourceHandle>& resourceMap,
         const std::unordered_map<std::string, nvrhi::rt::AccelStructHandle>& accelStructMap = {}
     );
 
-    void dispatch(nvrhi::ICommandList* commandList, uint32_t width, uint32_t height, uint32_t depth = 1);
+    void dispatch(Device& device, uint32_t width, uint32_t height, uint32_t depth = 1);
 
 private:
     nvrhi::rt::PipelineHandle m_Pipeline;

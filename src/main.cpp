@@ -27,9 +27,6 @@ int main()
         LOG_ERROR("Failed to initialize device!");
         return 1;
     }
-    // Create NVRHI command list for ray tracing dispatch
-    nvrhi::CommandListParameters cmdParams;
-    nvrhi::CommandListHandle commandList = device.getDevice()->createCommandList(cmdParams);
 
     const uint32_t width = 1920;
     const uint32_t height = 1080;
@@ -127,6 +124,7 @@ int main()
         auto tlasDesc = nvrhi::rt::AccelStructDesc().setDebugName("TLAS").setIsTopLevel(true).setTopLevelMaxInstances(1);
 
         nvrhi::rt::AccelStructHandle tlas = device.getDevice()->createAccelStruct(tlasDesc);
+        auto commandList = device.getCommandList();
         commandList->open();
 
         // Upload the vertex and index data
@@ -164,7 +162,7 @@ int main()
         std::unordered_map<std::string, nvrhi::ShaderType> entryPoints = {
             {"rayGenMain", nvrhi::ShaderType::RayGeneration}, {"missMain", nvrhi::ShaderType::Miss}, {"closestHitMain", nvrhi::ShaderType::ClosestHit}
         };
-        pass.initialize(device.getDevice(), "/shaders/raytracing.slang", entryPoints, resourceMap, accelStructMap);
+        pass.initialize(device, "/shaders/raytracing.slang", entryPoints, resourceMap, accelStructMap);
 
         // -------------------------
         // 5. Setup GUI with original ImGui
@@ -198,24 +196,8 @@ int main()
             perFrameData.gColor = gColorSlider;
             cbPerFrame.updateData(device.getDevice(), &perFrameData, sizeof(PerFrameCB));
             cbCamera.updateData(device.getDevice(), &camera.getCameraData(), sizeof(CameraData));
-            commandList->open();
 
-            // Set up resource states for buffers
-            commandList->beginTrackingBufferState(cbPerFrame.getHandle(), nvrhi::ResourceStates::ConstantBuffer);
-            commandList->beginTrackingBufferState(cbCamera.getHandle(), nvrhi::ResourceStates::ConstantBuffer);
-
-            // Critical: Set up texture state for UAV access in ray tracing
-            commandList->beginTrackingTextureState(textureOut.getHandle(), nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
-            commandList->setTextureState(textureOut.getHandle(), nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess);
-
-            // Commit barriers before dispatch
-            commandList->commitBarriers();
-
-            pass.dispatch(commandList, width, height, 1);
-
-            commandList->close();
-            nvrhi::ICommandList* commandLists[] = {commandList};
-            device.getDevice()->executeCommandLists(commandLists, 1, nvrhi::CommandQueue::Graphics);
+            pass.dispatch(device, width, height, 1);
 
             // Set texture for display
             ID3D12Resource* d3d12Texture = static_cast<ID3D12Resource*>(textureOut.getHandle()->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource));
