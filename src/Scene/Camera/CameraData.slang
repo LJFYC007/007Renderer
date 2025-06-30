@@ -1,5 +1,3 @@
-#pragma once
-
 struct CameraData
 {
     float3 posW;

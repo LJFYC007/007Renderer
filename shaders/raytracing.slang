@@ -1,6 +1,6 @@
-import "Utils/Math/Ray.slang";
-import "Utils/Math/Sampling.slang";
-import "Scene/Camera/Camera.slang";
+import Utils.Math.Ray;
+import Utils.Sampling.SampleGenerator;
+import Scene.Camera.Camera;
 
 cbuffer PerFrameCB
 {
@@ -32,7 +32,7 @@ struct Payload
 {
     float3 color;
     uint depth;
-    uint seed;
+    TinyUniformSampleGenerator sampleGen;
 };
 
 [shader("raygeneration")]
@@ -42,22 +42,13 @@ void rayGenMain()
     if (launchID.x >= gWidth || launchID.y >= gHeight)
         return;    
 
-    // Better seed initialization with multiple hash steps for improved distribution
-    uint2 pixelCoord = launchID.xy;
-    uint pixelIndex = pixelCoord.y * gWidth + pixelCoord.x;
-    
-    // Use multiple hash operations to break correlation patterns
-    uint baseSeed = hash(pixelIndex);
-    baseSeed = hash(baseSeed + frameCount * 0x9e3779b9u);
-    baseSeed = wangHash(baseSeed);
-    
     float3 pixel = gCamera.data.pixel00 + launchID.x * gCamera.data.cameraU + launchID.y * gCamera.data.cameraV;
     Ray ray = Ray(gCamera.data.posW, normalize(pixel - gCamera.data.posW));
 
     Payload payload;
     payload.color = float3(0, 0, 0);
     payload.depth = 1;
-    payload.seed = baseSeed;
+    payload.sampleGen = TinyUniformSampleGenerator(launchID, frameCount);
     
     TraceRay(gScene, RAY_FLAG_NONE, 0xFF, 0, 0, 0, ray.toRayDesc(), payload);
 
@@ -99,32 +90,26 @@ void closestHitMain(inout Payload payload, BuiltInTriangleIntersectionAttributes
     float3 normal0 = gVertices[i0].normal;
     float3 normal1 = gVertices[i1].normal;
     float3 normal2 = gVertices[i2].normal;
-    float3 hitNormal = normalize(w * normal0 + u * normal1 + v * normal2);    // Sample hemisphere for indirect lighting with decorrelated random numbers
-    uint sampleSeed1 = nextRandom(payload.seed);
-    uint sampleSeed2 = nextRandom(payload.seed);
-    float2 randomSample = float2(
-        float(sampleSeed1) / float(0xffffffffu),
-        float(sampleSeed2) / float(0xffffffffu)
-    );
+    float3 hitNormal = normalize(w * normal0 + u * normal1 + v * normal2);
+    
+    // Sample hemisphere for indirect lighting using the sample generator
+    float2 randomSample = sampleNext2D(payload.sampleGen);
     float3 sampleDir = sampleHemisphere(hitNormal, randomSample);
     
     // Create new ray for indirect lighting
     float3 hitPoint = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
     Ray bounceRay = Ray(hitPoint + hitNormal * 0.001f, sampleDir);  // Small offset to avoid self-intersection
 
-    // Create new seed for bounce ray to avoid correlation
-    // Hash with depth and primitive index for better distribution
-    uint bounceSeed = hash(payload.seed + primitiveIndex * 1023u + payload.depth * 7919u);
-    bounceSeed = wangHash(bounceSeed);
+    // Create new sample generator for bounce ray to avoid correlation
+    uint2 newPixel = uint2(primitiveIndex, payload.depth);
     
     // Trace bounce ray
     Payload bouncePayload;
     bouncePayload.color = float3(0, 0, 0);
     bouncePayload.depth = payload.depth + 1;
-    bouncePayload.seed = bounceSeed;
+    bouncePayload.sampleGen = payload.sampleGen;
     
     TraceRay(gScene, RAY_FLAG_NONE, 0xFF, 0, 0, 0, bounceRay.toRayDesc(), bouncePayload);
     
     payload.color = 0.5 * bouncePayload.color;
-    payload.seed = bouncePayload.seed;
 }
