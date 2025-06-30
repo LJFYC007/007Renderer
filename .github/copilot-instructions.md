@@ -8,4 +8,4 @@ For the answers, I hope you can provide detailed Chinese explanations, especiall
 
 When writing control statements like `if`, `for`, or `while` that have a single statement body, omit braces and place the statement on the same line. Use concise one-liners where possible to improve readability.
 
-Remember I'm using Windows, so if you are using terminal/powershell commands, ensure they are compatible with Windows. Avoid using Unix-specific commands or paths.
+To compile the project, use `C:\Scoop\shims\cmake.EXE --build e:/007Renderer/build/Debug --config Debug --target 007Renderer --`

@@ -6,6 +6,8 @@
 #include "Core/Window.h"
 #include "Core/Buffer.h"
 #include "Core/Texture.h"
+#include "Core/Geometry.h"
+#include "Core/OBJLoader.h"
 #include "RenderPasses/ComputePass.h"
 #include "RenderPasses/RayTracingPass.h"
 #include "Utils/Math/Math.h"
@@ -68,84 +70,8 @@ int main()
         // -------------------------
         // 4. Setup triangle geometry for ray tracing
         // -------------------------
-        // Define triangle vertices (world space coordinates)
-        struct Vertex
-        {
-            float position[3];
-            float texCoord[2];
-        };
-
-        static const Vertex triangleVertices[] = {
-            //  position          texCoord
-            {{0.f, 0.5f, -0.5f}, {0.5f, 0.f}},
-            {{-0.5f, -0.5f, -0.5f}, {0.f, 1.f}},
-            {{0.5f, -0.5f, -0.5f}, {1.f, 1.f}}
-        };
-
-        // Define triangle indices
-        static const uint32_t triangleIndices[] = {0, 1, 2};
-        // Create vertex buffer for acceleration structure build input
-        nvrhi::BufferDesc vertexBufferDesc = nvrhi::BufferDesc()
-                                                 .setByteSize(sizeof(triangleVertices))
-                                                 .setIsVertexBuffer(true)
-                                                 .setInitialState(nvrhi::ResourceStates::VertexBuffer)
-                                                 .setKeepInitialState(true) // enable fully automatic state tracking
-                                                 .setDebugName("Vertex Buffer")
-                                                 .setCanHaveRawViews(true)
-                                                 .setIsAccelStructBuildInput(true);
-        nvrhi::BufferHandle vertexBuffer = device.getDevice()->createBuffer(vertexBufferDesc);
-
-        // Create index buffer for acceleration structure build input
-        nvrhi::BufferDesc indexBufferDesc = nvrhi::BufferDesc()
-                                                .setByteSize(sizeof(triangleIndices))
-                                                .setIsIndexBuffer(true)
-                                                .setInitialState(nvrhi::ResourceStates::IndexBuffer)
-                                                .setKeepInitialState(true) // enable fully automatic state tracking
-                                                .setDebugName("Index Buffer")
-                                                .setCanHaveRawViews(true)
-                                                .setIsAccelStructBuildInput(true);
-        nvrhi::BufferHandle indexBuffer = device.getDevice()->createBuffer(indexBufferDesc);
-
-        // Geometry descriptor
-        auto triangles = nvrhi::rt::GeometryTriangles()
-                             .setVertexBuffer(vertexBuffer)
-                             .setVertexFormat(nvrhi::Format::RGB32_FLOAT)
-                             .setVertexCount(std::size(triangleVertices))
-                             .setVertexStride(sizeof(Vertex))
-                             .setIndexBuffer(indexBuffer)
-                             .setIndexFormat(nvrhi::Format::R32_UINT)
-                             .setIndexCount(std::size(triangleIndices)); // BLAS descriptor with proper geometry flags
-        auto blasDesc = nvrhi::rt::AccelStructDesc().setDebugName("BLAS").setIsTopLevel(false).addBottomLevelGeometry(
-            nvrhi::rt::GeometryDesc().setTriangles(triangles).setFlags(nvrhi::rt::GeometryFlags::Opaque)
-        );
-
-        nvrhi::rt::AccelStructHandle blas = device.getDevice()->createAccelStruct(blasDesc);
-
-        auto tlasDesc = nvrhi::rt::AccelStructDesc().setDebugName("TLAS").setIsTopLevel(true).setTopLevelMaxInstances(1);
-
-        nvrhi::rt::AccelStructHandle tlas = device.getDevice()->createAccelStruct(tlasDesc);
-        auto commandList = device.getCommandList();
-        commandList->open();
-
-        // Upload the vertex and index data
-        commandList->writeBuffer(vertexBuffer, triangleVertices, sizeof(triangleVertices));
-        commandList->writeBuffer(indexBuffer, triangleIndices, sizeof(triangleIndices));
-
-        // Build the BLAS using the geometry array populated earlier.
-        // It's also possible to obtain the descriptor from the BLAS object using getDesc()
-        // and write the vertex and index buffer references into that descriptor again
-        // because NVRHI erases those when it creates the AS object.
-        commandList->buildBottomLevelAccelStruct(blas, blasDesc.bottomLevelGeometries.data(), blasDesc.bottomLevelGeometries.size());
-        auto instanceDesc = nvrhi::rt::InstanceDesc()
-                                .setBLAS(blas)
-                                .setFlags(nvrhi::rt::InstanceFlags::TriangleCullDisable)
-                                .setTransform(nvrhi::rt::c_IdentityTransform)
-                                .setInstanceMask(0xFF);
-
-        commandList->buildTopLevelAccelStruct(tlas, &instanceDesc, 1);
-
-        commandList->close();
-        device.getDevice()->executeCommandList(commandList);
+        auto geometryData = OBJLoader::loadFromFile(std::string(PROJECT_DIR) + "/media/cornell_box.obj");
+        Geometry triangleGeometry(device, *geometryData);
 
         // -------------------------
         // 5. Setup shader & dispatch
@@ -156,7 +82,7 @@ int main()
         resourceMap["gCamera"] = cbCamera.getHandle().operator->();
 
         std::unordered_map<std::string, nvrhi::rt::AccelStructHandle> accelStructMap;
-        accelStructMap["gScene"] = tlas;
+        accelStructMap["gScene"] = triangleGeometry.getTLAS();
 
         RayTracingPass pass;
         std::unordered_map<std::string, nvrhi::ShaderType> entryPoints = {
@@ -168,7 +94,7 @@ int main()
         // 5. Setup GUI with original ImGui
         // -------------------------
         bool notDone = true;
-        static float gColorSlider = 1.0f; // UI slider value
+        static float gColorSlider = 0.1f; // UI slider value
         static int counter = 0;
 
         while (notDone)

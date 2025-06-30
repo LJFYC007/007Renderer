@@ -35,6 +35,26 @@ add_subdirectory(external/spdlog)
 set_target_properties(spdlog PROPERTIES FOLDER "External")
 
 # ----------------------------------------------------------------------------
+# Assimp support
+# ----------------------------------------------------------------------------
+set(ASSIMP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(ASSIMP_BUILD_ASSIMP_TOOLS OFF CACHE BOOL "" FORCE)
+set(ASSIMP_INJECT_DEBUG_POSTFIX OFF CACHE BOOL "" FORCE)
+add_subdirectory(external/assimp)
+set_target_properties(assimp PROPERTIES FOLDER "External")
+
+# Hide additional Assimp targets in External folder
+if(TARGET UpdateAssimpLibsDebugSymbolsAndDLLs)
+    set_target_properties(UpdateAssimpLibsDebugSymbolsAndDLLs PROPERTIES FOLDER "External")
+endif()
+if(TARGET zlibstatic)
+    set_target_properties(zlibstatic PROPERTIES FOLDER "External")
+endif()
+if(TARGET uninstall)
+    set_target_properties(uninstall PROPERTIES FOLDER "External")
+endif()
+
+# ----------------------------------------------------------------------------
 # GLM support
 # ----------------------------------------------------------------------------
 set(GLM_ENABLE_EXPERIMENTAL ON CACHE BOOL "Enable GLM experimental features")
@@ -97,6 +117,7 @@ target_compile_definitions(007Core PUBLIC
 target_include_directories(007Core PUBLIC
     src/
     external/nvrhi/include
+    external/glm
     ${SLANG_INCLUDE_DIRS}
     ${IMGUI_INCLUDE_DIRS}
 )
@@ -108,7 +129,7 @@ target_link_libraries(007Core PUBLIC
     ${SLANG_LIBRARIES}
     ${IMGUI_LIBRARIES}
     spdlog::spdlog
-    glm::glm
+    assimp
 )
 
 # ----------------------------------------------------------------------------
