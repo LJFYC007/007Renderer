@@ -80,7 +80,8 @@ bool Geometry::createBuffers(Device& device, const std::vector<Vertex>& vertices
                                              .setKeepInitialState(true) // enable fully automatic state tracking
                                              .setDebugName("Vertex Buffer: " + m_name)
                                              .setCanHaveRawViews(true)
-                                             .setIsAccelStructBuildInput(true);
+                                             .setIsAccelStructBuildInput(true)
+                                             .setStructStride(sizeof(Vertex));
     m_vertexBuffer = device.getDevice()->createBuffer(vertexBufferDesc);
     if (!m_vertexBuffer)
     {
@@ -96,7 +97,8 @@ bool Geometry::createBuffers(Device& device, const std::vector<Vertex>& vertices
                                             .setKeepInitialState(true) // enable fully automatic state tracking
                                             .setDebugName("Index Buffer: " + m_name)
                                             .setCanHaveRawViews(true)
-                                            .setIsAccelStructBuildInput(true);
+                                            .setIsAccelStructBuildInput(true)
+                                            .setStructStride(sizeof(uint32_t));
     m_indexBuffer = device.getDevice()->createBuffer(indexBufferDesc);
     if (!m_indexBuffer)
     {

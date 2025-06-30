@@ -8,16 +8,16 @@ struct Vertex
 {
     float position[3];
     float texCoord[2];
-    float normal[3]; // Add normal for proper lighting and shading
+    float normal[3];
 };
 
 struct Material
 {
     std::string name;
-    float diffuse[3] = {0.8f, 0.8f, 0.8f};  // Default white-ish diffuse
-    float specular[3] = {0.0f, 0.0f, 0.0f}; // Default no specular
-    float emission[3] = {0.0f, 0.0f, 0.0f}; // Default no emission
-    float shininess = 1.0f;
+    float diffuse[3];
+    float specular[3];
+    float emission[3];
+    float shininess;
     std::string diffuseTexturePath;
     std::string normalTexturePath;
     std::string specularTexturePath;
@@ -26,7 +26,7 @@ struct Material
 struct SubMesh
 {
     std::vector<uint32_t> indices;
-    uint32_t materialIndex = 0; // Index into materials array
+    uint32_t materialIndex;
     std::string name;
 };
 

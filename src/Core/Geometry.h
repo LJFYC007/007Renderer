@@ -29,6 +29,10 @@ public:
     nvrhi::rt::AccelStructHandle getBLAS() const { return m_blas; }
     nvrhi::rt::AccelStructHandle getTLAS() const { return m_tlas; }
 
+    // Get geometry buffers for shader access
+    nvrhi::BufferHandle getVertexBuffer() const { return m_vertexBuffer; }
+    nvrhi::BufferHandle getIndexBuffer() const { return m_indexBuffer; }
+
     // Get geometry info
     size_t getVertexCount() const { return m_vertexCount; }
     size_t getIndexCount() const { return m_indexCount; }

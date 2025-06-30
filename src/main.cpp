@@ -50,11 +50,12 @@ int main()
         {
             uint32_t gWidth;
             uint32_t gHeight;
+            uint32_t maxDepth;
+            uint32_t frameCount;
             float gColor;
-            float _padding;
         } perFrameData;
 
-        Camera camera(width, height, float3(0.f, 0.f, 2.f), float3(0.f, 0.f, 0.f), glm::radians(45.0f));
+        Camera camera(width, height, float3(0.f, 0.f, -5.f), float3(0.f, 0.f, -6.f), glm::radians(45.0f));
         Buffer cbPerFrame, cbCamera;
         Texture textureOut;
         cbPerFrame.initialize(
@@ -80,6 +81,9 @@ int main()
         resourceMap["result"] = textureOut.getHandle().operator->();
         resourceMap["PerFrameCB"] = cbPerFrame.getHandle().operator->();
         resourceMap["gCamera"] = cbCamera.getHandle().operator->();
+        // Add vertex and index buffers for shader access
+        resourceMap["gVertices"] = triangleGeometry.getVertexBuffer().operator->();
+        resourceMap["gIndices"] = triangleGeometry.getIndexBuffer().operator->();
 
         std::unordered_map<std::string, nvrhi::rt::AccelStructHandle> accelStructMap;
         accelStructMap["gScene"] = triangleGeometry.getTLAS();
@@ -94,8 +98,10 @@ int main()
         // 5. Setup GUI with original ImGui
         // -------------------------
         bool notDone = true;
-        static float gColorSlider = 0.1f; // UI slider value
+        static float gColorSlider = 1.f; // UI slider value
+        static int maxDepth = 5;
         static int counter = 0;
+        static uint32_t frameCount = 0;
 
         while (notDone)
         {
@@ -119,6 +125,8 @@ int main()
 
             perFrameData.gWidth = width;
             perFrameData.gHeight = height;
+            perFrameData.maxDepth = maxDepth;
+            perFrameData.frameCount = frameCount++;
             perFrameData.gColor = gColorSlider;
             cbPerFrame.updateData(device.getDevice(), &perFrameData, sizeof(PerFrameCB));
             cbCamera.updateData(device.getDevice(), &camera.getCameraData(), sizeof(CameraData));
@@ -144,10 +152,12 @@ int main()
             GUI::Begin("Settings");
             GUI::Text("This is some useful text.");
             GUI::SliderFloat("gColor", &gColorSlider, 0.0f, 1.0f);
+            GUI::SliderInt("Max Depth", &maxDepth, 1, 10, "%d");
             if (GUI::Button("Button"))
                 counter++;
             GUI::SameLine();
             GUI::Text("counter = %d", counter);
+            GUI::Text("Frame Count: %u", frameCount);
             GUI::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / GUI::GetIO().Framerate, GUI::GetIO().Framerate);
             camera.renderUI();
             camera.handleInput();
