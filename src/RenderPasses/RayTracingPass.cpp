@@ -10,7 +10,7 @@ bool RayTracingPass::initialize(
 )
 {
     auto nvrhiDevice = device.getDevice();
-    ShaderProgram program(nvrhiDevice, std::string(PROJECT_DIR) + shaderPath, entryPoints, "lib_6_3");
+    Program program(nvrhiDevice, std::string(PROJECT_DIR) + shaderPath, entryPoints, "lib_6_3");
     // program.printReflectionInfo();
 
     if (!program.generateBindingLayout(resourceMap, accelStructMap))

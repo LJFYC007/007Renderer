@@ -1,17 +1,17 @@
-#include "ShaderProgram.h"
+#include "Program.h"
 
-void ShaderProgram::initializeSession(const std::string& profile)
+void Program::initializeSession(const std::string& profile)
 {
     slang::createGlobalSession(m_GlobalSession.writeRef());
 
 #ifdef _DEBUG
-    LOG_INFO("[ShaderProgram] Using DEBUG compilation options with profile: {}", profile);
+    LOG_INFO("[Program] Using DEBUG compilation options with profile: {}", profile);
     slang::CompilerOptionEntry debugOptions[] = {
         {slang::CompilerOptionName::DebugInformation, {slang::CompilerOptionValueKind::Int, SLANG_DEBUG_INFO_LEVEL_MAXIMAL, 0, nullptr, nullptr}},
         {slang::CompilerOptionName::Optimization, {slang::CompilerOptionValueKind::Int, SLANG_OPTIMIZATION_LEVEL_NONE, 0, nullptr, nullptr}},
     };
 #else
-    LOG_INFO("[ShaderProgram] Using RELEASE compilation options with profile: {}", profile);
+    LOG_INFO("[Program] Using RELEASE compilation options with profile: {}", profile);
     slang::CompilerOptionEntry debugOptions[] = {
         {slang::CompilerOptionName::DebugInformation, {slang::CompilerOptionValueKind::Int, SLANG_DEBUG_INFO_LEVEL_MINIMAL, 0, nullptr, nullptr}},
         {slang::CompilerOptionName::Optimization, {slang::CompilerOptionValueKind::Int, SLANG_OPTIMIZATION_LEVEL_HIGH, 0, nullptr, nullptr}},
@@ -38,7 +38,7 @@ void ShaderProgram::initializeSession(const std::string& profile)
         LOG_ERROR("[Slang] Failed to create session with result: {}", sessionResult);
 }
 
-ShaderProgram::ShaderProgram(
+Program::Program(
     nvrhi::IDevice* device,
     const std::string& filePath,
     const std::unordered_map<std::string, nvrhi::ShaderType>& entryPoints,
@@ -46,7 +46,7 @@ ShaderProgram::ShaderProgram(
 )
 {
     if (entryPoints.empty())
-        LOG_ERROR_RETURN("[ShaderProgram] No entry points provided");
+        LOG_ERROR_RETURN("[Program] No entry points provided");
     initializeSession(profile);
 
     // Load module
@@ -113,33 +113,33 @@ ShaderProgram::ShaderProgram(
             LOG_ERROR_RETURN("[Slang] Failed to get entry point code for {}", entryPointName);
         }
 
-        LOG_DEBUG("[ShaderProgram] Compiled entry point {}: {} bytes", entryPointName, kernelBlob->getBufferSize());
+        LOG_DEBUG("[Program] Compiled entry point {}: {} bytes", entryPointName, kernelBlob->getBufferSize());
 
         nvrhi::ShaderDesc desc;
         desc.entryName = entryPointName.c_str(); // Determine shader type based on entry point name
         desc.shaderType = entryPointType;
         auto shader = device->createShader(desc, kernelBlob->getBufferPointer(), kernelBlob->getBufferSize());
         if (!shader)
-            LOG_ERROR_RETURN("[ShaderProgram] Failed to create shader for entry point: {}", entryPointName);
+            LOG_ERROR_RETURN("[Program] Failed to create shader for entry point: {}", entryPointName);
 
         m_Shaders.push_back(shader);
         m_EntryPointToShaderIndex[entryPointName] = entryPointIndex;
         entryPointIndex++;
     }
 
-    LOG_DEBUG("[ShaderProgram] Successfully loaded shader with {} entry points from: {}", entryPoints.size(), filePath);
+    LOG_DEBUG("[Program] Successfully loaded shader with {} entry points from: {}", entryPoints.size(), filePath);
 }
 
-void ShaderProgram::printReflectionInfo() const
+void Program::printReflectionInfo() const
 {
     if (!m_ProgramLayout)
-        LOG_DEBUG_RETURN("[ShaderProgram] No program layout available for reflection");
-    LOG_DEBUG("[ShaderProgram] Printing shader reflection information");
+        LOG_DEBUG_RETURN("[Program] No program layout available for reflection");
+    LOG_DEBUG("[Program] Printing shader reflection information");
 
     auto globalScopeLayout = m_ProgramLayout->getGlobalParamsVarLayout();
     if (globalScopeLayout)
     {
-        LOG_DEBUG("[ShaderProgram] Global Parameters:");
+        LOG_DEBUG("[Program] Global Parameters:");
         printVariableLayout(globalScopeLayout, 1);
     }
 
@@ -147,7 +147,7 @@ void ShaderProgram::printReflectionInfo() const
     for (unsigned int i = 0; i < entryPointCount; i++)
     {
         auto entryPoint = m_ProgramLayout->getEntryPointByIndex(i);
-        LOG_DEBUG("[ShaderProgram] Entry Point {}: {}", i, entryPoint->getName());
+        LOG_DEBUG("[Program] Entry Point {}: {}", i, entryPoint->getName());
 
         auto entryPointLayout = entryPoint->getVarLayout();
         if (entryPointLayout)
@@ -155,7 +155,7 @@ void ShaderProgram::printReflectionInfo() const
     }
 }
 
-void ShaderProgram::printVariableLayout(slang::VariableLayoutReflection* varLayout, int indent) const
+void Program::printVariableLayout(slang::VariableLayoutReflection* varLayout, int indent) const
 {
     if (!varLayout)
         return;
@@ -234,14 +234,14 @@ void ShaderProgram::printVariableLayout(slang::VariableLayoutReflection* varLayo
         LOG_DEBUG("{}  Binding Offset: {}", indentStr, bindingOffset);
 }
 
-bool ShaderProgram::generateBindingLayout(
+bool Program::generateBindingLayout(
     const std::unordered_map<std::string, nvrhi::ResourceHandle>& resourceMap,
     const std::unordered_map<std::string, nvrhi::rt::AccelStructHandle>& accelStructMap
 )
 {
     if (!m_ProgramLayout)
     {
-        LOG_ERROR("[ShaderProgram] No program layout available for binding generation");
+        LOG_ERROR("[Program] No program layout available for binding generation");
         return false;
     }
 
@@ -267,7 +267,7 @@ bool ShaderProgram::generateBindingLayout(
     return true;
 }
 
-bool ShaderProgram::processParameterGroup(slang::VariableLayoutReflection* varLayout)
+bool Program::processParameterGroup(slang::VariableLayoutReflection* varLayout)
 {
     if (!varLayout)
         return true;
@@ -291,7 +291,7 @@ bool ShaderProgram::processParameterGroup(slang::VariableLayoutReflection* varLa
     return true;
 }
 
-bool ShaderProgram::processParameter(slang::VariableLayoutReflection* varLayout)
+bool Program::processParameter(slang::VariableLayoutReflection* varLayout)
 {
     if (!varLayout)
         return true;
@@ -419,12 +419,12 @@ bool ShaderProgram::processParameter(slang::VariableLayoutReflection* varLayout)
     return true;
 }
 
-nvrhi::ShaderHandle ShaderProgram::getShader(const std::string& entryPoint) const
+nvrhi::ShaderHandle Program::getShader(const std::string& entryPoint) const
 {
     auto it = m_EntryPointToShaderIndex.find(entryPoint);
     if (it != m_EntryPointToShaderIndex.end())
         return m_Shaders[it->second];
 
-    LOG_WARN("[ShaderProgram] Entry point '{}' not found", entryPoint);
+    LOG_WARN("[Program] Entry point '{}' not found", entryPoint);
     return nullptr;
 }

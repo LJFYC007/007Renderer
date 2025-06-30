@@ -24,7 +24,6 @@ private:
     void calculateCameraParameters();
 
     CameraData mData;
-    float2 mLastMousePos = float2(0.0f, 0.0f);
     bool mFirstMouseInput = true;
 
     // First person camera rotation angles

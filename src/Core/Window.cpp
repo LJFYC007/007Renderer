@@ -199,9 +199,15 @@ void Window::RenderEnd()
     {
         ImGui::UpdatePlatformWindows();
         ImGui::RenderPlatformWindowsDefault();
-    } // Present
+    }
+
+    // Present
     UINT syncInterval = m_enableVSync ? 1 : 0;
-    HRESULT hr = g_pSwapChain->Present(syncInterval, 0);
+    UINT presentFlags = 0;
+    // Use DXGI_PRESENT_ALLOW_TEARING for variable refresh rate displays when V-Sync is off
+    if (!m_enableVSync)
+        presentFlags = DXGI_PRESENT_ALLOW_TEARING;
+    HRESULT hr = g_pSwapChain->Present(syncInterval, presentFlags);
     g_SwapChainOccluded = (hr == DXGI_STATUS_OCCLUDED);
 
     UINT64 fenceValue = g_fenceLastSignaledValue + 1;
@@ -244,8 +250,7 @@ void Window::CleanupResources()
 
 // Helper functions
 bool Window::CreateDeviceD3D(HWND hWnd)
-{
-    // Setup swap chain
+{ // Setup swap chain
     DXGI_SWAP_CHAIN_DESC1 sd;
     {
         ZeroMemory(&sd, sizeof(sd));
@@ -253,7 +258,8 @@ bool Window::CreateDeviceD3D(HWND hWnd)
         sd.Width = 0;
         sd.Height = 0;
         sd.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-        sd.Flags = DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT;
+        // Enable both frame latency waitable object and allow tearing for high frame rate
+        sd.Flags = DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT | DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;
         sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
         sd.SampleDesc.Count = 1;
         sd.SampleDesc.Quality = 0;
@@ -494,7 +500,11 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
             WaitForLastSubmittedFrame();
             CleanupRenderTarget();
             HRESULT result = g_pSwapChain->ResizeBuffers(
-                0, (UINT)LOWORD(lParam), (UINT)HIWORD(lParam), DXGI_FORMAT_UNKNOWN, DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT
+                0,
+                (UINT)LOWORD(lParam),
+                (UINT)HIWORD(lParam),
+                DXGI_FORMAT_UNKNOWN,
+                DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT | DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING
             );
             assert(SUCCEEDED(result) && "Failed to resize swapchain.");
             CreateRenderTarget();

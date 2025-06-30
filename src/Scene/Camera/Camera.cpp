@@ -68,18 +68,23 @@ void Camera::handleInput()
     // Only handle mouse input if ImGui is not using it
     if (GUI::IsMouseDown(0) && !GUI::GetIO().WantCaptureMouse) // Left mouse button
     {
-        float2 currentMousePos(GUI::GetMousePos().x, GUI::GetMousePos().y);
+        // Use ImGui's smoothed mouse delta directly instead of calculating our own
+        ImVec2 mouseDelta = GUI::GetIO().MouseDelta;
+        float2 delta(mouseDelta.x, mouseDelta.y);
+
         if (mFirstMouseInput)
         {
-            mLastMousePos = currentMousePos;
+            // Reset delta on first frame to prevent large jumps
+            delta = float2(0.0f, 0.0f);
             mFirstMouseInput = false;
         }
 
-        float2 delta = currentMousePos - mLastMousePos;
+        // Apply delta time scaling for frame-rate independent mouse sensitivity
+        float deltaTime = GUI::GetIO().DeltaTime;
+        float sensitivity = 0.002f;
+
         if (glm::length(delta) > 0.001f)
         {
-            float sensitivity = 0.002f;
-
             // Update yaw (horizontal rotation) and pitch (vertical rotation)
             mYaw += delta.x * sensitivity;
             mPitch -= delta.y * sensitivity; // Invert Y for natural feel
@@ -98,7 +103,6 @@ void Camera::handleInput()
             // Update target to reflect new direction
             mData.target = mData.posW + mData.forward;
         }
-        mLastMousePos = currentMousePos;
     }
     else
         mFirstMouseInput = true;

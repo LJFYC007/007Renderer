@@ -2,7 +2,7 @@
 #include <nvrhi/nvrhi.h>
 #include <vector>
 
-#include "Core/ShaderProgram.h"
+#include "Core/Program/Program.h"
 #include "Core/Device.h"
 
 class RayTracingPass

@@ -9,7 +9,7 @@ bool ComputePass::initialize(
 {
     std::unordered_map<std::string, nvrhi::ShaderType> entryPoints;
     entryPoints[entryPoint] = nvrhi::ShaderType::Compute;
-    ShaderProgram program(device, std::string(PROJECT_DIR) + shaderPath, entryPoints, "cs_6_2");
+    Program program(device, std::string(PROJECT_DIR) + shaderPath, entryPoints, "cs_6_2");
     m_Shader = program.getShader(entryPoint);
     // program.printReflectionInfo();
 

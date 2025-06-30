@@ -8,10 +8,10 @@
 
 #include "Utils/Logger.h"
 
-class ShaderProgram
+class Program
 {
 public:
-    ShaderProgram(
+    Program(
         nvrhi::IDevice* device,
         const std::string& filePath,
         const std::unordered_map<std::string, nvrhi::ShaderType>& entryPoints,

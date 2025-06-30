@@ -1,7 +1,7 @@
 #pragma once
 #include <nvrhi/nvrhi.h>
 
-#include "Core/ShaderProgram.h"
+#include "Core/Program/Program.h"
 
 class ComputePass
 {
