@@ -1,23 +1,19 @@
 #include "RayTracingPass.h"
+#include "Core/Program/Program.h"
 #include "Utils/Logger.h"
 
-bool RayTracingPass::initialize(
-    Device& device,
-    const std::string& shaderPath,
-    const std::unordered_map<std::string, nvrhi::ShaderType>& entryPoints,
-    const std::unordered_map<std::string, nvrhi::ResourceHandle>& resourceMap,
-    const std::unordered_map<std::string, nvrhi::rt::AccelStructHandle>& accelStructMap
-)
+RayTracingPass::RayTracingPass(Device& device, const std::string& shaderPath, const std::unordered_map<std::string, nvrhi::ShaderType>& entryPoints)
+    : Pass(device)
 {
     auto nvrhiDevice = device.getDevice();
     Program program(nvrhiDevice, std::string(PROJECT_DIR) + shaderPath, entryPoints, "lib_6_3");
     // program.printReflectionInfo();
 
-    if (!program.generateBindingLayout(resourceMap, accelStructMap))
-        return false;
-    auto layoutItems = program.getBindingLayoutItems();
-    auto bindings = program.getBindingSetItems();
-    m_BindingSetManager = std::make_unique<BindingSetManager>(&device, layoutItems, bindings);
+    if (!program.generateBindingLayout())
+        LOG_ERROR_RETURN("[RayTracingPass] Failed to generate binding layout from program");
+    auto bindingLayoutItems = program.getBindingLayoutItems();
+    auto bindingMap = program.getBindingSetItems();
+    m_BindingSetManager = std::make_unique<BindingSetManager>(&device, bindingLayoutItems, bindingMap);
 
     // Create ray tracing pipeline with proper configuration
     nvrhi::rt::PipelineDesc pipelineDesc;
@@ -46,10 +42,7 @@ bool RayTracingPass::initialize(
     );
     m_Pipeline = nvrhiDevice->createRayTracingPipeline(pipelineDesc);
     if (!m_Pipeline)
-    {
-        LOG_ERROR("[RayTracingPass] Failed to create ray tracing pipeline");
-        return false;
-    }
+        LOG_ERROR_RETURN("[RayTracingPass] Failed to create ray tracing pipeline");
     LOG_DEBUG("[RayTracingPass] Ray tracing pipeline created successfully");
 
     // Create shader table with matching export names
@@ -58,68 +51,16 @@ bool RayTracingPass::initialize(
     m_ShaderTable->addMissShader("missMain");
     m_ShaderTable->addHitGroup("closestHitMain");
     m_rtState.setShaderTable(m_ShaderTable);
-    return true;
 }
 
-void RayTracingPass::dispatch(Device& device, uint32_t width, uint32_t height, uint32_t depth)
+void RayTracingPass::execute(uint32_t width, uint32_t height, uint32_t depth)
 {
     m_rtState.bindings = {m_BindingSetManager->getBindingSet()};
 
-    auto commandList = device.getCommandList();
-    auto nvrhiDevice = device.getDevice();
+    auto commandList = m_Device.getCommandList();
+    auto nvrhiDevice = m_Device.getDevice();
     commandList->open();
-
-    // Set up resource states for all bound resources
-    const nvrhi::BindingSetDesc* desc = m_BindingSetManager->getBindingSet()->getDesc();
-    for (const nvrhi::BindingSetItem& item : desc->bindings)
-    {
-        if (item.type == nvrhi::ResourceType::StructuredBuffer_SRV || item.type == nvrhi::ResourceType::StructuredBuffer_UAV)
-        {
-            nvrhi::IBuffer* buffer = dynamic_cast<nvrhi::IBuffer*>(item.resourceHandle);
-            if (buffer)
-                commandList->beginTrackingBufferState(
-                    buffer,
-                    item.type == nvrhi::ResourceType::StructuredBuffer_SRV ? nvrhi::ResourceStates::ShaderResource
-                                                                           : nvrhi::ResourceStates::UnorderedAccess
-                );
-            else
-                LOG_WARN("[RayTracingPass] WARNING: Resource handle for slot {} is not a buffer", item.slot);
-        }
-        else if (item.type == nvrhi::ResourceType::Texture_SRV || item.type == nvrhi::ResourceType::Texture_UAV)
-        {
-            nvrhi::ITexture* texture = dynamic_cast<nvrhi::ITexture*>(item.resourceHandle);
-            if (texture)
-            {
-                nvrhi::TextureSubresourceSet allSubresources;
-                commandList->beginTrackingTextureState(
-                    texture,
-                    allSubresources,
-                    item.type == nvrhi::ResourceType::Texture_SRV ? nvrhi::ResourceStates::ShaderResource : nvrhi::ResourceStates::UnorderedAccess
-                );
-            }
-            else
-                LOG_WARN("[RayTracingPass] WARNING: Resource handle for slot {} is not a texture", item.slot);
-        }
-        else if (item.type == nvrhi::ResourceType::ConstantBuffer)
-        {
-            nvrhi::IBuffer* buffer = dynamic_cast<nvrhi::IBuffer*>(item.resourceHandle);
-            if (buffer)
-                commandList->beginTrackingBufferState(buffer, nvrhi::ResourceStates::ConstantBuffer);
-            else
-                LOG_WARN("[RayTracingPass] WARNING: Resource handle for slot {} is not a constant buffer", item.slot);
-        }
-        else if (item.type == nvrhi::ResourceType::RayTracingAccelStruct)
-        {
-            // Ray tracing acceleration structures are automatically managed by NVRHI
-            // No explicit state tracking needed for acceleration structures
-            LOG_TRACE("[RayTracingPass] Acceleration structure resource found for slot {}", item.slot);
-        }
-        else
-            LOG_WARN("[RayTracingPass] WARNING: Unsupported resource type for slot {}", item.slot);
-    }
-
-    // Commit all resource state transitions
-    commandList->commitBarriers();
+    trackingResourceState(commandList);
 
     commandList->setRayTracingState(m_rtState);
     nvrhi::rt::DispatchRaysArguments args;

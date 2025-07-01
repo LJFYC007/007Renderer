@@ -10,8 +10,8 @@ class BindingSetManager
 public:
     BindingSetManager(
         Device* device,
-        std::unordered_map<std::string, nvrhi::BindingLayoutItem> layoutMap,
-        std::unordered_map<std::string, nvrhi::BindingSetItem> initialBindings
+        std::vector<nvrhi::BindingLayoutItem> bindingLayoutItems,
+        std::unordered_map<std::string, nvrhi::BindingSetItem> bindingMap
     );
 
     ~BindingSetManager() {}

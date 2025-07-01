@@ -3,16 +3,15 @@
 
 BindingSetManager::BindingSetManager(
     Device* device,
-    std::unordered_map<std::string, nvrhi::BindingLayoutItem> layoutMap,
-    std::unordered_map<std::string, nvrhi::BindingSetItem> initialBindings
+    std::vector<nvrhi::BindingLayoutItem> bindingLayoutItems,
+    std::unordered_map<std::string, nvrhi::BindingSetItem> bindingMap
 )
-    : m_device(device)
+    : m_device(device), m_LayoutItems(bindingLayoutItems)
 {
     uint32_t index = 0;
-    for (const auto& [name, item] : layoutMap)
+    for (const auto& [name, item] : bindingMap)
     {
-        m_LayoutItems.push_back(item);
-        m_BindingSetItems.push_back(initialBindings[name]);
+        m_BindingSetItems.push_back(item);
         m_IndexMap[name] = index++;
     }
 

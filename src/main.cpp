@@ -1,5 +1,6 @@
 #include <iostream>
 #include <vector>
+#include <memory>
 #include <spdlog/fmt/fmt.h>
 
 #include "Core/Device.h"
@@ -8,7 +9,7 @@
 #include "Core/Texture.h"
 #include "Core/Geometry.h"
 #include "Core/OBJLoader.h"
-// #include "RenderPasses/ComputePass.h"
+#include "RenderPasses/ComputePass.h"
 #include "RenderPasses/RayTracingPass.h"
 #include "Utils/Math/Math.h"
 #include "Utils/Logger.h"
@@ -77,22 +78,10 @@ int main()
         // -------------------------
         // 5. Setup shader & dispatch
         // -------------------------
-        std::unordered_map<std::string, nvrhi::ResourceHandle> resourceMap;
-        resourceMap["result"] = textureOut.getHandle().operator->();
-        resourceMap["PerFrameCB"] = cbPerFrame.getHandle().operator->();
-        resourceMap["gCamera"] = cbCamera.getHandle().operator->();
-        // Add vertex and index buffers for shader access
-        resourceMap["gVertices"] = triangleGeometry.getVertexBuffer().operator->();
-        resourceMap["gIndices"] = triangleGeometry.getIndexBuffer().operator->();
-
-        std::unordered_map<std::string, nvrhi::rt::AccelStructHandle> accelStructMap;
-        accelStructMap["gScene"] = triangleGeometry.getTLAS();
-
-        RayTracingPass pass;
         std::unordered_map<std::string, nvrhi::ShaderType> entryPoints = {
             {"rayGenMain", nvrhi::ShaderType::RayGeneration}, {"missMain", nvrhi::ShaderType::Miss}, {"closestHitMain", nvrhi::ShaderType::ClosestHit}
         };
-        pass.initialize(device, "/shaders/raytracing.slang", entryPoints, resourceMap, accelStructMap);
+        Pass& pass = RayTracingPass(device, "/shaders/raytracing.slang", entryPoints);
 
         // -------------------------
         // 5. Setup GUI with original ImGui
@@ -131,7 +120,13 @@ int main()
             cbPerFrame.updateData(device.getDevice(), &perFrameData, sizeof(PerFrameCB));
             cbCamera.updateData(device.getDevice(), &camera.getCameraData(), sizeof(CameraData));
 
-            pass.dispatch(device, width, height, 1);
+            pass["PerFrameCB"] = cbPerFrame.getHandle();
+            pass["gCamera"] = cbCamera.getHandle();
+            pass["result"] = textureOut.getHandle();
+            pass["gVertices"] = triangleGeometry.getVertexBuffer();
+            pass["gIndices"] = triangleGeometry.getIndexBuffer();
+            pass["gScene"] = triangleGeometry.getTLAS();
+            pass.execute(width, height, 1);
 
             // Set texture for display
             ID3D12Resource* d3d12Texture = static_cast<ID3D12Resource*>(textureOut.getHandle()->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource));

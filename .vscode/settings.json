@@ -93,7 +93,8 @@
         "source_location": "cpp",
         "future": "cpp",
         "stack": "cpp",
-        "codecvt": "cpp"
+        "codecvt": "cpp",
+        "shared_mutex": "cpp"
     },
     "cmake.generator": "Ninja",
     "cmake.buildDirectory": "${workspaceFolder}/build/${buildType}",

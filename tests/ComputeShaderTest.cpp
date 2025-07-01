@@ -38,14 +38,11 @@ TEST_F(ComputeShaderTest, Basic)
         device->getDevice(), nullptr, inputA.size() * sizeof(float), nvrhi::ResourceStates::UnorderedAccess, true, false, "BufferResult"
     );
 
-    std::unordered_map<std::string, nvrhi::ResourceHandle> resourceMap;
-    resourceMap["BufferA"] = bufA.getHandle();
-    resourceMap["BufferB"] = bufB.getHandle();
-    resourceMap["BufferResult"] = bufResult.getHandle();
-
-    ComputePass pass;
-    pass.initialize(device->getDevice(), "/tests/ComputeShaderTest.slang", "computeMain", resourceMap);
-    pass.dispatchThreads(device->getDevice(), elementCount, 1, 1);
+    Pass& pass = ComputePass(*device, "/tests/ComputeShaderTest.slang", "computeMain");
+    pass["BufferA"] = bufA.getHandle();
+    pass["BufferB"] = bufB.getHandle();
+    pass["BufferResult"] = bufResult.getHandle();
+    pass.execute(elementCount, 1, 1);
 
     auto readResult = bufResult.readback(device->getDevice(), device->getDevice()->createCommandList());
     const float* resultData = reinterpret_cast<const float*>(readResult.data());
