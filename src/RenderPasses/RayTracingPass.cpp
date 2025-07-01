@@ -2,10 +2,14 @@
 #include "Core/Program/Program.h"
 #include "Utils/Logger.h"
 
-RayTracingPass::RayTracingPass(Device& device, const std::string& shaderPath, const std::unordered_map<std::string, nvrhi::ShaderType>& entryPoints)
+RayTracingPass::RayTracingPass(
+    ref<Device> device,
+    const std::string& shaderPath,
+    const std::unordered_map<std::string, nvrhi::ShaderType>& entryPoints
+)
     : Pass(device)
 {
-    auto nvrhiDevice = device.getDevice();
+    auto nvrhiDevice = device->getDevice();
     Program program(nvrhiDevice, std::string(PROJECT_DIR) + shaderPath, entryPoints, "lib_6_3");
     // program.printReflectionInfo();
 
@@ -13,7 +17,7 @@ RayTracingPass::RayTracingPass(Device& device, const std::string& shaderPath, co
         LOG_ERROR_RETURN("[RayTracingPass] Failed to generate binding layout from program");
     auto bindingLayoutItems = program.getBindingLayoutItems();
     auto bindingMap = program.getBindingSetItems();
-    m_BindingSetManager = std::make_unique<BindingSetManager>(&device, bindingLayoutItems, bindingMap);
+    m_BindingSetManager = make_ref<BindingSetManager>(device, bindingLayoutItems, bindingMap);
 
     // Create ray tracing pipeline with proper configuration
     nvrhi::rt::PipelineDesc pipelineDesc;
@@ -57,8 +61,8 @@ void RayTracingPass::execute(uint32_t width, uint32_t height, uint32_t depth)
 {
     m_rtState.bindings = {m_BindingSetManager->getBindingSet()};
 
-    auto commandList = m_Device.getCommandList();
-    auto nvrhiDevice = m_Device.getDevice();
+    auto commandList = m_Device->getCommandList();
+    auto nvrhiDevice = m_Device->getDevice();
     commandList->open();
     trackingResourceState(commandList);
 

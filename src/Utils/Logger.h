@@ -3,7 +3,8 @@
 #include <streambuf>
 #include <iostream>
 #include <string>
-#include <memory>
+
+#include "Core/Pointer.h"
 
 #define LOG_INFO(...) SPDLOG_LOGGER_INFO(Logger::get(), __VA_ARGS__)
 #define LOG_ERROR(...) SPDLOG_LOGGER_ERROR(Logger::get(), "[{}:{}] {}", __FILE__, __LINE__, fmt::format(__VA_ARGS__))
@@ -39,6 +40,6 @@
 class Logger
 {
 public:
-    static std::shared_ptr<spdlog::logger> get();
+    static ref<spdlog::logger> get();
     static void init();
 };

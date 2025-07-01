@@ -1,12 +1,12 @@
 #pragma once
 
 #include "GeometryData.h"
-#include <memory>
+#include "Pointer.h"
 
 class OBJLoader
 {
 public:
-    static std::unique_ptr<GeometryData> loadFromFile(const std::filesystem::path& filePath);
+    static ref<GeometryData> loadFromFile(const std::filesystem::path& filePath);
 
 private:
     static bool loadOBJ(const std::filesystem::path& filePath, GeometryData& geometryData);

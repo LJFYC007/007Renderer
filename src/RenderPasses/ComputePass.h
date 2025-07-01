@@ -4,7 +4,7 @@
 class ComputePass : public Pass
 {
 public:
-    ComputePass(Device& device, const std::string& shaderPath, const std::string& entryPoint);
+    ComputePass(ref<Device> device, const std::string& shaderPath, const std::string& entryPoint);
 
     void execute(uint32_t width, uint32_t height, uint32_t depth) override;
 

@@ -11,7 +11,7 @@
 
 Device::Device() : m_isInitialized(false)
 {
-    m_messageCallback = std::make_unique<MessageCallback>();
+    m_messageCallback = make_ref<MessageCallback>();
 }
 
 bool Device::initialize()

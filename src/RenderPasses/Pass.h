@@ -1,14 +1,14 @@
 #pragma once
 #include <nvrhi/nvrhi.h>
-#include <memory>
 
 #include "Core/Device.h"
 #include "Core/Program/BindingSetManager.h"
+#include "Core/Pointer.h"
 
 class Pass
 {
 public:
-    Pass(Device& device) : m_Device(device) {};
+    Pass(ref<Device> device) : m_Device(device) {};
 
     virtual void execute(uint32_t width, uint32_t height, uint32_t depth) = 0;
 
@@ -35,6 +35,6 @@ public:
 protected:
     void trackingResourceState(nvrhi::CommandListHandle commandList);
 
-    Device& m_Device;
-    std::unique_ptr<BindingSetManager> m_BindingSetManager; // Manages binding sets and layouts
+    ref<Device> m_Device;
+    ref<BindingSetManager> m_BindingSetManager; // Manages binding sets and layouts
 };

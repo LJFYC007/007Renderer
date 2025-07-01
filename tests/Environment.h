@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "Core/Device.h"
+#include "Core/Pointer.h"
 #include "Utils/Logger.h"
 
 // Global device instance for all tests
@@ -11,7 +12,7 @@ public:
     {
         Logger::init();
         Logger::get()->set_level(spdlog::level::off); // Disable logging for tests
-        device = std::make_unique<Device>();
+        device = make_ref<Device>();
         if (!device->initialize())
             FAIL() << "Failed to initialize device for Buffer tests";
     }
@@ -22,12 +23,12 @@ public:
         spdlog::shutdown();
     }
 
-    static Device* getDevice() { return device.get(); }
+    static ref<Device> getDevice() { return device; }
 
 private:
-    static std::unique_ptr<Device> device;
+    static ref<Device> device;
 };
 
-std::unique_ptr<Device> BasicTestEnvironment::device = nullptr;
+ref<Device> BasicTestEnvironment::device = nullptr;
 // Register the global test environment
 ::testing::Environment* const basicEnv = ::testing::AddGlobalTestEnvironment(new BasicTestEnvironment);

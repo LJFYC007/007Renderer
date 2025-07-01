@@ -18,7 +18,7 @@ protected:
         ASSERT_TRUE(device->isValid());
     }
 
-    Device* device = nullptr;
+    ref<Device> device;
 };
 
 TEST_F(ComputeShaderTest, Basic)
@@ -38,11 +38,11 @@ TEST_F(ComputeShaderTest, Basic)
         device->getDevice(), nullptr, inputA.size() * sizeof(float), nvrhi::ResourceStates::UnorderedAccess, true, false, "BufferResult"
     );
 
-    Pass& pass = ComputePass(*device, "/tests/ComputeShaderTest.slang", "computeMain");
-    pass["BufferA"] = bufA.getHandle();
-    pass["BufferB"] = bufB.getHandle();
-    pass["BufferResult"] = bufResult.getHandle();
-    pass.execute(elementCount, 1, 1);
+    ref<Pass> pass = make_ref<ComputePass>(device, "/tests/ComputeShaderTest.slang", "computeMain");
+    (*pass)["BufferA"] = bufA.getHandle();
+    (*pass)["BufferB"] = bufB.getHandle();
+    (*pass)["BufferResult"] = bufResult.getHandle();
+    pass->execute(elementCount, 1, 1);
 
     auto readResult = bufResult.readback(device->getDevice(), device->getDevice()->createCommandList());
     const float* resultData = reinterpret_cast<const float*>(readResult.data());

@@ -1,9 +1,9 @@
 #include "ComputePass.h"
 #include "Core/Program/Program.h"
 
-ComputePass::ComputePass(Device& device, const std::string& shaderPath, const std::string& entryPoint) : Pass(device)
+ComputePass::ComputePass(ref<Device> device, const std::string& shaderPath, const std::string& entryPoint) : Pass(device)
 {
-    auto nvrhiDevice = device.getDevice();
+    auto nvrhiDevice = device->getDevice();
     std::unordered_map<std::string, nvrhi::ShaderType> entryPoints;
     entryPoints[entryPoint] = nvrhi::ShaderType::Compute;
 
@@ -14,7 +14,7 @@ ComputePass::ComputePass(Device& device, const std::string& shaderPath, const st
         LOG_ERROR_RETURN("[ComputePass] Failed to generate binding layout from program");
     auto bindingLayoutItems = program.getBindingLayoutItems();
     auto bindingMap = program.getBindingSetItems();
-    m_BindingSetManager = std::make_unique<BindingSetManager>(&device, bindingLayoutItems, bindingMap);
+    m_BindingSetManager = make_ref<BindingSetManager>(device, bindingLayoutItems, bindingMap);
 
     auto programLayout = program.getProgramLayout();
     if (programLayout && programLayout->getEntryPointCount() > 0)
@@ -44,8 +44,8 @@ ComputePass::ComputePass(Device& device, const std::string& shaderPath, const st
 
 void ComputePass::dispatch(uint32_t width, uint32_t height, uint32_t depth)
 {
-    auto nvrhiDevice = m_Device.getDevice();
-    auto commandList = m_Device.getCommandList();
+    auto nvrhiDevice = m_Device->getDevice();
+    auto commandList = m_Device->getCommandList();
     commandList->open();
     trackingResourceState(commandList);
 

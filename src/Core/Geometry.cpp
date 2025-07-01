@@ -17,7 +17,7 @@ static const Vertex triangleVertices[] = {
 static const uint32_t triangleIndices[] = {0, 1, 2};
 } // namespace
 
-Geometry::Geometry(Device& device, const GeometryData& geometryData)
+Geometry::Geometry(ref<Device> device, const GeometryData& geometryData)
 {
     if (!geometryData.isValid())
         LOG_ERROR_RETURN("Invalid geometry data");
@@ -39,7 +39,7 @@ Geometry::Geometry(Device& device, const GeometryData& geometryData)
     LOG_INFO("Successfully initialized geometry '{}' ({} vertices, {} indices)", m_name, m_vertexCount, m_indexCount);
 }
 
-Geometry::Geometry(Device& device)
+Geometry::Geometry(ref<Device> device)
 {
     std::vector<Vertex> vertices(std::begin(triangleVertices), std::end(triangleVertices));
     std::vector<uint32_t> indices(std::begin(triangleIndices), std::end(triangleIndices));
@@ -67,7 +67,7 @@ void Geometry::cleanup()
     m_name.clear();
 }
 
-bool Geometry::createBuffers(Device& device, const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices)
+bool Geometry::createBuffers(ref<Device> device, const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices)
 {
     size_t vertexBufferSize = vertices.size() * sizeof(Vertex);
     size_t indexBufferSize = indices.size() * sizeof(uint32_t);
@@ -82,7 +82,7 @@ bool Geometry::createBuffers(Device& device, const std::vector<Vertex>& vertices
                                              .setCanHaveRawViews(true)
                                              .setIsAccelStructBuildInput(true)
                                              .setStructStride(sizeof(Vertex));
-    m_vertexBuffer = device.getDevice()->createBuffer(vertexBufferDesc);
+    m_vertexBuffer = device->getDevice()->createBuffer(vertexBufferDesc);
     if (!m_vertexBuffer)
     {
         LOG_ERROR("Failed to create vertex buffer for '{}'", m_name);
@@ -99,7 +99,7 @@ bool Geometry::createBuffers(Device& device, const std::vector<Vertex>& vertices
                                             .setCanHaveRawViews(true)
                                             .setIsAccelStructBuildInput(true)
                                             .setStructStride(sizeof(uint32_t));
-    m_indexBuffer = device.getDevice()->createBuffer(indexBufferDesc);
+    m_indexBuffer = device->getDevice()->createBuffer(indexBufferDesc);
     if (!m_indexBuffer)
     {
         LOG_ERROR("Failed to create index buffer for '{}'", m_name);
@@ -109,12 +109,12 @@ bool Geometry::createBuffers(Device& device, const std::vector<Vertex>& vertices
     return true;
 }
 
-bool Geometry::createAccelerationStructures(Device& device)
+bool Geometry::createAccelerationStructures(ref<Device> device)
 {
     // BLAS descriptor - we'll update this in buildAccelerationStructures with actual geometry data
     auto blasDesc = nvrhi::rt::AccelStructDesc().setDebugName("BLAS: " + m_name).setIsTopLevel(false);
 
-    m_blas = device.getDevice()->createAccelStruct(blasDesc);
+    m_blas = device->getDevice()->createAccelStruct(blasDesc);
     if (!m_blas)
     {
         LOG_ERROR("Failed to create BLAS for '{}'", m_name);
@@ -123,7 +123,7 @@ bool Geometry::createAccelerationStructures(Device& device)
 
     auto tlasDesc = nvrhi::rt::AccelStructDesc().setDebugName("TLAS: " + m_name).setIsTopLevel(true).setTopLevelMaxInstances(1);
 
-    m_tlas = device.getDevice()->createAccelStruct(tlasDesc);
+    m_tlas = device->getDevice()->createAccelStruct(tlasDesc);
     if (!m_tlas)
     {
         LOG_ERROR("Failed to create TLAS for '{}'", m_name);
@@ -133,9 +133,9 @@ bool Geometry::createAccelerationStructures(Device& device)
     return true;
 }
 
-bool Geometry::buildAccelerationStructures(Device& device, const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices)
+bool Geometry::buildAccelerationStructures(ref<Device> device, const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices)
 {
-    auto commandList = device.getCommandList();
+    auto commandList = device->getCommandList();
     commandList->open();
 
     // Upload the vertex and index data
@@ -164,7 +164,7 @@ bool Geometry::buildAccelerationStructures(Device& device, const std::vector<Ver
     commandList->buildTopLevelAccelStruct(m_tlas, &instanceDesc, 1);
 
     commandList->close();
-    device.getDevice()->executeCommandList(commandList);
+    device->getDevice()->executeCommandList(commandList);
 
     return true;
 }

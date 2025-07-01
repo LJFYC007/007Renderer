@@ -2,7 +2,7 @@
 #include "Utils/Logger.h"
 
 BindingSetManager::BindingSetManager(
-    Device* device,
+    ref<Device> device,
     std::vector<nvrhi::BindingLayoutItem> bindingLayoutItems,
     std::unordered_map<std::string, nvrhi::BindingSetItem> bindingMap
 )

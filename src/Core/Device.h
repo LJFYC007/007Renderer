@@ -2,13 +2,14 @@
 
 #include <iostream>
 #include <string>
-#include <memory>
 #include <wrl/client.h>
 #include <d3d12.h>
 #include <dxgi1_6.h>
 #include <nvrhi/nvrhi.h>
 #include <nvrhi/d3d12.h>
 #include <nvrhi/validation.h>
+
+#include "Pointer.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -56,7 +57,7 @@ private:
     nvrhi::DeviceHandle m_nvrhiDevice;
     nvrhi::CommandListParameters m_CmdParams;
 
-    std::unique_ptr<MessageCallback> m_messageCallback;
+    ref<MessageCallback> m_messageCallback;
     bool m_isInitialized = false;
 
 #ifdef _DEBUG

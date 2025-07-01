@@ -2,18 +2,19 @@
 
 #include <nvrhi/nvrhi.h>
 #include <cstdint>
-#include <memory>
 #include <filesystem>
 #include <vector>
+
 #include "GeometryData.h"
+#include "Core/Pointer.h"
 
 class Device;
 
 class Geometry
 {
 public:
-    Geometry(Device& device);
-    Geometry(Device& device, const GeometryData& geometryData);
+    Geometry(ref<Device> device);
+    Geometry(ref<Device> device, const GeometryData& geometryData);
     ~Geometry() = default;
 
     // Non-copyable
@@ -49,7 +50,7 @@ private:
     size_t m_indexCount = 0;
     std::string m_name;
 
-    bool createBuffers(Device& device, const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices);
-    bool createAccelerationStructures(Device& device);
-    bool buildAccelerationStructures(Device& device, const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices);
+    bool createBuffers(ref<Device> device, const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices);
+    bool createAccelerationStructures(ref<Device> device);
+    bool buildAccelerationStructures(ref<Device> device, const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices);
 };

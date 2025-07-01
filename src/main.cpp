@@ -1,6 +1,5 @@
 #include <iostream>
 #include <vector>
-#include <memory>
 #include <spdlog/fmt/fmt.h>
 
 #include "Core/Device.h"
@@ -9,6 +8,7 @@
 #include "Core/Texture.h"
 #include "Core/Geometry.h"
 #include "Core/OBJLoader.h"
+#include "Core/Pointer.h"
 #include "RenderPasses/ComputePass.h"
 #include "RenderPasses/RayTracingPass.h"
 #include "Utils/Math/Math.h"
@@ -24,8 +24,8 @@ int main()
     // -------------------------
     // 1. Initialize Device (D3D12 + NVRHI)
     // -------------------------
-    Device device;
-    if (!device.initialize())
+    ref<Device> device = make_ref<Device>();
+    if (!device->initialize())
     {
         LOG_ERROR("Failed to initialize device!");
         return 1;
@@ -40,7 +40,7 @@ int main()
     windowDesc.title = "007Renderer";
     windowDesc.enableVSync = false;
 
-    Window window(device.getD3D12Device(), device.getCommandQueue(), windowDesc);
+    Window window(device->getD3D12Device(), device->getCommandQueue(), windowDesc);
     window.PrepareResources();
 
     {
@@ -60,13 +60,13 @@ int main()
         Buffer cbPerFrame, cbCamera;
         Texture textureOut;
         cbPerFrame.initialize(
-            device.getDevice(), &perFrameData, sizeof(PerFrameCB), nvrhi::ResourceStates::ConstantBuffer, false, true, "PerFrameCB"
+            device->getDevice(), &perFrameData, sizeof(PerFrameCB), nvrhi::ResourceStates::ConstantBuffer, false, true, "PerFrameCB"
         );
         textureOut.initialize(
-            device.getDevice(), width, height, nvrhi::Format::RGBA32_FLOAT, nvrhi::ResourceStates::UnorderedAccess, true, "TextureOut"
+            device->getDevice(), width, height, nvrhi::Format::RGBA32_FLOAT, nvrhi::ResourceStates::UnorderedAccess, true, "TextureOut"
         );
         cbCamera.initialize(
-            device.getDevice(), &camera.getCameraData(), sizeof(CameraData), nvrhi::ResourceStates::ConstantBuffer, false, true, "Camera"
+            device->getDevice(), &camera.getCameraData(), sizeof(CameraData), nvrhi::ResourceStates::ConstantBuffer, false, true, "Camera"
         );
 
         // -------------------------
@@ -81,7 +81,7 @@ int main()
         std::unordered_map<std::string, nvrhi::ShaderType> entryPoints = {
             {"rayGenMain", nvrhi::ShaderType::RayGeneration}, {"missMain", nvrhi::ShaderType::Miss}, {"closestHitMain", nvrhi::ShaderType::ClosestHit}
         };
-        Pass& pass = RayTracingPass(device, "/shaders/raytracing.slang", entryPoints);
+        auto pass = make_ref<RayTracingPass>(device, "/shaders/raytracing.slang", entryPoints);
 
         // -------------------------
         // 5. Setup GUI with original ImGui
@@ -94,7 +94,7 @@ int main()
 
         while (notDone)
         {
-            HRESULT deviceRemovedReason = device.getD3D12Device()->GetDeviceRemovedReason();
+            HRESULT deviceRemovedReason = device->getD3D12Device()->GetDeviceRemovedReason();
             if (FAILED(deviceRemovedReason))
             {
                 LOG_ERROR("Device removed: 0x{:08X}", static_cast<uint32_t>(deviceRemovedReason));
@@ -110,23 +110,23 @@ int main()
                 break;
             }
 
-            device.getDevice()->runGarbageCollection();
+            device->getDevice()->runGarbageCollection();
 
             perFrameData.gWidth = width;
             perFrameData.gHeight = height;
             perFrameData.maxDepth = maxDepth;
             perFrameData.frameCount = frameCount++;
             perFrameData.gColor = gColorSlider;
-            cbPerFrame.updateData(device.getDevice(), &perFrameData, sizeof(PerFrameCB));
-            cbCamera.updateData(device.getDevice(), &camera.getCameraData(), sizeof(CameraData));
+            cbPerFrame.updateData(device->getDevice(), &perFrameData, sizeof(PerFrameCB));
+            cbCamera.updateData(device->getDevice(), &camera.getCameraData(), sizeof(CameraData));
 
-            pass["PerFrameCB"] = cbPerFrame.getHandle();
-            pass["gCamera"] = cbCamera.getHandle();
-            pass["result"] = textureOut.getHandle();
-            pass["gVertices"] = triangleGeometry.getVertexBuffer();
-            pass["gIndices"] = triangleGeometry.getIndexBuffer();
-            pass["gScene"] = triangleGeometry.getTLAS();
-            pass.execute(width, height, 1);
+            (*pass)["PerFrameCB"] = cbPerFrame.getHandle();
+            (*pass)["gCamera"] = cbCamera.getHandle();
+            (*pass)["result"] = textureOut.getHandle();
+            (*pass)["gVertices"] = triangleGeometry.getVertexBuffer();
+            (*pass)["gIndices"] = triangleGeometry.getIndexBuffer();
+            (*pass)["gScene"] = triangleGeometry.getTLAS();
+            pass->execute(width, height, 1);
 
             // Set texture for display
             ID3D12Resource* d3d12Texture = static_cast<ID3D12Resource*>(textureOut.getHandle()->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource));
@@ -167,7 +167,7 @@ int main()
     }
 
     window.CleanupResources();
-    device.shutdown();
+    device->shutdown();
     LOG_INFO("Renderer shutdown successfully.");
     spdlog::shutdown();
     return 0;

@@ -6,7 +6,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/constants.hpp>
 
-std::unique_ptr<GeometryData> OBJLoader::loadFromFile(const std::filesystem::path& filePath)
+ref<GeometryData> OBJLoader::loadFromFile(const std::filesystem::path& filePath)
 {
     if (!std::filesystem::exists(filePath))
     {
@@ -14,7 +14,7 @@ std::unique_ptr<GeometryData> OBJLoader::loadFromFile(const std::filesystem::pat
         return nullptr;
     }
 
-    auto geometryData = std::make_unique<GeometryData>();
+    auto geometryData = make_ref<GeometryData>();
     geometryData->name = filePath.stem().string();
 
     if (!loadOBJ(filePath, *geometryData))
@@ -193,10 +193,7 @@ bool OBJLoader::loadOBJ(const std::filesystem::path& filePath, GeometryData& geo
     // Calculate normals if they weren't provided or seem incorrect
     if (!geometryData.vertices.empty() && geometryData.vertices[0].normal[0] == 0.0f && geometryData.vertices[0].normal[1] == 1.0f &&
         geometryData.vertices[0].normal[2] == 0.0f)
-    {
         calculateNormals(geometryData);
-    }
-
     return true;
 }
 
@@ -204,9 +201,7 @@ void OBJLoader::calculateNormals(GeometryData& geometryData)
 {
     // Reset all normals to zero
     for (auto& vertex : geometryData.vertices)
-    {
         vertex.normal[0] = vertex.normal[1] = vertex.normal[2] = 0.0f;
-    }
 
     // Calculate face normals and accumulate to vertex normals
     for (const auto& subMesh : geometryData.subMeshes)
@@ -262,16 +257,9 @@ void OBJLoader::calculateNormals(GeometryData& geometryData)
 void OBJLoader::validateGeometry(GeometryData& geometryData)
 {
     if (geometryData.vertices.empty())
-    {
-        LOG_WARN("Geometry has no vertices");
-        return;
-    }
-
+        LOG_WARN_RETURN("Geometry has no vertices");
     if (geometryData.subMeshes.empty())
-    {
-        LOG_WARN("Geometry has no sub-meshes");
-        return;
-    }
+        LOG_WARN_RETURN("Geometry has no sub-meshes");
 
     // Check index bounds
     uint32_t maxIndex = static_cast<uint32_t>(geometryData.vertices.size() - 1);
