@@ -1,5 +1,6 @@
-#include "Window.h"
 #include <iostream>
+
+#include "Window.h"
 
 namespace
 {
@@ -232,6 +233,15 @@ void Window::SetDisplayTexture(ID3D12Resource* texture)
 
     g_pd3dDevice->CreateShaderResourceView(texture, &srvDesc, m_DisplaySrvCpuHandle);
     m_DisplayImGuiHandle = (ImTextureID)(intptr_t)m_DisplaySrvGpuHandle.ptr;
+}
+
+uint2 Window::GetWindowSize() const
+{
+    RECT clientRect;
+    GetClientRect(hwnd, &clientRect);
+    uint width = static_cast<uint32_t>(clientRect.right - clientRect.left);
+    uint height = static_cast<uint32_t>(clientRect.bottom - clientRect.top);
+    return uint2(width, height);
 }
 
 void Window::CleanupResources()

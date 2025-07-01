@@ -5,7 +5,6 @@
 #include "Core/Device.h"
 #include "Core/Window.h"
 #include "Core/Buffer.h"
-#include "Core/Texture.h"
 #include "Core/Geometry.h"
 #include "Core/OBJLoader.h"
 #include "Core/Pointer.h"
@@ -31,8 +30,8 @@ int main()
         return 1;
     }
 
-    const uint32_t width = 1920;
-    const uint32_t height = 1080;
+    uint32_t width = 1920;
+    uint32_t height = 1080;
     // Create window with configuration
     Window::desc windowDesc;
     windowDesc.width = width;
@@ -58,16 +57,21 @@ int main()
 
         Camera camera(width, height, float3(0.f, 0.f, -5.f), float3(0.f, 0.f, -6.f), glm::radians(45.0f));
         Buffer cbPerFrame, cbCamera;
-        Texture textureOut;
         cbPerFrame.initialize(
             device->getDevice(), &perFrameData, sizeof(PerFrameCB), nvrhi::ResourceStates::ConstantBuffer, false, true, "PerFrameCB"
-        );
-        textureOut.initialize(
-            device->getDevice(), width, height, nvrhi::Format::RGBA32_FLOAT, nvrhi::ResourceStates::UnorderedAccess, true, "TextureOut"
         );
         cbCamera.initialize(
             device->getDevice(), &camera.getCameraData(), sizeof(CameraData), nvrhi::ResourceStates::ConstantBuffer, false, true, "Camera"
         );
+
+        nvrhi::TextureDesc textureDesc = nvrhi::TextureDesc()
+                                             .setWidth(width)
+                                             .setHeight(height)
+                                             .setFormat(nvrhi::Format::RGBA32_FLOAT)
+                                             .setInitialState(nvrhi::ResourceStates::UnorderedAccess)
+                                             .setDebugName("TextureOut")
+                                             .setIsUAV(true);
+        nvrhi::TextureHandle textureOut = device->getDevice()->createTexture(textureDesc);
 
         // -------------------------
         // 4. Setup triangle geometry for ray tracing
@@ -112,24 +116,39 @@ int main()
 
             device->getDevice()->runGarbageCollection();
 
+            uint2 windowSize = window.GetWindowSize();
+            if (windowSize.x != width || windowSize.y != height)
+            {
+                width = windowSize.x;
+                height = windowSize.y;
+                camera.setWidth(width);
+                camera.setHeight(height);
+
+                textureDesc.setWidth(width).setHeight(height);
+                textureOut = device->getDevice()->createTexture(textureDesc);
+                LOG_DEBUG("Resized texture to {}x{}", width, height);
+            }
+
             perFrameData.gWidth = width;
             perFrameData.gHeight = height;
             perFrameData.maxDepth = maxDepth;
             perFrameData.frameCount = frameCount++;
             perFrameData.gColor = gColorSlider;
+            camera.calculateCameraParameters();
+
             cbPerFrame.updateData(device->getDevice(), &perFrameData, sizeof(PerFrameCB));
             cbCamera.updateData(device->getDevice(), &camera.getCameraData(), sizeof(CameraData));
 
             (*pass)["PerFrameCB"] = cbPerFrame.getHandle();
             (*pass)["gCamera"] = cbCamera.getHandle();
-            (*pass)["result"] = textureOut.getHandle();
+            (*pass)["result"] = textureOut;
             (*pass)["gVertices"] = triangleGeometry.getVertexBuffer();
             (*pass)["gIndices"] = triangleGeometry.getIndexBuffer();
             (*pass)["gScene"] = triangleGeometry.getTLAS();
             pass->execute(width, height, 1);
 
             // Set texture for display
-            ID3D12Resource* d3d12Texture = static_cast<ID3D12Resource*>(textureOut.getHandle()->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource));
+            ID3D12Resource* d3d12Texture = static_cast<ID3D12Resource*>(textureOut->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource));
             window.SetDisplayTexture(d3d12Texture);
 
             // Custom ImGui content before window render

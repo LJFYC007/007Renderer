@@ -4,13 +4,12 @@
 #include <glm/ext.hpp>
 #include <glm/gtc/constants.hpp>
 
-void Camera::setCamera(const uint32_t width, const uint32_t height, const float3& posW, const float3& target, float fovY)
+Camera::Camera(const uint32_t width, const uint32_t height, const float3& posW, const float3& target, float fovY)
 {
     mData.frameWidth = width;
     mData.frameHeight = height;
     mData.posW = posW;
     mData.forward = glm::normalize(target - posW);
-    mData.aspectRatio = static_cast<float>(width) / static_cast<float>(height);
     mData.target = target;
     mData.up = float3(0.0f, 1.0f, 0.0f); // Fixed up vector for first-person camera
     mData.fovY = fovY;
@@ -20,13 +19,11 @@ void Camera::setCamera(const uint32_t width, const uint32_t height, const float3
     float3 initialForward = glm::normalize(target - posW);
     mYaw = atan2(initialForward.z, initialForward.x);
     mPitch = asin(initialForward.y);
-
-    calculateCameraParameters();
+    dirty = true;
 }
 
 void Camera::renderUI()
 {
-    bool dirty = false;
     GUI::Text("Camera Parameters");
 
     dirty |= GUI::DragFloat3("Position", &mData.posW.x, 0.1f, -100.0f, 100.0f);
@@ -38,27 +35,23 @@ void Camera::renderUI()
     GUI::Text("FOV Y (degrees): %.1f", mData.fovY * 180.0f / 3.14159265f);
     GUI::Text("Aspect Ratio: %.3f", mData.aspectRatio);
     GUI::Text("Focal Length: %.3f", mData.focalLength);
-
-    // Recalculate camera parameters if any value was updated
-    if (dirty)
-        calculateCameraParameters();
 }
 
 void Camera::handleInput()
 {
     float3 movement(0.f);
     if (GUI::IsKeyDown(ImGuiKey_W))
-        movement += mData.forward;
+        movement += mData.forward, dirty = true;
     if (GUI::IsKeyDown(ImGuiKey_S))
-        movement -= mData.forward;
+        movement -= mData.forward, dirty = true;
     if (GUI::IsKeyDown(ImGuiKey_A))
-        movement -= mData.right;
+        movement -= mData.right, dirty = true;
     if (GUI::IsKeyDown(ImGuiKey_D))
-        movement += mData.right;
+        movement += mData.right, dirty = true;
     if (GUI::IsKeyDown(ImGuiKey_Q))
-        movement -= mData.up;
+        movement -= mData.up, dirty = true;
     if (GUI::IsKeyDown(ImGuiKey_E))
-        movement += mData.up;
+        movement += mData.up, dirty = true;
 
     // Frame-rate independent movement using delta time
     float deltaTime = GUI::GetIO().DeltaTime;
@@ -102,21 +95,23 @@ void Camera::handleInput()
 
             // Update target to reflect new direction
             mData.target = mData.posW + mData.forward;
+            dirty = true;
         }
     }
     else
         mFirstMouseInput = true;
-
-    calculateCameraParameters();
 }
 
 void Camera::calculateCameraParameters()
 {
+    if (dirty == false)
+        return;
     // For first-person camera, forward is already calculated from yaw/pitch
     // Keep world up vector fixed to maintain stability
     mData.right = glm::normalize(glm::cross(mData.forward, mData.up));
 
     // Calculate viewport dimensions based on FOV
+    mData.aspectRatio = static_cast<float>(mData.frameWidth) / static_cast<float>(mData.frameHeight);
     float viewportHeight = 2.0f;
     float viewportWidth = viewportHeight * mData.aspectRatio;
     mData.focalLength = 1.0f / glm::tan(mData.fovY * 0.5f);
@@ -129,4 +124,6 @@ void Camera::calculateCameraParameters()
     float3 viewportCenter = mData.posW + mData.forward * mData.focalLength;
     float3 viewportCorner = viewportCenter - 0.5f * viewportWidth * mData.right + 0.5f * viewportHeight * mData.up;
     mData.pixel00 = viewportCorner + 0.5f * (mData.cameraU + mData.cameraV);
+
+    dirty = false;
 }

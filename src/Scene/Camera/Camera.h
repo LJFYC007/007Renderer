@@ -6,25 +6,33 @@
 class Camera
 {
 public:
-    Camera(const uint32_t width, const uint32_t height, const float3& posW, const float3& target, float fovY)
-    {
-        setCamera(width, height, posW, target, fovY);
-    }
+    Camera(const uint32_t width, const uint32_t height, const float3& posW, const float3& target, float fovY);
 
     const CameraData& getCameraData() const { return mData; }
     CameraData& getCameraData() { return mData; }
 
-    void setCamera(const uint32_t width, const uint32_t height, const float3& posW, const float3& target, float fovY);
+    void setWidth(const uint32_t width)
+    {
+        mData.frameWidth = width;
+        dirty = true;
+    }
+
+    void setHeight(const uint32_t height)
+    {
+        mData.frameHeight = height;
+        dirty = true;
+    }
 
     void renderUI();
 
     void handleInput();
 
-private:
     void calculateCameraParameters();
 
+private:
     CameraData mData;
     bool mFirstMouseInput = true;
+    bool dirty;
 
     // First person camera rotation angles
     float mYaw = 0.0f;   // Horizontal rotation (around Y axis)

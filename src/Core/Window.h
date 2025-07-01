@@ -1,3 +1,4 @@
+#pragma once
 #include <imgui.h>
 #include <imgui_impl_win32.h>
 #include <imgui_impl_dx12.h>
@@ -9,6 +10,7 @@
 #include <string>
 
 #include "DescriptorHeapAllocator.h"
+#include "Utils/Math/Math.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -46,6 +48,7 @@ public:
     bool RenderBegin();
     void RenderEnd();
     void SetDisplayTexture(ID3D12Resource* texture);
+    uint2 GetWindowSize() const;
 
     // Forward declarations of helper functions
     bool CreateDeviceD3D(HWND hWnd);
