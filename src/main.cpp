@@ -5,8 +5,7 @@
 #include "Core/Device.h"
 #include "Core/Window.h"
 #include "Core/Buffer.h"
-#include "Core/Geometry.h"
-#include "Core/OBJLoader.h"
+#include "Scene/Importer/AssimpImporter.h"
 #include "Core/Pointer.h"
 #include "RenderPasses/ComputePass.h"
 #include "RenderPasses/RayTracingPass.h"
@@ -76,8 +75,14 @@ int main()
         // -------------------------
         // 4. Setup triangle geometry for ray tracing
         // -------------------------
-        auto geometryData = OBJLoader::loadFromFile(std::string(PROJECT_DIR) + "/media/cornell_box.obj");
-        Geometry triangleGeometry(device, *geometryData);
+        AssimpImporter importer(device);
+        ref<Scene> scene = importer.loadScene(std::string(PROJECT_DIR) + "/media/cornell_box.obj");
+        if (!scene)
+        {
+            LOG_ERROR("Failed to load scene from file.");
+            return 1;
+        }
+        scene->buildAccelStructs();
 
         // -------------------------
         // 5. Setup shader & dispatch
@@ -142,9 +147,9 @@ int main()
             (*pass)["PerFrameCB"] = cbPerFrame.getHandle();
             (*pass)["gCamera"] = cbCamera.getHandle();
             (*pass)["result"] = textureOut;
-            (*pass)["gVertices"] = triangleGeometry.getVertexBuffer();
-            (*pass)["gIndices"] = triangleGeometry.getIndexBuffer();
-            (*pass)["gScene"] = triangleGeometry.getTLAS();
+            (*pass)["gVertices"] = scene->getVertexBuffer();
+            (*pass)["gIndices"] = scene->getIndexBuffer();
+            (*pass)["gScene"] = scene->getTLAS();
             pass->execute(width, height, 1);
 
             // Set texture for display

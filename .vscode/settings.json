@@ -94,7 +94,17 @@
         "future": "cpp",
         "stack": "cpp",
         "codecvt": "cpp",
-        "shared_mutex": "cpp"
+        "shared_mutex": "cpp",
+        "typeindex": "cpp",
+        "cfenv": "cpp",
+        "csetjmp": "cpp",
+        "cwctype": "cpp",
+        "execution": "cpp",
+        "memory_resource": "cpp",
+        "ranges": "cpp",
+        "scoped_allocator": "cpp",
+        "strstream": "cpp",
+        "valarray": "cpp"
     },
     "cmake.generator": "Ninja",
     "cmake.buildDirectory": "${workspaceFolder}/build/${buildType}",
