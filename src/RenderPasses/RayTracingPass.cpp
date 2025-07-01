@@ -15,23 +15,13 @@ bool RayTracingPass::initialize(
 
     if (!program.generateBindingLayout(resourceMap, accelStructMap))
         return false;
-    std::vector<nvrhi::BindingLayoutItem> layoutItems = program.getBindingLayoutItems();
-    std::vector<nvrhi::BindingSetItem> bindings = program.getBindingSetItems();
-
-    // Create binding layout
-    nvrhi::BindingLayoutDesc layoutDesc;
-    layoutDesc.visibility = nvrhi::ShaderType::AllRayTracing;
-    layoutDesc.bindings = layoutItems;
-    m_BindingLayout = nvrhiDevice->createBindingLayout(layoutDesc);
-
-    // Create binding set
-    nvrhi::BindingSetDesc bindingSetDesc;
-    bindingSetDesc.bindings = bindings;
-    m_BindingSet = nvrhiDevice->createBindingSet(bindingSetDesc, m_BindingLayout);
+    auto layoutItems = program.getBindingLayoutItems();
+    auto bindings = program.getBindingSetItems();
+    m_BindingSetManager = std::make_unique<BindingSetManager>(&device, layoutItems, bindings);
 
     // Create ray tracing pipeline with proper configuration
     nvrhi::rt::PipelineDesc pipelineDesc;
-    pipelineDesc.addBindingLayout(m_BindingLayout);
+    pipelineDesc.addBindingLayout(m_BindingSetManager->getBindingLayout());
 
     // Configure pipeline parameters - these are critical for D3D12
     pipelineDesc.maxPayloadSize = 64;   // Size in bytes for ray payload
@@ -67,21 +57,21 @@ bool RayTracingPass::initialize(
     m_ShaderTable->setRayGenerationShader("rayGenMain");
     m_ShaderTable->addMissShader("missMain");
     m_ShaderTable->addHitGroup("closestHitMain");
-
     m_rtState.setShaderTable(m_ShaderTable);
-    m_rtState.addBindingSet(m_BindingSet);
     return true;
 }
 
 void RayTracingPass::dispatch(Device& device, uint32_t width, uint32_t height, uint32_t depth)
 {
+    m_rtState.bindings = {m_BindingSetManager->getBindingSet()};
+
     auto commandList = device.getCommandList();
     auto nvrhiDevice = device.getDevice();
     commandList->open();
 
     // Set up resource states for all bound resources
-    const nvrhi::BindingSetDesc& desc = *m_BindingSet->getDesc();
-    for (const nvrhi::BindingSetItem& item : desc.bindings)
+    const nvrhi::BindingSetDesc* desc = m_BindingSetManager->getBindingSet()->getDesc();
+    for (const nvrhi::BindingSetItem& item : desc->bindings)
     {
         if (item.type == nvrhi::ResourceType::StructuredBuffer_SRV || item.type == nvrhi::ResourceType::StructuredBuffer_UAV)
         {

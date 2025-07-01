@@ -8,7 +8,7 @@
 #include "Core/Texture.h"
 #include "Core/Geometry.h"
 #include "Core/OBJLoader.h"
-#include "RenderPasses/ComputePass.h"
+// #include "RenderPasses/ComputePass.h"
 #include "RenderPasses/RayTracingPass.h"
 #include "Utils/Math/Math.h"
 #include "Utils/Logger.h"

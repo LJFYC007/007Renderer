@@ -22,8 +22,8 @@ public:
 
     slang::ProgramLayout* getProgramLayout() const { return m_ProgramLayout; }
     const std::vector<nvrhi::ShaderHandle>& getShaders() const { return m_Shaders; }
-    const std::vector<nvrhi::BindingLayoutItem>& getBindingLayoutItems() const { return m_BindingLayoutItems; }
-    const std::vector<nvrhi::BindingSetItem>& getBindingSetItems() const { return m_BindingSetItems; }
+    std::unordered_map<std::string, nvrhi::BindingLayoutItem> getBindingLayoutItems() { return m_BindingLayoutItems; }
+    std::unordered_map<std::string, nvrhi::BindingSetItem> getBindingSetItems() { return m_BindingSetItems; }
 
     // Debugging utility to print reflection information
     void printReflectionInfo() const;
@@ -49,10 +49,10 @@ private:
     Slang::ComPtr<slang::IComponentType> m_LinkedProgram;
     slang::ProgramLayout* m_ProgramLayout;
 
-    std::vector<nvrhi::ShaderHandle> m_Shaders;                        // All shaders
-    std::unordered_map<std::string, size_t> m_EntryPointToShaderIndex; // Map entry point names to shader indices
-    std::vector<nvrhi::BindingLayoutItem> m_BindingLayoutItems;        // Binding layout items
-    std::vector<nvrhi::BindingSetItem> m_BindingSetItems;              // Binding set items
+    std::vector<nvrhi::ShaderHandle> m_Shaders;                                     // All shaders
+    std::unordered_map<std::string, size_t> m_EntryPointToShaderIndex;              // Map entry point names to shader indices
+    std::unordered_map<std::string, nvrhi::BindingLayoutItem> m_BindingLayoutItems; // Binding layout items
+    std::unordered_map<std::string, nvrhi::BindingSetItem> m_BindingSetItems;       // Binding set items
     std::unordered_map<std::string, nvrhi::ResourceHandle> m_ResourceMap;
     std::unordered_map<std::string, nvrhi::rt::AccelStructHandle> m_AccelStructMap;
 };

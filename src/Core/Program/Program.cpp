@@ -414,8 +414,8 @@ bool Program::processParameter(slang::VariableLayoutReflection* varLayout)
         return true;
     }
 
-    m_BindingLayoutItems.push_back(layoutItem);
-    m_BindingSetItems.push_back(bindingItem);
+    m_BindingLayoutItems[paramNameStr] = layoutItem;
+    m_BindingSetItems[paramNameStr] = bindingItem;
     return true;
 }
 

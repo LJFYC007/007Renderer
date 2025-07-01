@@ -1,8 +1,10 @@
 #pragma once
 #include <nvrhi/nvrhi.h>
 #include <vector>
+#include <memory>
 
 #include "Core/Program/Program.h"
+#include "Core/Program/BindingSetManager.h"
 #include "Core/Device.h"
 
 class RayTracingPass
@@ -20,11 +22,11 @@ public:
 
 private:
     nvrhi::rt::PipelineHandle m_Pipeline;
-    nvrhi::BindingSetHandle m_BindingSet;
-    nvrhi::BindingLayoutHandle m_BindingLayout;
     nvrhi::ShaderHandle m_RayGenShader;
     nvrhi::ShaderHandle m_MissShader;
     nvrhi::ShaderHandle m_ClosestHitShader;
     nvrhi::rt::State m_rtState;
     nvrhi::rt::ShaderTableHandle m_ShaderTable;
+
+    std::unique_ptr<BindingSetManager> m_BindingSetManager; // Manages binding sets and layouts
 };
