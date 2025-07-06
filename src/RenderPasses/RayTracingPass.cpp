@@ -15,13 +15,14 @@ RayTracingPass::RayTracingPass(
 
     if (!program.generateBindingLayout())
         LOG_ERROR_RETURN("[RayTracingPass] Failed to generate binding layout from program");
-    auto bindingLayoutItems = program.getBindingLayoutItems();
-    auto bindingMap = program.getBindingSetItems();
-    m_BindingSetManager = make_ref<BindingSetManager>(device, bindingLayoutItems, bindingMap);
+    m_BindingSetManager = make_ref<BindingSetManager>(device, program.getReflectionInfo());
 
     // Create ray tracing pipeline with proper configuration
     nvrhi::rt::PipelineDesc pipelineDesc;
-    pipelineDesc.addBindingLayout(m_BindingSetManager->getBindingLayout());
+    std::vector<nvrhi::BindingLayoutHandle> bindingLayouts = m_BindingSetManager->getBindingLayouts();
+    for (const auto& layout : bindingLayouts)
+        if (layout)
+            pipelineDesc.addBindingLayout(layout);
 
     // Configure pipeline parameters - these are critical for D3D12
     pipelineDesc.maxPayloadSize = 64;   // Size in bytes for ray payload
@@ -54,12 +55,16 @@ RayTracingPass::RayTracingPass(
     m_ShaderTable->setRayGenerationShader("rayGenMain");
     m_ShaderTable->addMissShader("missMain");
     m_ShaderTable->addHitGroup("closestHitMain");
-    m_rtState.setShaderTable(m_ShaderTable);
 }
 
 void RayTracingPass::execute(uint32_t width, uint32_t height, uint32_t depth)
 {
-    m_rtState.bindings = {m_BindingSetManager->getBindingSet()};
+    nvrhi::rt::State m_rtState;
+    m_rtState.setShaderTable(m_ShaderTable);
+    std::vector<nvrhi::BindingSetHandle> bindingSets = m_BindingSetManager->getBindingSets();
+    for (const auto& bindingSet : bindingSets)
+        if (bindingSet)
+            m_rtState.addBindingSet(bindingSet);
 
     auto commandList = m_Device->getCommandList();
     auto nvrhiDevice = m_Device->getDevice();

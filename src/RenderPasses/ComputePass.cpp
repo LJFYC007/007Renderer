@@ -12,9 +12,7 @@ ComputePass::ComputePass(ref<Device> device, const std::string& shaderPath, cons
     // program.printReflectionInfo();
     if (!program.generateBindingLayout())
         LOG_ERROR_RETURN("[ComputePass] Failed to generate binding layout from program");
-    auto bindingLayoutItems = program.getBindingLayoutItems();
-    auto bindingMap = program.getBindingSetItems();
-    m_BindingSetManager = make_ref<BindingSetManager>(device, bindingLayoutItems, bindingMap);
+    m_BindingSetManager = make_ref<BindingSetManager>(device, program.getReflectionInfo());
 
     auto programLayout = program.getProgramLayout();
     if (programLayout && programLayout->getEntryPointCount() > 0)
@@ -34,7 +32,11 @@ ComputePass::ComputePass(ref<Device> device, const std::string& shaderPath, cons
 
     // Create compute pipeline
     nvrhi::ComputePipelineDesc pipelineDesc;
-    pipelineDesc.addBindingLayout(m_BindingSetManager->getBindingLayout());
+    std::vector<nvrhi::BindingLayoutHandle> bindingLayouts = m_BindingSetManager->getBindingLayouts();
+    for (const auto& layout : bindingLayouts)
+        if (layout)
+            pipelineDesc.addBindingLayout(layout);
+
     pipelineDesc.setComputeShader(m_Shader);
     m_Pipeline = nvrhiDevice->createComputePipeline(pipelineDesc);
     if (!m_Pipeline)
@@ -51,7 +53,11 @@ void ComputePass::dispatch(uint32_t width, uint32_t height, uint32_t depth)
 
     nvrhi::ComputeState state;
     state.pipeline = m_Pipeline;
-    state.bindings = {m_BindingSetManager->getBindingSet()};
+    std::vector<nvrhi::BindingSetHandle> bindingSets = m_BindingSetManager->getBindingSets();
+    for (const auto& bindingSet : bindingSets)
+        if (bindingSet)
+            state.addBindingSet(bindingSet);
+
     commandList->setComputeState(state);
     commandList->dispatch(width, height, depth);
     commandList->close();

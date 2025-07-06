@@ -15,5 +15,4 @@ private:
     nvrhi::ShaderHandle m_ClosestHitShader;
     nvrhi::rt::ShaderTableHandle m_ShaderTable;
     nvrhi::rt::PipelineHandle m_Pipeline;
-    nvrhi::rt::State m_rtState;
 };

@@ -34,4 +34,6 @@
 /external/dxc
 /logs
 /media
+/out
+/.vs
 imgui.ini

@@ -241,9 +241,7 @@ bool Program::generateBindingLayout()
         LOG_ERROR("[Program] No program layout available for binding generation");
         return false;
     }
-
-    m_BindingLayoutItems.clear();
-    m_BindingSetItems.clear();
+    m_ReflectionInfo.clear();
 
     // Process global parameters
     auto globalScopeLayout = m_ProgramLayout->getGlobalParamsVarLayout();
@@ -375,8 +373,13 @@ bool Program::processParameter(slang::VariableLayoutReflection* varLayout)
         return true;
     }
 
-    m_BindingLayoutItems.push_back(layoutItem);
-    m_BindingSetItems[paramNameStr] = bindingItem;
+    ReflectionInfo reflectionInfo;
+    reflectionInfo.name = paramNameStr;
+    reflectionInfo.bindingLayoutItem = layoutItem;
+    reflectionInfo.bindingSetItem = bindingItem;
+    reflectionInfo.bindingSpace = varLayout->getBindingSpace();
+    m_ReflectionInfo.push_back(reflectionInfo);
+
     return true;
 }
 
