@@ -215,9 +215,21 @@ void Program::printVariableLayout(slang::VariableLayoutReflection* varLayout, in
     case slang::TypeReflection::Kind::ConstantBuffer:
         LOG_DEBUG("{}Kind: ConstantBuffer", indentStr);
         break;
-
     case slang::TypeReflection::Kind::ParameterBlock:
         LOG_DEBUG("{}Kind: ParameterBlock", indentStr);
+        {
+            auto elementTypeLayout = typeLayout->getElementTypeLayout();
+            if (elementTypeLayout)
+            {
+                auto fieldCount = elementTypeLayout->getFieldCount();
+                LOG_DEBUG("{}  Contains {} fields", indentStr, fieldCount);
+                for (unsigned int i = 0; i < fieldCount; i++)
+                {
+                    auto fieldLayout = elementTypeLayout->getFieldByIndex(i);
+                    printVariableLayout(fieldLayout, indent + 1);
+                }
+            }
+        }
         break;
 
     default:
@@ -284,7 +296,7 @@ bool Program::processParameterGroup(slang::VariableLayoutReflection* varLayout)
     return true;
 }
 
-bool Program::processParameter(slang::VariableLayoutReflection* varLayout)
+bool Program::processParameter(slang::VariableLayoutReflection* varLayout, std::string prefix)
 {
     if (!varLayout)
         return true;
@@ -368,16 +380,47 @@ bool Program::processParameter(slang::VariableLayoutReflection* varLayout)
         LOG_DEBUG("[ShaderBinding] Found constant buffer: {} at slot {}", paramNameStr, bindingSlot);
         break;
     }
+    case slang::TypeReflection::Kind::ParameterBlock:
+    {
+        LOG_DEBUG("[ShaderBinding] Processing parameter block: {} at slot {} in space {}", paramNameStr, bindingSlot, varLayout->getBindingSpace());
+
+        // ParameterBlock creates its own binding space - process its contents recursively
+        auto elementTypeLayout = typeLayout->getElementTypeLayout();
+        if (elementTypeLayout)
+        {
+            auto fieldCount = elementTypeLayout->getFieldCount();
+            LOG_DEBUG("[ShaderBinding] ParameterBlock {} contains {} fields", paramNameStr, fieldCount);
+
+            for (unsigned int i = 0; i < fieldCount; i++)
+            {
+                auto fieldLayout = elementTypeLayout->getFieldByIndex(i);
+                if (!processParameter(fieldLayout, paramNameStr + "."))
+                    return false;
+            }
+        }
+        else
+        {
+            LOG_WARN("[ShaderBinding] ParameterBlock {} has no element type layout", paramNameStr);
+        }
+
+        // ParameterBlock doesn't create a binding itself, only its contents do
+        return true;
+    }
 
     default:
         return true;
     }
 
     ReflectionInfo reflectionInfo;
-    reflectionInfo.name = paramNameStr;
+    reflectionInfo.name = prefix + paramNameStr;
     reflectionInfo.bindingLayoutItem = layoutItem;
     reflectionInfo.bindingSetItem = bindingItem;
     reflectionInfo.bindingSpace = varLayout->getBindingSpace();
+
+    if (prefix != "")
+        reflectionInfo.bindingSpace = 1;
+
+    LOG_DEBUG("[ShaderBinding] Reflection Info - Name: {}, Binding Space: {}", reflectionInfo.name, reflectionInfo.bindingSpace);
     m_ReflectionInfo.push_back(reflectionInfo);
 
     return true;

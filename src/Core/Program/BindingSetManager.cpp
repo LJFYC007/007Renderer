@@ -24,6 +24,7 @@ BindingSetManager::BindingSetManager(ref<Device> device, std::vector<ReflectionI
 
         nvrhi::BindingLayoutDesc layoutDesc;
         layoutDesc.visibility = nvrhi::ShaderType::All;
+        layoutDesc.registerSpace = space;
         layoutDesc.bindings = m_spaces[space].layoutItems;
         m_spaces[space].bindingLayout = m_device->getDevice()->createBindingLayout(layoutDesc);
     }

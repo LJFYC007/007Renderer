@@ -1,6 +1,7 @@
 import Utils.Math.Ray;
 import Utils.Sampling.SampleGenerator;
 import Scene.Camera.Camera;
+import Scene.Scene;
 
 cbuffer PerFrameCB
 {
@@ -13,19 +14,6 @@ cbuffer PerFrameCB
 
 ConstantBuffer<Camera> gCamera;
 RWTexture2D<float4> result;
-RaytracingAccelerationStructure gScene;
-
-// Vertex structure that matches C++ side
-struct Vertex
-{
-    float3 position;
-    float2 texCoord;
-    float3 normal;
-};
-
-// Vertex and index buffers
-StructuredBuffer<Vertex> gVertices;
-StructuredBuffer<uint> gIndices;
 
 // Payload: defines what we pass between shaders
 struct Payload
@@ -50,7 +38,7 @@ void rayGenMain()
     payload.depth = 1;
     payload.sampleGen = TinyUniformSampleGenerator(launchID, frameCount);
     
-    TraceRay(gScene, RAY_FLAG_NONE, 0xFF, 0, 0, 0, ray.toRayDesc(), payload);
+    TraceRay(gScene.rtAccel, RAY_FLAG_NONE, 0xFF, 0, 0, 0, ray.toRayDesc(), payload);
 
     result[launchID] = float4(payload.color, 1.0);
 }
@@ -82,14 +70,14 @@ void closestHitMain(inout Payload payload, BuiltInTriangleIntersectionAttributes
     
     // Get vertex indices for this triangle
     uint baseIndex = primitiveIndex * 3;
-    uint i0 = gIndices[baseIndex + 0];
-    uint i1 = gIndices[baseIndex + 1];
-    uint i2 = gIndices[baseIndex + 2];
-    
+    uint i0 = gScene.indices[baseIndex + 0];
+    uint i1 = gScene.indices[baseIndex + 1];
+    uint i2 = gScene.indices[baseIndex + 2];
+
     // Get vertex normals
-    float3 normal0 = gVertices[i0].normal;
-    float3 normal1 = gVertices[i1].normal;
-    float3 normal2 = gVertices[i2].normal;
+    float3 normal0 = gScene.vertices[i0].normal;
+    float3 normal1 = gScene.vertices[i1].normal;
+    float3 normal2 = gScene.vertices[i2].normal;
     float3 hitNormal = normalize(w * normal0 + u * normal1 + v * normal2);
     
     // Sample hemisphere for indirect lighting using the sample generator
@@ -108,8 +96,8 @@ void closestHitMain(inout Payload payload, BuiltInTriangleIntersectionAttributes
     bouncePayload.color = float3(0, 0, 0);
     bouncePayload.depth = payload.depth + 1;
     bouncePayload.sampleGen = payload.sampleGen;
-    
-    TraceRay(gScene, RAY_FLAG_NONE, 0xFF, 0, 0, 0, bounceRay.toRayDesc(), bouncePayload);
-    
+
+    TraceRay(gScene.rtAccel, RAY_FLAG_NONE, 0xFF, 0, 0, 0, bounceRay.toRayDesc(), bouncePayload);
+
     payload.color = 0.5 * bouncePayload.color;
 }

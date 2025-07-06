@@ -147,9 +147,9 @@ int main()
             (*pass)["PerFrameCB"] = cbPerFrame.getHandle();
             (*pass)["gCamera"] = cbCamera.getHandle();
             (*pass)["result"] = textureOut;
-            (*pass)["gVertices"] = scene->getVertexBuffer();
-            (*pass)["gIndices"] = scene->getIndexBuffer();
-            (*pass)["gScene"] = scene->getTLAS();
+            (*pass)["gScene.vertices"] = scene->getVertexBuffer();
+            (*pass)["gScene.indices"] = scene->getIndexBuffer();
+            (*pass)["gScene.rtAccel"] = scene->getTLAS();
             pass->execute(width, height, 1);
 
             // Set texture for display
