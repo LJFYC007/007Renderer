@@ -34,7 +34,25 @@ private:
     // Initialize session for Slang compilation
     void initializeSession(const std::string& profile);
 
-    void printVariableLayout(slang::VariableLayoutReflection* varLayout, int indent) const;
+    void printScope(slang::VariableLayoutReflection* scopeVarLayout, int indent) const;
+
+    void printVarLayout(slang::VariableLayoutReflection* varLayout, int indent) const;
+
+    void printTypeLayout(slang::TypeLayoutReflection* typeLayout, int indent) const;
+
+    void printRelativeOffsets(slang::VariableLayoutReflection* varLayout, int indent) const;
+
+    void printOffset(slang::VariableLayoutReflection* varLayout, slang::ParameterCategory layoutUnit, int indent) const;
+
+    void printOffsets(slang::VariableLayoutReflection* varLayout, int indent) const;
+
+    void printSize(slang::TypeLayoutReflection* typeLayout, slang::ParameterCategory layoutUnit, int indent) const;
+
+    void printSizes(slang::TypeLayoutReflection* typeLayout, int indent) const;
+
+    std::string printKind(slang::TypeReflection::Kind kind) const;
+
+    std::string printLayoutUnit(slang::ParameterCategory layoutUnit) const;
 
     bool processParameterGroup(slang::VariableLayoutReflection* varLayout);
 

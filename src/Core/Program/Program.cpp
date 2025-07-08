@@ -139,8 +139,8 @@ void Program::printReflectionInfo() const
     auto globalScopeLayout = m_ProgramLayout->getGlobalParamsVarLayout();
     if (globalScopeLayout)
     {
-        LOG_DEBUG("[Program] Global Parameters:");
-        printVariableLayout(globalScopeLayout, 1);
+        LOG_DEBUG("[Program] Global Scope:");
+        printScope(globalScopeLayout, 1);
     }
 
     auto entryPointCount = m_ProgramLayout->getEntryPointCount();
@@ -151,99 +151,313 @@ void Program::printReflectionInfo() const
 
         auto entryPointLayout = entryPoint->getVarLayout();
         if (entryPointLayout)
-            printVariableLayout(entryPointLayout, 1);
+            printScope(entryPointLayout, 1);
     }
 }
 
-void Program::printVariableLayout(slang::VariableLayoutReflection* varLayout, int indent) const
+void Program::printScope(slang::VariableLayoutReflection* scopeVarLayout, int indent) const
 {
-    if (!varLayout)
-        return;
     std::string indentStr(indent * 2, ' ');
-    auto typeLayout = varLayout->getTypeLayout();
-
-    if (varLayout->getName() != nullptr)
-        LOG_DEBUG("{}Variable: {}", indentStr, varLayout->getName());
-
-    const char* typeName = nullptr;
-    if (typeLayout)
-        typeName = typeLayout->getName();
-    else
-        LOG_WARN_RETURN("{}No type layout available for variable '{}'", indentStr, varLayout->getName() ? varLayout->getName() : "Unknown");
-    LOG_DEBUG("{}Type: {}", indentStr, typeName ? typeName : "Unknown");
-
-    switch (typeLayout->getKind())
+    auto scopeTypeLayout = scopeVarLayout->getTypeLayout();
+    switch (scopeTypeLayout->getKind())
     {
     case slang::TypeReflection::Kind::Struct:
-        LOG_DEBUG("{}Kind: Struct", indentStr);
-        {
-            auto fieldCount = typeLayout->getFieldCount();
-            for (unsigned int i = 0; i < fieldCount; i++)
-            {
-                auto fieldLayout = typeLayout->getFieldByIndex(i);
-                printVariableLayout(fieldLayout, indent + 1);
-            }
-        }
-        break;
-
-    case slang::TypeReflection::Kind::Array:
-        LOG_DEBUG("{}Kind: Array[{}]", indentStr, typeLayout->getElementCount());
-        break;
-
-    case slang::TypeReflection::Kind::Vector:
-        LOG_DEBUG("{}Kind: Vector[{}]", indentStr, typeLayout->getElementCount());
-        break;
-
-    case slang::TypeReflection::Kind::Matrix:
-        LOG_DEBUG("{}Kind: Matrix[{}x{}]", indentStr, typeLayout->getRowCount(), typeLayout->getColumnCount());
-        break;
-
-    case slang::TypeReflection::Kind::Scalar:
-        LOG_DEBUG("{}Kind: Scalar", indentStr);
-        break;
-
-    case slang::TypeReflection::Kind::Resource:
     {
-        LOG_DEBUG("{}Kind: Resource", indentStr);
-        auto resourceShape = typeLayout->getResourceShape();
-        auto resourceAccess = typeLayout->getResourceAccess();
-        LOG_DEBUG("{}  Resource Shape: {}", indentStr, static_cast<int>(resourceShape));
-        LOG_DEBUG("{}  Resource Access: {}", indentStr, static_cast<int>(resourceAccess));
+        LOG_DEBUG("{}parameters:", indentStr);
+        int paramCount = scopeTypeLayout->getFieldCount();
+        for (int i = 0; i < paramCount; i++)
+        {
+            auto param = scopeTypeLayout->getFieldByIndex(i);
+            printVarLayout(param, indent + 1);
+        }
     }
     break;
 
     case slang::TypeReflection::Kind::ConstantBuffer:
-        LOG_DEBUG("{}Kind: ConstantBuffer", indentStr);
-        break;
+    {
+        LOG_DEBUG("{}automatically-introduced constant buffer:", indentStr);
+        printOffsets(scopeTypeLayout->getContainerVarLayout(), indent + 1);
+        printScope(scopeTypeLayout->getElementVarLayout(), indent + 1);
+    }
+    break;
+
     case slang::TypeReflection::Kind::ParameterBlock:
-        LOG_DEBUG("{}Kind: ParameterBlock", indentStr);
+    {
+        LOG_DEBUG("automatically-introduced parameter block:", indentStr);
+        printOffsets(scopeTypeLayout->getContainerVarLayout(), indent + 1);
+        printScope(scopeTypeLayout->getElementVarLayout(), indent + 1);
+    }
+    break;
+
+    default:
+        LOG_WARN("[Program] Unsupported scope type kind for printing: {}", static_cast<int>(scopeTypeLayout->getKind()));
+        break;
+    }
+}
+
+void Program::printVarLayout(slang::VariableLayoutReflection* varLayout, int indent) const
+{
+    std::string indentStr(indent * 2, ' ');
+    LOG_DEBUG("{}name: {}", indentStr, varLayout->getName());
+    printRelativeOffsets(varLayout, indent + 1);
+    LOG_DEBUG("{}type layout:", indentStr);
+    printTypeLayout(varLayout->getTypeLayout(), indent + 1);
+}
+
+void Program::printTypeLayout(slang::TypeLayoutReflection* typeLayout, int indent) const
+{
+    std::string indentStr(indent * 2, ' ');
+    LOG_DEBUG("{}name: {}", indentStr, typeLayout->getName() ? typeLayout->getName() : "None");
+    LOG_DEBUG("{}kind: {}", indentStr, printKind(typeLayout->getKind()));
+    printSizes(typeLayout, indent + 1);
+
+    switch (typeLayout->getKind())
+    {
+    case slang::TypeReflection::Kind::Struct:
+    {
+        LOG_DEBUG("{}fields:", indentStr);
+        int fieldCount = typeLayout->getFieldCount();
+        for (int i = 0; i < fieldCount; i++)
         {
-            auto elementTypeLayout = typeLayout->getElementTypeLayout();
-            if (elementTypeLayout)
+            auto field = typeLayout->getFieldByIndex(i);
+            printVarLayout(field, indent + 1);
+        }
+    }
+    break;
+
+    case slang::TypeReflection::Kind::Array:
+    {
+        LOG_DEBUG("{}element count: {}", indentStr, typeLayout->getElementCount());
+        LOG_DEBUG("{}element type layout: ", indentStr);
+        printTypeLayout(typeLayout->getElementTypeLayout(), indent + 1);
+    }
+    break;
+
+    case slang::TypeReflection::Kind::Vector:
+    {
+        LOG_DEBUG("{}element type layout: ", indentStr);
+        printTypeLayout(typeLayout->getElementTypeLayout(), indent + 1);
+    }
+    break;
+
+    case slang::TypeReflection::Kind::ConstantBuffer:
+    case slang::TypeReflection::Kind::ParameterBlock:
+    case slang::TypeReflection::Kind::TextureBuffer:
+    case slang::TypeReflection::Kind::ShaderStorageBuffer:
+    {
+        auto containerVarLayout = typeLayout->getContainerVarLayout();
+        auto elementVarLayout = typeLayout->getElementVarLayout();
+
+        LOG_DEBUG("{}container", indentStr);
+        printOffsets(containerVarLayout, indent + 1);
+
+        LOG_DEBUG("{}element: ", indentStr);
+        printOffsets(elementVarLayout, indent + 1);
+
+        LOG_DEBUG("{}type layout: ", indentStr);
+        printTypeLayout(elementVarLayout->getTypeLayout(), indent + 1);
+    }
+    break;
+
+    case slang::TypeReflection::Kind::Resource:
+    {
+        if ((typeLayout->getResourceShape() & SLANG_RESOURCE_BASE_SHAPE_MASK) == SLANG_STRUCTURED_BUFFER)
+        {
+            LOG_DEBUG("{}element type layout: ", indentStr);
+            printTypeLayout(typeLayout->getElementTypeLayout(), indent + 1);
+        }
+        else
+        {
+            LOG_DEBUG("{}result type: todo", indentStr);
+        }
+    }
+    break;
+
+    default:
+        break;
+    }
+}
+
+/*
+CumulativeOffset Program::calculateCumulativeOffset(slang::ParameterCategory layoutUnit, AccessPath accessPath) const
+{
+    CumulativeOffset result;
+    switch (layoutUnit)
+    {
+    case slang::ParameterCategory::Uniform:
+        for (auto node = accessPath.leaf; node != accessPath.deepestConstantBuffer; node = node->outer)
+            result.offset += node->varLayout->getOffset(layoutUnit);
+        break;
+
+    case slang::ParameterCategory::ConstantBuffer:
+    case slang::ParameterCategory::ShaderResource:
+    case slang::ParameterCategory::UnorderedAccess:
+    case slang::ParameterCategory::SamplerState:
+    case slang::ParameterCategory::DescriptorTableSlot:
+        {
+            for (auto node = accessPath.leaf; node != accessPath.deepestParameterBlock; node = node->outer)
             {
-                auto fieldCount = elementTypeLayout->getFieldCount();
-                LOG_DEBUG("{}  Contains {} fields", indentStr, fieldCount);
-                for (unsigned int i = 0; i < fieldCount; i++)
-                {
-                    auto fieldLayout = elementTypeLayout->getFieldByIndex(i);
-                    printVariableLayout(fieldLayout, indent + 1);
-                }
+                result.offset += node->varLayout->getOffset(layoutUnit);
+                result.space += node->varLayout->getBindingSpace(layoutUnit);
             }
+            for (auto node = accessPath.deepestParameterBlock; node != nullptr; node = node->outer)
+                result.space += node->varLayout->getOffset(slang::ParameterCategory::SubElementRegisterSpace);
         }
         break;
 
     default:
-        LOG_WARN("{}Kind: Unknown type kind ({})", indentStr, static_cast<int>(typeLayout->getKind()));
+        for (auto node = accessPath.leaf; node != nullptr; node = node->outer)
+            result.offset += node->varLayout->getOffset(layoutUnit);
         break;
     }
+    return result;
+}
+*/
 
-    auto offset = varLayout->getOffset(slang::ParameterCategory::Uniform);
-    if (offset != ~0u)
-        LOG_DEBUG("{}  Uniform Offset: {}", indentStr, offset);
+void Program::printRelativeOffsets(slang::VariableLayoutReflection* varLayout, int indent) const
+{
+    std::string indentStr(indent * 2, ' ');
+    LOG_DEBUG("{}relative offsets: ", indentStr);
+    int usedLayoutUnitCount = varLayout->getCategoryCount();
+    for (int i = 0; i < usedLayoutUnitCount; i++)
+    {
+        auto layoutUnit = varLayout->getCategoryByIndex(i);
+        printOffset(varLayout, layoutUnit, indent + 1);
+    }
+}
 
-    auto bindingOffset = varLayout->getOffset(slang::ParameterCategory::DescriptorTableSlot);
-    if (bindingOffset != ~0u)
-        LOG_DEBUG("{}  Binding Offset: {}", indentStr, bindingOffset);
+void Program::printOffset(slang::VariableLayoutReflection* varLayout, slang::ParameterCategory layoutUnit, int indent) const
+{
+    std::string indentStr(indent * 2, ' ');
+    size_t offset = varLayout->getOffset(layoutUnit);
+    LOG_DEBUG("{}value: {}", indentStr, offset);
+    LOG_DEBUG("{}unit: {}", indentStr, printLayoutUnit(layoutUnit));
+
+    size_t spaceOffset = varLayout->getBindingSpace(layoutUnit);
+    switch (layoutUnit)
+    {
+    case slang::ParameterCategory::ConstantBuffer:
+    case slang::ParameterCategory::ShaderResource:
+    case slang::ParameterCategory::UnorderedAccess:
+    case slang::ParameterCategory::SamplerState:
+    case slang::ParameterCategory::DescriptorTableSlot:
+        LOG_DEBUG("{}space: {}", indentStr, spaceOffset);
+    default:
+        break;
+    }
+}
+
+void Program::printOffsets(slang::VariableLayoutReflection* varLayout, int indent) const
+{
+    std::string indentStr(indent * 2, ' ');
+    LOG_DEBUG("{}offsets:", indentStr);
+    printRelativeOffsets(varLayout, indent + 1);
+}
+
+void Program::printSize(slang::TypeLayoutReflection* typeLayout, slang::ParameterCategory layoutUnit, int indent) const
+{
+    std::string indentStr(indent * 2, ' ');
+    size_t size = typeLayout->getSize(layoutUnit);
+    LOG_DEBUG("{}value: {}", indentStr, size);
+    LOG_DEBUG("{}unit: {}", indentStr, printLayoutUnit(layoutUnit));
+}
+
+void Program::printSizes(slang::TypeLayoutReflection* typeLayout, int indent) const
+{
+    std::string indentStr(indent * 2, ' ');
+    int usedLayoutUnitCount = typeLayout->getCategoryCount();
+    for (int i = 0; i < usedLayoutUnitCount; i++)
+    {
+        auto layoutUnit = typeLayout->getCategoryByIndex(i);
+        printSize(typeLayout, layoutUnit, indent + 1);
+    }
+
+    // Alignment and stride
+    if (typeLayout->getSize() != 0)
+    {
+        LOG_DEBUG("{}alignment in bytes: {}", indentStr, typeLayout->getAlignment());
+        LOG_DEBUG("{}stride in bytes: {}", indentStr, typeLayout->getStride());
+    }
+}
+
+std::string Program::printKind(slang::TypeReflection::Kind kind) const
+{
+    switch (kind)
+    {
+    case slang::TypeReflection::Kind::Struct:
+        return "Struct";
+    case slang::TypeReflection::Kind::ConstantBuffer:
+        return "ConstantBuffer";
+    case slang::TypeReflection::Kind::ParameterBlock:
+        return "ParameterBlock";
+    case slang::TypeReflection::Kind::TextureBuffer:
+        return "TextureBuffer";
+    case slang::TypeReflection::Kind::Vector:
+        return "Vector";
+    case slang::TypeReflection::Kind::Scalar:
+        return "Scalar";
+    case slang::TypeReflection::Kind::Resource:
+        return "Resource";
+    default:
+        LOG_WARN("[Program] Unknown type kind: {}", static_cast<int>(kind));
+        return "Unknown";
+    }
+}
+
+std::string Program::printLayoutUnit(slang::ParameterCategory layoutUnit) const
+{
+    switch (layoutUnit)
+    {
+    case slang::ParameterCategory::ConstantBuffer:
+        return "constant buffer slots";
+    case slang::ParameterCategory::ShaderResource:
+        return "texture slots";
+    case slang::ParameterCategory::UnorderedAccess:
+        return "uav slots";
+    case slang::ParameterCategory::VaryingInput:
+        return "varying input slots";
+    case slang::ParameterCategory::VaryingOutput:
+        return "varying output slots";
+    case slang::ParameterCategory::SamplerState:
+        return "sampler slots";
+    case slang::ParameterCategory::Uniform:
+        return "bytes";
+    case slang::ParameterCategory::DescriptorTableSlot:
+        return "bindings";
+    case slang::ParameterCategory::SpecializationConstant:
+        return "specialization constant ids";
+    case slang::ParameterCategory::PushConstantBuffer:
+        return "push-constant buffers";
+    case slang::ParameterCategory::RegisterSpace:
+        return "register space offset for a variable";
+    case slang::ParameterCategory::GenericResource:
+        return "generic resources";
+    case slang::ParameterCategory::RayPayload:
+        return "ray payloads";
+    case slang::ParameterCategory::HitAttributes:
+        return "hit attributes";
+    case slang::ParameterCategory::CallablePayload:
+        return "callable payloads";
+    case slang::ParameterCategory::ShaderRecord:
+        return "shader records";
+    case slang::ParameterCategory::ExistentialTypeParam:
+        return "existential type parameters";
+    case slang::ParameterCategory::ExistentialObjectParam:
+        return "existential object parameters";
+    case slang::ParameterCategory::SubElementRegisterSpace:
+        return "register spaces / descriptor sets";
+    case slang::ParameterCategory::InputAttachmentIndex:
+        return "subpass input attachments";
+    case slang::ParameterCategory::MetalArgumentBufferElement:
+        return "Metal argument buffer elements";
+    case slang::ParameterCategory::MetalAttribute:
+        return "Metal attributes";
+    case slang::ParameterCategory::MetalPayload:
+        return "Metal payloads";
+    case slang::ParameterCategory::None:
+        LOG_WARN("[Program] Layout unit is None, this should not happen");
+        return "Unknown";
+    }
 }
 
 bool Program::generateBindingLayout()
