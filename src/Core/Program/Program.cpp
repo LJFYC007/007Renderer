@@ -457,6 +457,9 @@ std::string Program::printLayoutUnit(slang::ParameterCategory layoutUnit) const
     case slang::ParameterCategory::None:
         LOG_WARN("[Program] Layout unit is None, this should not happen");
         return "Unknown";
+    default:
+        LOG_WARN("[Program] Unknown layout unit: {}", static_cast<int>(layoutUnit));
+        return "Unknown";
     }
 }
 
@@ -510,7 +513,7 @@ bool Program::processParameterGroup(slang::VariableLayoutReflection* varLayout)
     return true;
 }
 
-bool Program::processParameter(slang::VariableLayoutReflection* varLayout, std::string prefix)
+bool Program::processParameter(slang::VariableLayoutReflection* varLayout, int bindingSpaceOffset, std::string prefix)
 {
     if (!varLayout)
         return true;
@@ -548,10 +551,11 @@ bool Program::processParameter(slang::VariableLayoutReflection* varLayout, std::
                 bindingItem = resourceAccess == SLANG_RESOURCE_ACCESS_READ ? nvrhi::BindingSetItem::Texture_SRV(bindingSlot, nullptr)
                                                                            : nvrhi::BindingSetItem::Texture_UAV(bindingSlot, nullptr);
                 LOG_DEBUG(
-                    "[ShaderBinding] Found {} texture: {} at slot {}",
+                    "[ShaderBinding] Found {} texture: {} at slot {} in space {}",
                     resourceAccess == SLANG_RESOURCE_ACCESS_READ ? "SRV" : "UAV",
                     paramNameStr,
-                    bindingSlot
+                    bindingSlot,
+                    bindingSpaceOffset
                 );
             }
             break;
@@ -564,10 +568,11 @@ bool Program::processParameter(slang::VariableLayoutReflection* varLayout, std::
                 bindingItem = resourceAccess == SLANG_RESOURCE_ACCESS_READ ? nvrhi::BindingSetItem::StructuredBuffer_SRV(bindingSlot, nullptr)
                                                                            : nvrhi::BindingSetItem::StructuredBuffer_UAV(bindingSlot, nullptr);
                 LOG_DEBUG(
-                    "[ShaderBinding] Found {} structured buffer: {} at slot {}",
+                    "[ShaderBinding] Found {} structured buffer: {} at slot {} in space {}",
                     resourceAccess == SLANG_RESOURCE_ACCESS_READ ? "SRV" : "UAV",
                     paramNameStr,
-                    bindingSlot
+                    bindingSlot,
+                    bindingSpaceOffset
                 );
             }
             break;
@@ -576,7 +581,12 @@ bool Program::processParameter(slang::VariableLayoutReflection* varLayout, std::
             {
                 layoutItem = nvrhi::BindingLayoutItem::RayTracingAccelStruct(bindingSlot);
                 bindingItem = nvrhi::BindingSetItem::RayTracingAccelStruct(bindingSlot, nullptr);
-                LOG_DEBUG("[ShaderBinding] Found ray tracing acceleration structure: {} at slot {}", paramNameStr, bindingSlot);
+                LOG_DEBUG(
+                    "[ShaderBinding] Found ray tracing acceleration structure: {} at slot {} in space {}",
+                    paramNameStr,
+                    bindingSlot,
+                    bindingSpaceOffset
+                );
             }
             break;
 
@@ -596,19 +606,20 @@ bool Program::processParameter(slang::VariableLayoutReflection* varLayout, std::
     }
     case slang::TypeReflection::Kind::ParameterBlock:
     {
-        LOG_DEBUG("[ShaderBinding] Processing parameter block: {} at slot {} in space {}", paramNameStr, bindingSlot, varLayout->getBindingSpace());
+        auto bindingSpace = varLayout->getOffset(slang::ParameterCategory::SubElementRegisterSpace) + bindingSpaceOffset;
+        LOG_DEBUG("[ShaderBinding] Processing parameter block: {} at slot {} in space {}", paramNameStr, bindingSlot, bindingSpace);
 
         // ParameterBlock creates its own binding space - process its contents recursively
         auto elementTypeLayout = typeLayout->getElementTypeLayout();
         if (elementTypeLayout)
         {
             auto fieldCount = elementTypeLayout->getFieldCount();
-            LOG_DEBUG("[ShaderBinding] ParameterBlock {} contains {} fields", paramNameStr, fieldCount);
+            LOG_DEBUG("[ShaderBinding] ParameterBlock {} contains {} fields: ", paramNameStr, fieldCount);
 
             for (unsigned int i = 0; i < fieldCount; i++)
             {
                 auto fieldLayout = elementTypeLayout->getFieldByIndex(i);
-                if (!processParameter(fieldLayout, paramNameStr + "."))
+                if (!processParameter(fieldLayout, bindingSpace, paramNameStr + "."))
                     return false;
             }
         }
@@ -629,12 +640,7 @@ bool Program::processParameter(slang::VariableLayoutReflection* varLayout, std::
     reflectionInfo.name = prefix + paramNameStr;
     reflectionInfo.bindingLayoutItem = layoutItem;
     reflectionInfo.bindingSetItem = bindingItem;
-    reflectionInfo.bindingSpace = varLayout->getBindingSpace();
-
-    if (prefix != "")
-        reflectionInfo.bindingSpace = 1;
-
-    LOG_DEBUG("[ShaderBinding] Reflection Info - Name: {}, Binding Space: {}", reflectionInfo.name, reflectionInfo.bindingSpace);
+    reflectionInfo.bindingSpace = bindingSpaceOffset;
     m_ReflectionInfo.push_back(reflectionInfo);
 
     return true;

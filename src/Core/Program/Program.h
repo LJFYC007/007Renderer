@@ -56,7 +56,7 @@ private:
 
     bool processParameterGroup(slang::VariableLayoutReflection* varLayout);
 
-    bool processParameter(slang::VariableLayoutReflection* varLayout, std::string prefix = "");
+    bool processParameter(slang::VariableLayoutReflection* varLayout, int bindingSpaceOffset = 0, std::string prefix = "");
 
     Slang::ComPtr<slang::IGlobalSession> m_GlobalSession;
     Slang::ComPtr<slang::ISession> m_Session;
