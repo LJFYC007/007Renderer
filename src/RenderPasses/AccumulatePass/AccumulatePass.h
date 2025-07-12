@@ -12,16 +12,27 @@ public:
 
     void renderUI() override;
 
+    void setScene(ref<Scene> scene) override
+    {
+        m_Scene = scene;
+        if (m_Scene->update)
+            reset = true;
+    }
+
 private:
-    uint32_t width = 1920;
-    uint32_t height = 1080;
+    void prepareResources();
+
+    uint32_t width = 0;
+    uint32_t height = 0;
     uint32_t frameCount = 0;
+    bool reset = false;
 
     struct PerFrameCB
     {
         uint32_t gWidth;
         uint32_t gHeight;
         uint32_t frameCount;
+        uint32_t reset;
     } perFrameData;
 
     Buffer cbPerFrame;

@@ -3,6 +3,8 @@
 #include <nvrhi/nvrhi.h>
 
 #include "Core/Device.h"
+#include "Scene/Camera/Camera.h"
+#include "Core/Pointer.h"
 
 struct Vertex
 {
@@ -23,7 +25,9 @@ public:
     std::vector<Vertex> vertices;
     std::vector<uint32_t> indices;
     std::vector<Mesh> meshes;
+    ref<Camera> camera;
     std::string name;
+    bool update = false; // Flag to indicate if the scene updated since last frame
 
     Scene(ref<Device> device) : m_device(device) {}
 

@@ -1,7 +1,8 @@
+#pragma once
+#include <cstdint>
+
 #include "Utils/Math/Math.h"
 #include "CameraData.slang"
-
-#include <cstdint>
 
 class Camera
 {
@@ -29,10 +30,11 @@ public:
 
     void calculateCameraParameters();
 
+    bool dirty;
+
 private:
     CameraData mData;
     bool mFirstMouseInput = true;
-    bool dirty;
 
     // First person camera rotation angles
     float mYaw = 0.0f;   // Horizontal rotation (around Y axis)

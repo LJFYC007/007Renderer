@@ -8,13 +8,15 @@ class PathTracingPass : public RenderPass
 public:
     PathTracingPass(ref<Device> device);
 
-    RenderData execute(const RenderData& input) override;
+    RenderData execute(const RenderData& input = RenderData()) override;
 
     void renderUI() override;
 
 private:
-    uint32_t width = 1920;
-    uint32_t height = 1080;
+    void prepareResources();
+
+    uint32_t width;
+    uint32_t height;
     uint32_t frameCount = 0;
     uint32_t maxDepth = 5;
     float gColorSlider = 1.f; // UI slider value
@@ -28,7 +30,7 @@ private:
         float gColor;
     } perFrameData;
 
-    Buffer cbPerFrame;
+    Buffer cbPerFrame, cbCamera;
     nvrhi::TextureHandle textureOut;
     ref<RayTracingPass> pass;
 };

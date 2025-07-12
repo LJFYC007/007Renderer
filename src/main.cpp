@@ -41,16 +41,6 @@ int main()
 
     {
         // -------------------------
-        // 3. Prepare shader buffer data
-        // -------------------------
-
-        Camera camera(width, height, float3(0.f, 0.f, -5.f), float3(0.f, 0.f, -6.f), glm::radians(45.0f));
-        Buffer cbCamera;
-        cbCamera.initialize(
-            device->getDevice(), &camera.getCameraData(), sizeof(CameraData), nvrhi::ResourceStates::ConstantBuffer, false, true, "Camera"
-        );
-
-        // -------------------------
         // 4. Setup triangle geometry for ray tracing
         // -------------------------
         AssimpImporter importer(device);
@@ -61,8 +51,10 @@ int main()
             return 1;
         }
         scene->buildAccelStructs();
+        scene->camera = make_ref<Camera>(width, height, float3(0.f, 0.f, -5.f), float3(0.f, 0.f, -6.f), glm::radians(45.0f));
 
         PathTracingPass pathTracingPass(device);
+        pathTracingPass.setScene(scene);
         AccumulatePass accumulatePass(device);
 
         // -------------------------
@@ -73,6 +65,8 @@ int main()
 
         while (notDone)
         {
+            scene->update = false;
+
             HRESULT deviceRemovedReason = device->getD3D12Device()->GetDeviceRemovedReason();
             if (FAILED(deviceRemovedReason))
             {
@@ -96,24 +90,20 @@ int main()
             {
                 width = windowSize.x;
                 height = windowSize.y;
-                camera.setWidth(width);
-                camera.setHeight(height);
-
-                // textureDesc.setWidth(width).setHeight(height);
-                // textureOut = device->getDevice()->createTexture(textureDesc);
-                // LOG_DEBUG("Resized texture to {}x{}", width, height);
-                LOG_WARN("It's not supported to resize window yet");
+                scene->camera->setWidth(width);
+                scene->camera->setHeight(height);
+                scene->update = true;
+                pathTracingPass.setScene(scene);
+                LOG_DEBUG("Resized texture to {}x{}", width, height);
             }
 
-            camera.calculateCameraParameters();
-            cbCamera.updateData(device->getDevice(), &camera.getCameraData(), sizeof(CameraData));
+            if (scene->camera->dirty)
+                scene->update = true;
+            scene->camera->calculateCameraParameters();
+            pathTracingPass.setScene(scene);
+            accumulatePass.setScene(scene);
 
-            RenderData pathTracingInput;
-            pathTracingInput.setResource("gCamera", cbCamera.getHandle());
-            pathTracingInput["gScene.vertices"] = scene->getVertexBuffer();
-            pathTracingInput["gScene.indices"] = scene->getIndexBuffer();
-            pathTracingInput["gScene.rtAccel"] = scene->getTLAS();
-            RenderData pathTracingOutput = pathTracingPass.execute(pathTracingInput);
+            RenderData pathTracingOutput = pathTracingPass.execute();
             RenderData accumulatePassOutput = accumulatePass.execute(pathTracingOutput);
 
             // Set texture for display
@@ -140,9 +130,10 @@ int main()
             GUI::SameLine();
             GUI::Text("counter = %d", counter);
             GUI::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / GUI::GetIO().Framerate, GUI::GetIO().Framerate);
-            camera.renderUI();
-            camera.handleInput();
+            scene->camera->renderUI();
+            scene->camera->handleInput();
             pathTracingPass.renderUI();
+            accumulatePass.renderUI();
             GUI::End();
 
             if (GUI::IsKeyPressed(ImGuiKey_Escape))
