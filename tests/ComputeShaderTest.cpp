@@ -4,7 +4,7 @@
 
 #include "Core/Buffer.h"
 #include "Core/Device.h"
-#include "RenderPasses/ComputePass.h"
+#include "ShaderPasses/ComputePass.h"
 #include "Utils/Logger.h"
 #include "Environment.h"
 

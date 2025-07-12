@@ -4,11 +4,9 @@
 
 #include "Core/Device.h"
 #include "Core/Window.h"
-#include "Core/Buffer.h"
 #include "Scene/Importer/AssimpImporter.h"
-#include "Core/Pointer.h"
-#include "RenderPasses/ComputePass.h"
-#include "RenderPasses/RayTracingPass.h"
+#include "RenderPasses/PathTracingPass/PathTracingPass.h"
+#include "RenderPasses/AccumulatePass/AccumulatePass.h"
 #include "Utils/Math/Math.h"
 #include "Utils/Logger.h"
 #include "Utils/GUI.h"
@@ -45,32 +43,12 @@ int main()
         // -------------------------
         // 3. Prepare shader buffer data
         // -------------------------
-        struct PerFrameCB
-        {
-            uint32_t gWidth;
-            uint32_t gHeight;
-            uint32_t maxDepth;
-            uint32_t frameCount;
-            float gColor;
-        } perFrameData;
 
         Camera camera(width, height, float3(0.f, 0.f, -5.f), float3(0.f, 0.f, -6.f), glm::radians(45.0f));
-        Buffer cbPerFrame, cbCamera;
-        cbPerFrame.initialize(
-            device->getDevice(), &perFrameData, sizeof(PerFrameCB), nvrhi::ResourceStates::ConstantBuffer, false, true, "PerFrameCB"
-        );
+        Buffer cbCamera;
         cbCamera.initialize(
             device->getDevice(), &camera.getCameraData(), sizeof(CameraData), nvrhi::ResourceStates::ConstantBuffer, false, true, "Camera"
         );
-
-        nvrhi::TextureDesc textureDesc = nvrhi::TextureDesc()
-                                             .setWidth(width)
-                                             .setHeight(height)
-                                             .setFormat(nvrhi::Format::RGBA32_FLOAT)
-                                             .setInitialState(nvrhi::ResourceStates::UnorderedAccess)
-                                             .setDebugName("TextureOut")
-                                             .setIsUAV(true);
-        nvrhi::TextureHandle textureOut = device->getDevice()->createTexture(textureDesc);
 
         // -------------------------
         // 4. Setup triangle geometry for ray tracing
@@ -84,22 +62,14 @@ int main()
         }
         scene->buildAccelStructs();
 
-        // -------------------------
-        // 5. Setup shader & dispatch
-        // -------------------------
-        std::unordered_map<std::string, nvrhi::ShaderType> entryPoints = {
-            {"rayGenMain", nvrhi::ShaderType::RayGeneration}, {"missMain", nvrhi::ShaderType::Miss}, {"closestHitMain", nvrhi::ShaderType::ClosestHit}
-        };
-        auto pass = make_ref<RayTracingPass>(device, "/shaders/raytracing.slang", entryPoints);
+        PathTracingPass pathTracingPass(device);
+        AccumulatePass accumulatePass(device);
 
         // -------------------------
         // 5. Setup GUI with original ImGui
         // -------------------------
         bool notDone = true;
-        static float gColorSlider = 1.f; // UI slider value
-        static int maxDepth = 5;
         static int counter = 0;
-        static uint32_t frameCount = 0;
 
         while (notDone)
         {
@@ -129,31 +99,26 @@ int main()
                 camera.setWidth(width);
                 camera.setHeight(height);
 
-                textureDesc.setWidth(width).setHeight(height);
-                textureOut = device->getDevice()->createTexture(textureDesc);
-                LOG_DEBUG("Resized texture to {}x{}", width, height);
+                // textureDesc.setWidth(width).setHeight(height);
+                // textureOut = device->getDevice()->createTexture(textureDesc);
+                // LOG_DEBUG("Resized texture to {}x{}", width, height);
+                LOG_WARN("It's not supported to resize window yet");
             }
 
-            perFrameData.gWidth = width;
-            perFrameData.gHeight = height;
-            perFrameData.maxDepth = maxDepth;
-            perFrameData.frameCount = frameCount++;
-            perFrameData.gColor = gColorSlider;
             camera.calculateCameraParameters();
-
-            cbPerFrame.updateData(device->getDevice(), &perFrameData, sizeof(PerFrameCB));
             cbCamera.updateData(device->getDevice(), &camera.getCameraData(), sizeof(CameraData));
 
-            (*pass)["PerFrameCB"] = cbPerFrame.getHandle();
-            (*pass)["gCamera"] = cbCamera.getHandle();
-            (*pass)["result"] = textureOut;
-            (*pass)["gScene.vertices"] = scene->getVertexBuffer();
-            (*pass)["gScene.indices"] = scene->getIndexBuffer();
-            (*pass)["gScene.rtAccel"] = scene->getTLAS();
-            pass->execute(width, height, 1);
+            RenderData pathTracingInput;
+            pathTracingInput.setResource("gCamera", cbCamera.getHandle());
+            pathTracingInput["gScene.vertices"] = scene->getVertexBuffer();
+            pathTracingInput["gScene.indices"] = scene->getIndexBuffer();
+            pathTracingInput["gScene.rtAccel"] = scene->getTLAS();
+            RenderData pathTracingOutput = pathTracingPass.execute(pathTracingInput);
+            RenderData accumulatePassOutput = accumulatePass.execute(pathTracingOutput);
 
             // Set texture for display
-            ID3D12Resource* d3d12Texture = static_cast<ID3D12Resource*>(textureOut->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource));
+            ID3D12Resource* d3d12Texture =
+                static_cast<ID3D12Resource*>(accumulatePassOutput["output"]->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource));
             window.SetDisplayTexture(d3d12Texture);
 
             // Custom ImGui content before window render
@@ -170,16 +135,14 @@ int main()
 
             GUI::Begin("Settings");
             GUI::Text("This is some useful text.");
-            GUI::SliderFloat("gColor", &gColorSlider, 0.0f, 1.0f);
-            GUI::SliderInt("Max Depth", &maxDepth, 1, 10, "%d");
             if (GUI::Button("Button"))
                 counter++;
             GUI::SameLine();
             GUI::Text("counter = %d", counter);
-            GUI::Text("Frame Count: %u", frameCount);
             GUI::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / GUI::GetIO().Framerate, GUI::GetIO().Framerate);
             camera.renderUI();
             camera.handleInput();
+            pathTracingPass.renderUI();
             GUI::End();
 
             if (GUI::IsKeyPressed(ImGuiKey_Escape))

@@ -1,6 +1,4 @@
 #pragma once
-#include <nvrhi/nvrhi.h>
-
 #include "Core/Device.h"
 #include "Core/Program/BindingSetManager.h"
 #include "Core/Pointer.h"
