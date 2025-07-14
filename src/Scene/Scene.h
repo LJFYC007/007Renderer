@@ -27,7 +27,6 @@ public:
     std::vector<Mesh> meshes;
     ref<Camera> camera;
     std::string name;
-    bool update = false; // Flag to indicate if the scene updated since last frame
 
     Scene(ref<Device> device) : m_device(device) {}
 

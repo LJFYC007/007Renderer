@@ -21,7 +21,6 @@ RenderData AccumulatePass::execute(const RenderData& input)
 
     perFrameData.gWidth = width;
     perFrameData.gHeight = height;
-    perFrameData.frameCount = ++frameCount;
     perFrameData.reset = false;
     if (reset)
     {
@@ -29,6 +28,7 @@ RenderData AccumulatePass::execute(const RenderData& input)
         reset = false;
         perFrameData.reset = true;
     }
+    perFrameData.frameCount = ++frameCount;
 
     RenderData output;
     output.setResource("output", textureOut);
@@ -43,7 +43,8 @@ RenderData AccumulatePass::execute(const RenderData& input)
 
 void AccumulatePass::renderUI()
 {
-    GUI::Checkbox("Reset Accumulation", &reset);
+    if (GUI::Button("Reset Accumulation"))
+        reset = true;
 }
 
 void AccumulatePass::prepareResources()

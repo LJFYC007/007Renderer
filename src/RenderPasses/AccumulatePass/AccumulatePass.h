@@ -15,8 +15,7 @@ public:
     void setScene(ref<Scene> scene) override
     {
         m_Scene = scene;
-        if (m_Scene->update)
-            reset = true;
+        reset = true;
     }
 
 private:

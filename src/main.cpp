@@ -54,8 +54,9 @@ int main()
         scene->camera = make_ref<Camera>(width, height, float3(0.f, 0.f, -5.f), float3(0.f, 0.f, -6.f), glm::radians(45.0f));
 
         PathTracingPass pathTracingPass(device);
-        pathTracingPass.setScene(scene);
         AccumulatePass accumulatePass(device);
+        pathTracingPass.setScene(scene);
+        accumulatePass.setScene(scene);
 
         // -------------------------
         // 5. Setup GUI with original ImGui
@@ -65,8 +66,6 @@ int main()
 
         while (notDone)
         {
-            scene->update = false;
-
             HRESULT deviceRemovedReason = device->getD3D12Device()->GetDeviceRemovedReason();
             if (FAILED(deviceRemovedReason))
             {
@@ -92,16 +91,17 @@ int main()
                 height = windowSize.y;
                 scene->camera->setWidth(width);
                 scene->camera->setHeight(height);
-                scene->update = true;
                 pathTracingPass.setScene(scene);
+                accumulatePass.setScene(scene);
                 LOG_DEBUG("Resized texture to {}x{}", width, height);
             }
 
             if (scene->camera->dirty)
-                scene->update = true;
+            {
+                pathTracingPass.setScene(scene);
+                accumulatePass.setScene(scene);
+            }
             scene->camera->calculateCameraParameters();
-            pathTracingPass.setScene(scene);
-            accumulatePass.setScene(scene);
 
             RenderData pathTracingOutput = pathTracingPass.execute();
             RenderData accumulatePassOutput = accumulatePass.execute(pathTracingOutput);
