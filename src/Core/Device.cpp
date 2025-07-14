@@ -38,7 +38,7 @@ bool Device::initialize()
         return false;
     if (!createNVRHIDevice())
         return false;
-    m_CommandList = m_nvrhiDevice->createCommandList(m_CmdParams);
+    m_commandList = m_nvrhiDevice->createCommandList(m_CmdParams);
 
     m_isInitialized = true;
     LOG_INFO("Device initialization completed successfully");

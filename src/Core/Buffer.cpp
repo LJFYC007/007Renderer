@@ -3,7 +3,7 @@
 #include <iostream>
 
 bool Buffer::initialize(
-    nvrhi::IDevice* device,
+    ref<Device> device,
     const void* data,
     size_t size,
     nvrhi::ResourceStates initState,
@@ -23,7 +23,7 @@ bool Buffer::initialize(
     desc.canHaveUAVs = isUAV;
     desc.isConstantBuffer = isConstantBuffer;
 
-    buffer = device->createBuffer(desc);
+    buffer = device->getDevice()->createBuffer(desc);
 
     if (data)
         upload(device, data, size);
@@ -31,20 +31,20 @@ bool Buffer::initialize(
     return buffer;
 }
 
-void Buffer::upload(nvrhi::IDevice* device, const void* data, size_t size)
+void Buffer::upload(ref<Device> device, const void* data, size_t size)
 {
     if (!buffer)
         return;
 
-    auto uploadCmd = device->createCommandList();
+    auto uploadCmd = device->getCommandList();
     uploadCmd->open();
     uploadCmd->beginTrackingBufferState(buffer, nvrhi::ResourceStates::ShaderResource);
     uploadCmd->writeBuffer(buffer, data, size);
     uploadCmd->close();
-    device->executeCommandList(uploadCmd);
+    device->getDevice()->executeCommandList(uploadCmd);
 }
 
-void Buffer::updateData(nvrhi::IDevice* device, const void* data, size_t size)
+void Buffer::updateData(ref<Device> device, const void* data, size_t size)
 {
     if (!buffer || !data)
         return;
@@ -52,7 +52,7 @@ void Buffer::updateData(nvrhi::IDevice* device, const void* data, size_t size)
     upload(device, data, size);
 }
 
-Buffer Buffer::createReadback(nvrhi::IDevice* device, size_t size)
+Buffer Buffer::createReadback(ref<Device> device, size_t size)
 {
     Buffer buf;
     buf.byteSize = size;
@@ -63,12 +63,15 @@ Buffer Buffer::createReadback(nvrhi::IDevice* device, size_t size)
     desc.cpuAccess = nvrhi::CpuAccessMode::Read;
     desc.debugName = "ReadbackBuffer";
 
-    buf.buffer = device->createBuffer(desc);
+    buf.buffer = device->getDevice()->createBuffer(desc);
     return buf;
 }
 
-std::vector<uint8_t> Buffer::readback(nvrhi::IDevice* device, nvrhi::CommandListHandle commandList) const
+std::vector<uint8_t> Buffer::readback(ref<Device> device) const
 {
+    nvrhi::DeviceHandle nvrhiDevice = device->getDevice();
+    nvrhi::CommandListHandle commandList = device->getCommandList();
+
     std::vector<uint8_t> result(byteSize);
     commandList->open();
     commandList->beginTrackingBufferState(buffer, nvrhi::ResourceStates::CopySource);
@@ -78,14 +81,14 @@ std::vector<uint8_t> Buffer::readback(nvrhi::IDevice* device, nvrhi::CommandList
 
     commandList->copyBuffer(staging.buffer, 0, buffer, 0, byteSize);
     commandList->close();
-    device->executeCommandList(commandList);
-    device->waitForIdle();
+    nvrhiDevice->executeCommandList(commandList);
+    nvrhiDevice->waitForIdle();
 
-    void* mapped = device->mapBuffer(staging.buffer, nvrhi::CpuAccessMode::Read);
+    void* mapped = nvrhiDevice->mapBuffer(staging.buffer, nvrhi::CpuAccessMode::Read);
     if (mapped)
     {
         std::memcpy(result.data(), mapped, byteSize);
-        device->unmapBuffer(staging.buffer);
+        nvrhiDevice->unmapBuffer(staging.buffer);
     }
     return result;
 }

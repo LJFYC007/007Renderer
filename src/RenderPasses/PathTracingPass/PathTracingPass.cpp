@@ -2,8 +2,8 @@
 
 PathTracingPass::PathTracingPass(ref<Device> device) : RenderPass(device)
 {
-    cbPerFrame.initialize(device->getDevice(), nullptr, sizeof(PerFrameCB), nvrhi::ResourceStates::ConstantBuffer, false, true, "PerFrameCB");
-    cbCamera.initialize(device->getDevice(), nullptr, sizeof(CameraData), nvrhi::ResourceStates::ConstantBuffer, false, true, "Camera");
+    cbPerFrame.initialize(device, nullptr, sizeof(PerFrameCB), nvrhi::ResourceStates::ConstantBuffer, false, true, "PerFrameCB");
+    cbCamera.initialize(device, nullptr, sizeof(CameraData), nvrhi::ResourceStates::ConstantBuffer, false, true, "Camera");
 
     std::unordered_map<std::string, nvrhi::ShaderType> entryPoints = {
         {"rayGenMain", nvrhi::ShaderType::RayGeneration}, {"missMain", nvrhi::ShaderType::Miss}, {"closestHitMain", nvrhi::ShaderType::ClosestHit}
@@ -29,8 +29,8 @@ RenderData PathTracingPass::execute(const RenderData& input)
 
     RenderData output;
     output.setResource("output", textureOut);
-    cbPerFrame.updateData(m_Device->getDevice(), &perFrameData, sizeof(PerFrameCB));
-    cbCamera.updateData(m_Device->getDevice(), &m_Scene->camera->getCameraData(), sizeof(CameraData));
+    cbPerFrame.updateData(m_Device, &perFrameData, sizeof(PerFrameCB));
+    cbCamera.updateData(m_Device, &m_Scene->camera->getCameraData(), sizeof(CameraData));
 
     (*pass)["PerFrameCB"] = cbPerFrame.getHandle();
     (*pass)["gCamera"] = cbCamera.getHandle();

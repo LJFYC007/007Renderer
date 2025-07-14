@@ -4,13 +4,15 @@
 #include <cstdint>
 #include <string>
 
+#include "Core/Device.h"
+
 class Buffer
 {
 public:
     Buffer() = default;
 
     bool initialize(
-        nvrhi::IDevice* device,
+        ref<Device> device,
         const void* data,
         size_t size,
         nvrhi::ResourceStates initState,
@@ -19,17 +21,17 @@ public:
         const std::string& debugName = "Buffer"
     );
 
-    void updateData(nvrhi::IDevice* device, const void* data, size_t size);
+    void updateData(ref<Device> device, const void* data, size_t size);
 
-    std::vector<uint8_t> readback(nvrhi::IDevice* device, nvrhi::CommandListHandle commandList) const;
+    std::vector<uint8_t> readback(ref<Device> device) const;
 
     nvrhi::BufferHandle getHandle() const { return buffer; }
     size_t getSize() const { return byteSize; }
 
 private:
-    static Buffer createReadback(nvrhi::IDevice* device, size_t size);
+    static Buffer createReadback(ref<Device> device, size_t size);
 
-    void upload(nvrhi::IDevice* device, const void* data, size_t size);
+    void upload(ref<Device> device, const void* data, size_t size);
 
     nvrhi::BufferHandle buffer;
     size_t byteSize = 0;

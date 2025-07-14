@@ -3,7 +3,7 @@
 
 AccumulatePass::AccumulatePass(ref<Device> device) : RenderPass(device)
 {
-    cbPerFrame.initialize(device->getDevice(), &perFrameData, sizeof(PerFrameCB), nvrhi::ResourceStates::ConstantBuffer, false, true, "PerFrameCB");
+    cbPerFrame.initialize(device, &perFrameData, sizeof(PerFrameCB), nvrhi::ResourceStates::ConstantBuffer, false, true, "PerFrameCB");
     pass = make_ref<ComputePass>(device, "/src/RenderPasses/AccumulatePass/AccumulatePass.slang", "main");
 }
 
@@ -21,18 +21,17 @@ RenderData AccumulatePass::execute(const RenderData& input)
 
     perFrameData.gWidth = width;
     perFrameData.gHeight = height;
-    perFrameData.reset = false;
+    perFrameData.reset = reset;
     if (reset)
     {
         frameCount = 0;
         reset = false;
-        perFrameData.reset = true;
     }
     perFrameData.frameCount = ++frameCount;
 
     RenderData output;
     output.setResource("output", textureOut);
-    cbPerFrame.updateData(m_Device->getDevice(), &perFrameData, sizeof(PerFrameCB));
+    cbPerFrame.updateData(m_Device, &perFrameData, sizeof(PerFrameCB));
     (*pass)["PerFrameCB"] = cbPerFrame.getHandle();
     (*pass)["input"] = inputTexture;
     (*pass)["accumulateTexture"] = accumulateTexture;
