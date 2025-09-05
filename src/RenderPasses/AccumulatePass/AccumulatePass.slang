@@ -15,7 +15,7 @@ cbuffer PerFrameCB
     uint2 id = dispatchThreadID.xy;
     if (id.x >= gWidth || id.y >= gHeight)
         return;
-    if (reset)
+    if (reset == 1)
         accumulateTexture[id] = float4(0.f);
 
     accumulateTexture[id] += input[id];

@@ -2,6 +2,7 @@ import Utils.Math.Ray;
 import Utils.Sampling.SampleGenerator;
 import Scene.Camera.Camera;
 import Scene.Scene;
+#include "Scene/Material/LambertianMaterial.slang"
 
 cbuffer PerFrameCB
 {
@@ -76,14 +77,15 @@ struct Payload
     float3 normal1 = gScene.vertices[i1].normal;
     float3 normal2 = gScene.vertices[i2].normal;
     float3 hitNormal = normalize(w * normal0 + u * normal1 + v * normal2);
-
-    // Sample hemisphere for indirect lighting using the sample generator
-    float2 randomSample = sampleNext2D(payload.sampleGen);
-    float3 sampleDir = sampleHemisphere(hitNormal, randomSample);
-
-    // Create new ray for indirect lighting
     float3 hitPoint = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
-    Ray bounceRay = Ray(hitPoint + hitNormal * 0.001f, sampleDir); // Small offset to avoid self-intersection
+
+    ShadingData sd;
+    sd.normal = hitNormal;
+    sd.position = hitPoint + hitNormal * 0.001f; // Small offset to avoid self-intersection
+
+    Material material = LambertianMaterial(float3(1.0f, 0.5f, 0.5f));
+    BSDFSample sample = material.scatter(sd, payload.sampleGen);
+    Ray bounceRay = Ray(sd.position, sample.wo);
 
     // Create new sample generator for bounce ray to avoid correlation
     uint2 newPixel = uint2(primitiveIndex, payload.depth);

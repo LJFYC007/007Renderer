@@ -51,9 +51,12 @@ Program::Program(
 
     // Load module
     Slang::ComPtr<slang::IModule> module;
-    module = m_Session->loadModule(filePath.c_str());
+    Slang::ComPtr<slang::IBlob> diagnostics;
+    module = m_Session->loadModule(filePath.c_str(), diagnostics.writeRef());
     if (!module)
         LOG_ERROR_RETURN("[Slang] Failed to load module: {}", filePath);
+    if (diagnostics && diagnostics->getBufferSize() > 0)
+        LOG_DEBUG("[Program] Compilation diagnostics: {}", (const char*)diagnostics->getBufferPointer());
 
     // Create entry points and collect them
     std::vector<Slang::ComPtr<slang::IEntryPoint>> slangEntryPoints;
@@ -83,7 +86,6 @@ Program::Program(
         LOG_ERROR_RETURN("[Slang] Failed to link program");
 
     // Get program layout with diagnostics
-    Slang::ComPtr<slang::IBlob> diagnostics;
     m_ProgramLayout = m_LinkedProgram->getLayout(0, diagnostics.writeRef());
     if (!m_ProgramLayout)
     {
