@@ -2,7 +2,8 @@ import Utils.Math.Ray;
 import Utils.Sampling.SampleGenerator;
 import Scene.Camera.Camera;
 import Scene.Scene;
-#include "Scene/Material/LambertianMaterial.slang"
+import Scene.Material.GLTFMaterial;
+import Scene.ShadingData;
 
 cbuffer PerFrameCB
 {
@@ -83,7 +84,10 @@ struct Payload
     sd.normal = hitNormal;
     sd.position = hitPoint + hitNormal * 0.001f; // Small offset to avoid self-intersection
 
-    Material material = LambertianMaterial(float3(1.0f, 0.5f, 0.5f));
+    uint meshIndex = gScene.triangleToMesh[primitiveIndex];
+    uint materialIndex = gScene.meshes[meshIndex].materialIndex;
+    GLTFMaterial material = gScene.materials[materialIndex];
+    // Material material = LambertianMaterial(float3(1.0f, 0.5f, 0.5f));
     BSDFSample sample = material.scatter(sd, payload.sampleGen);
     Ray bounceRay = Ray(sd.position, sample.wo);
 
@@ -98,5 +102,5 @@ struct Payload
 
     TraceRay(gScene.rtAccel, RAY_FLAG_NONE, 0xFF, 0, 0, 0, bounceRay.toRayDesc(), bouncePayload);
 
-    payload.color = 0.5 * bouncePayload.color;
+    payload.color = material.baseColorFactor.xyz * bouncePayload.color;
 }

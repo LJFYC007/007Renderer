@@ -53,10 +53,10 @@ Program::Program(
     Slang::ComPtr<slang::IModule> module;
     Slang::ComPtr<slang::IBlob> diagnostics;
     module = m_Session->loadModule(filePath.c_str(), diagnostics.writeRef());
-    if (!module)
-        LOG_ERROR_RETURN("[Slang] Failed to load module: {}", filePath);
     if (diagnostics && diagnostics->getBufferSize() > 0)
         LOG_DEBUG("[Program] Compilation diagnostics: {}", (const char*)diagnostics->getBufferPointer());
+    if (!module)
+        LOG_ERROR_RETURN("[Slang] Failed to load module: {}", filePath);
 
     // Create entry points and collect them
     std::vector<Slang::ComPtr<slang::IEntryPoint>> slangEntryPoints;

@@ -36,6 +36,45 @@ void Scene::buildAccelStructs()
     if (!m_indexBuffer)
         LOG_ERROR_RETURN("Failed to create index buffer for scene");
 
+    // Create mesh buffer for shader access
+    size_t meshBufferSize = meshes.size() * sizeof(Mesh);
+    nvrhi::BufferDesc meshBufferDesc = nvrhi::BufferDesc()
+                                           .setByteSize(meshBufferSize)
+                                           .setInitialState(nvrhi::ResourceStates::ShaderResource)
+                                           .setKeepInitialState(true)
+                                           .setDebugName("Scene Mesh Buffer")
+                                           .setCanHaveRawViews(true)
+                                           .setStructStride(sizeof(Mesh));
+    m_meshBuffer = nvrhiDevice->createBuffer(meshBufferDesc);
+    if (!m_meshBuffer)
+        LOG_ERROR_RETURN("Failed to create mesh buffer for scene");
+
+    // Create triangleToMesh buffer for shader access
+    size_t triangleToMeshBufferSize = triangleToMesh.size() * sizeof(uint32_t);
+    nvrhi::BufferDesc triangleToMeshBufferDesc = nvrhi::BufferDesc()
+                                                     .setByteSize(triangleToMeshBufferSize)
+                                                     .setInitialState(nvrhi::ResourceStates::ShaderResource)
+                                                     .setKeepInitialState(true)
+                                                     .setDebugName("Scene TriangleToMesh Buffer")
+                                                     .setCanHaveRawViews(true)
+                                                     .setStructStride(sizeof(uint32_t));
+    m_triangleToMeshBuffer = nvrhiDevice->createBuffer(triangleToMeshBufferDesc);
+    if (!m_triangleToMeshBuffer)
+        LOG_ERROR_RETURN("Failed to create triangleToMesh buffer for scene");
+
+    // Create material buffer for shader access
+    size_t materialBufferSize = materials.size() * sizeof(Material);
+    nvrhi::BufferDesc materialBufferDesc = nvrhi::BufferDesc()
+                                               .setByteSize(materialBufferSize)
+                                               .setInitialState(nvrhi::ResourceStates::ShaderResource)
+                                               .setKeepInitialState(true)
+                                               .setDebugName("Scene Material Buffer")
+                                               .setCanHaveRawViews(true)
+                                               .setStructStride(sizeof(Material));
+    m_materialBuffer = nvrhiDevice->createBuffer(materialBufferDesc);
+    if (!m_materialBuffer)
+        LOG_ERROR_RETURN("Failed to create material buffer for scene");
+
     // BLAS descriptor
     auto blasDesc = nvrhi::rt::AccelStructDesc().setDebugName("BLAS").setIsTopLevel(false);
     m_blas = nvrhiDevice->createAccelStruct(blasDesc);
@@ -53,6 +92,9 @@ void Scene::buildAccelStructs()
     // Upload the vertex and index data
     commandList->writeBuffer(m_vertexBuffer, vertices.data(), vertices.size() * sizeof(Vertex));
     commandList->writeBuffer(m_indexBuffer, indices.data(), indices.size() * sizeof(uint32_t));
+    commandList->writeBuffer(m_meshBuffer, meshes.data(), meshes.size() * sizeof(Mesh));
+    commandList->writeBuffer(m_triangleToMeshBuffer, triangleToMesh.data(), triangleToMesh.size() * sizeof(uint32_t));
+    commandList->writeBuffer(m_materialBuffer, materials.data(), materials.size() * sizeof(Material));
 
     // Build the BLAS
     auto triangles = nvrhi::rt::GeometryTriangles()
@@ -77,5 +119,11 @@ void Scene::buildAccelStructs()
 
     commandList->close();
     nvrhiDevice->executeCommandList(commandList);
-    LOG_INFO("Successfully initialized geometry ({} vertices, {} indices)", vertices.size(), indices.size());
+    LOG_INFO(
+        "Successfully initialized geometry ({} vertices, {} indices, {} meshes, {} materials)",
+        vertices.size(),
+        indices.size(),
+        meshes.size(),
+        materials.size()
+    );
 }

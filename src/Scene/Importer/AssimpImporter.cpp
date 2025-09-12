@@ -1,5 +1,6 @@
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
+#include <assimp/GltfMaterial.h>
 
 #include "AssimpImporter.h"
 #include "Utils/Logger.h"
@@ -31,9 +32,9 @@ ref<Scene> AssimpImporter::loadScene(const std::string& fileName)
         const aiMesh* aiMesh = aiScene->mMeshes[i];
 
         Mesh mesh;
-        mesh.name = aiMesh->mName.C_Str();
-        if (mesh.name.empty())
-            mesh.name = "Mesh_" + std::to_string(i);
+        // mesh.name = aiMesh->mName.C_Str();
+        // if (mesh.name.empty())
+        //     mesh.name = "Mesh_" + std::to_string(i);
         mesh.materialIndex = aiMesh->mMaterialIndex;
 
         // Current vertex offset for this mesh
@@ -62,14 +63,70 @@ ref<Scene> AssimpImporter::loadScene(const std::string& fileName)
         }
 
         // Load indices
-        // mesh.indices.reserve(aiMesh->mNumFaces * 3);
+        uint32_t currentMeshIndex = static_cast<uint32_t>(scene->meshes.size());
         for (unsigned int j = 0; j < aiMesh->mNumFaces; ++j)
         {
             const aiFace& face = aiMesh->mFaces[j];
             for (unsigned int k = 0; k < face.mNumIndices; ++k)
                 scene->indices.push_back(vertexOffset + face.mIndices[k]);
+            scene->triangleToMesh.push_back(currentMeshIndex);
         }
+
         scene->meshes.push_back(std::move(mesh));
+    }
+
+    // Load materials
+    scene->materials.reserve(aiScene->mNumMaterials);
+    for (unsigned int i = 0; i < aiScene->mNumMaterials; ++i)
+    {
+        const aiMaterial* aiMat = aiScene->mMaterials[i];
+        Material material;
+
+        // Get material name
+        aiString matName;
+        // if (aiMat->Get(AI_MATKEY_NAME, matName) == AI_SUCCESS)
+        //     material.name = matName.C_Str();
+        // else
+        //     material.name = "Material_" + std::to_string(i);
+
+        // PBR Metallic-Roughness workflow properties (GLTF 2.0)
+        aiColor4D baseColor;
+        if (aiMat->Get(AI_MATKEY_BASE_COLOR, baseColor) == AI_SUCCESS)
+            material.baseColorFactor = glm::vec4(baseColor.r, baseColor.g, baseColor.b, baseColor.a);
+        else if (aiMat->Get(AI_MATKEY_COLOR_DIFFUSE, baseColor) == AI_SUCCESS) // Fallback to diffuse
+            material.baseColorFactor = glm::vec4(baseColor.r, baseColor.g, baseColor.b, baseColor.a);
+
+        float metallicFactor;
+        if (aiMat->Get(AI_MATKEY_METALLIC_FACTOR, metallicFactor) == AI_SUCCESS)
+            material.metallicFactor = metallicFactor;
+
+        float roughnessFactor;
+        if (aiMat->Get(AI_MATKEY_ROUGHNESS_FACTOR, roughnessFactor) == AI_SUCCESS)
+            material.roughnessFactor = roughnessFactor;
+
+        // Log material information
+        LOG_INFO(
+            "Loaded material '{}': baseColor({}, {}, {}, {}), metallic={}, roughness={}",
+            //  material.name,
+            matName.C_Str(),
+            material.baseColorFactor.r,
+            material.baseColorFactor.g,
+            material.baseColorFactor.b,
+            material.baseColorFactor.a,
+            material.metallicFactor,
+            material.roughnessFactor
+        );
+
+        scene->materials.push_back(std::move(material));
+    }
+
+    // Create default material if none exist
+    if (scene->materials.empty())
+    {
+        // Material defaultMaterial("DefaultMaterial");
+        Material defaultMaterial;
+        scene->materials.push_back(std::move(defaultMaterial));
+        LOG_INFO("Created default material");
     }
     return scene;
 }

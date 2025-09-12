@@ -36,6 +36,9 @@ RenderData PathTracingPass::execute(const RenderData& input)
     (*pass)["gCamera"] = cbCamera.getHandle();
     (*pass)["gScene.vertices"] = m_Scene->getVertexBuffer();
     (*pass)["gScene.indices"] = m_Scene->getIndexBuffer();
+    (*pass)["gScene.meshes"] = m_Scene->getMeshBuffer();
+    (*pass)["gScene.triangleToMesh"] = m_Scene->getTriangleToMeshBuffer();
+    (*pass)["gScene.materials"] = m_Scene->getMaterialBuffer();
     (*pass)["gScene.rtAccel"] = m_Scene->getTLAS();
     (*pass)["result"] = textureOut;
     pass->execute(width, height, 1);
