@@ -25,9 +25,9 @@ RayTracingPass::RayTracingPass(
             pipelineDesc.addBindingLayout(layout);
 
     // Configure pipeline parameters - these are critical for D3D12
-    pipelineDesc.maxPayloadSize = 64;   // Size in bytes for ray payload
-    pipelineDesc.maxAttributeSize = 8;  // Size in bytes for hit attributes (typically 2 floats for barycentric coords)
-    pipelineDesc.maxRecursionDepth = 5; // Maximum trace recursion depth
+    pipelineDesc.maxPayloadSize = 64;    // Size in bytes for ray payload
+    pipelineDesc.maxAttributeSize = 8;   // Size in bytes for hit attributes (typically 2 floats for barycentric coords)
+    pipelineDesc.maxRecursionDepth = 10; // Maximum trace recursion depth
 
     // Add shaders with correct export names matching the shader
     m_RayGenShader = program.getShader("rayGenMain");

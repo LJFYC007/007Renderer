@@ -21,6 +21,7 @@ RWTexture2D<float4> result;
 struct Payload
 {
     float3 color;
+    float3 origin;
     uint depth;
     TinyUniformSampleGenerator sampleGen;
 };
@@ -38,6 +39,7 @@ struct Payload
     payload.color = float3(0, 0, 0);
     payload.depth = 1;
     payload.sampleGen = TinyUniformSampleGenerator(launchID, frameCount);
+    payload.origin = ray.origin;
 
     TraceRay(gScene.rtAccel, RAY_FLAG_NONE, 0xFF, 0, 0, 0, ray.toRayDesc(), payload);
 
@@ -73,16 +75,53 @@ struct Payload
     uint i1 = gScene.indices[baseIndex + 1];
     uint i2 = gScene.indices[baseIndex + 2];
 
-    // Get vertex normals
+    // Get vertex data
+    float3 pos0 = gScene.vertices[i0].position;
+    float3 pos1 = gScene.vertices[i1].position;
+    float3 pos2 = gScene.vertices[i2].position;
+    float2 uv0 = gScene.vertices[i0].texCoord;
+    float2 uv1 = gScene.vertices[i1].texCoord;
+    float2 uv2 = gScene.vertices[i2].texCoord;
     float3 normal0 = gScene.vertices[i0].normal;
     float3 normal1 = gScene.vertices[i1].normal;
     float3 normal2 = gScene.vertices[i2].normal;
+
     float3 hitNormal = normalize(w * normal0 + u * normal1 + v * normal2);
     float3 hitPoint = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
+
+    // Calculate tangent space vectors
+    float3 deltaPos1 = pos1 - pos0;
+    float3 deltaPos2 = pos2 - pos0;
+    float2 deltaUV1 = uv1 - uv0;
+    float2 deltaUV2 = uv2 - uv0;
+
+    float det = deltaUV1.x * deltaUV2.y - deltaUV1.y * deltaUV2.x;
+    float3 tangent, bitangent;
+
+    if (abs(det) > 1e-6f)
+    {
+        float invDet = 1.0f / det;
+        tangent = (deltaPos1 * deltaUV2.y - deltaPos2 * deltaUV1.y) * invDet;
+        bitangent = (deltaPos2 * deltaUV1.x - deltaPos1 * deltaUV2.x) * invDet;
+    }
+    else
+    {
+        // Fallback: create orthonormal basis from normal
+        float3 up = abs(hitNormal.y) < 0.9f ? float3(0, 1, 0) : float3(1, 0, 0);
+        tangent = normalize(cross(up, hitNormal));
+        bitangent = cross(hitNormal, tangent);
+    }
+
+    // Gram-Schmidt orthogonalization to ensure orthonormal tangent space
+    tangent = normalize(tangent - dot(tangent, hitNormal) * hitNormal);
+    bitangent = normalize(cross(hitNormal, tangent));
 
     ShadingData sd;
     sd.normal = hitNormal;
     sd.position = hitPoint + hitNormal * 0.001f; // Small offset to avoid self-intersection
+    sd.V = payload.origin - hitPoint;
+    sd.T = tangent;
+    sd.B = bitangent;
 
     uint meshIndex = gScene.triangleToMesh[primitiveIndex];
     uint materialIndex = gScene.meshes[meshIndex].materialIndex;
@@ -90,13 +129,15 @@ struct Payload
     // Material material = LambertianMaterial(float3(1.0f, 0.5f, 0.5f));
 
     // Emissive contribution
-    if (any(material.emissiveFactor > 0.f))
+    if (any(material.emissive > 0.f))
     {
-        payload.color = material.emissiveFactor;
+        payload.color = material.emissive;
         return;
     }
 
-    BSDFSample sample = material.scatter(sd, payload.sampleGen);
+    BSDFSample sample;
+    if (!material.scatter(sd, payload.sampleGen, sample))
+        return;
     Ray bounceRay = Ray(sd.position, sample.wo);
 
     // Create new sample generator for bounce ray to avoid correlation
@@ -107,8 +148,9 @@ struct Payload
     bouncePayload.color = float3(0, 0, 0);
     bouncePayload.depth = payload.depth + 1;
     bouncePayload.sampleGen = payload.sampleGen;
+    bouncePayload.origin = bounceRay.origin;
 
     TraceRay(gScene.rtAccel, RAY_FLAG_NONE, 0xFF, 0, 0, 0, bounceRay.toRayDesc(), bouncePayload);
 
-    payload.color = material.baseColorFactor.xyz * bouncePayload.color;
+    payload.color = material.baseColor * bouncePayload.color;
 }

@@ -92,11 +92,11 @@ ref<Scene> AssimpImporter::loadScene(const std::string& fileName)
         //     material.name = "Material_" + std::to_string(i);
 
         // PBR Metallic-Roughness workflow properties (GLTF 2.0)
-        aiColor4D baseColor;
+        aiColor3D baseColor;
         if (aiMat->Get(AI_MATKEY_BASE_COLOR, baseColor) == AI_SUCCESS)
-            material.baseColorFactor = glm::vec4(baseColor.r, baseColor.g, baseColor.b, baseColor.a);
+            material.baseColorFactor = glm::vec3(baseColor.r, baseColor.g, baseColor.b);
         else if (aiMat->Get(AI_MATKEY_COLOR_DIFFUSE, baseColor) == AI_SUCCESS) // Fallback to diffuse
-            material.baseColorFactor = glm::vec4(baseColor.r, baseColor.g, baseColor.b, baseColor.a);
+            material.baseColorFactor = glm::vec3(baseColor.r, baseColor.g, baseColor.b);
 
         float metallicFactor;
         if (aiMat->Get(AI_MATKEY_METALLIC_FACTOR, metallicFactor) == AI_SUCCESS)
@@ -112,13 +112,12 @@ ref<Scene> AssimpImporter::loadScene(const std::string& fileName)
 
         // Log material information
         LOG_DEBUG(
-            "Loaded material '{}': baseColor({}, {}, {}, {}), metallic={}, roughness={}, emissive=({}, {}, {})",
+            "Loaded material '{}': baseColor({}, {}, {}), metallic={}, roughness={}, emissive=({}, {}, {})",
             //  material.name,
             matName.C_Str(),
             material.baseColorFactor.r,
             material.baseColorFactor.g,
             material.baseColorFactor.b,
-            material.baseColorFactor.a,
             material.metallicFactor,
             material.roughnessFactor,
             material.emissiveFactor.r,
