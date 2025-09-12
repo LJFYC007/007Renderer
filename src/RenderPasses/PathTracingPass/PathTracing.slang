@@ -88,6 +88,14 @@ struct Payload
     uint materialIndex = gScene.meshes[meshIndex].materialIndex;
     GLTFMaterial material = gScene.materials[materialIndex];
     // Material material = LambertianMaterial(float3(1.0f, 0.5f, 0.5f));
+
+    // Emissive contribution
+    if (any(material.emissiveFactor > 0.f))
+    {
+        payload.color = material.emissiveFactor;
+        return;
+    }
+
     BSDFSample sample = material.scatter(sd, payload.sampleGen);
     Ray bounceRay = Ray(sd.position, sample.wo);
 

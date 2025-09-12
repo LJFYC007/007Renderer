@@ -1,5 +1,6 @@
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
+#include <assimp/pbrmaterial.h>
 #include <assimp/GltfMaterial.h>
 
 #include "AssimpImporter.h"
@@ -16,6 +17,7 @@ ref<Scene> AssimpImporter::loadScene(const std::string& fileName)
                                     aiProcess_ImproveCacheLocality |     // Optimize vertex cache locality
                                     aiProcess_RemoveRedundantMaterials | // Remove unused materials
                                     aiProcess_OptimizeMeshes |           // Reduce mesh count
+                                    aiProcess_PreTransformVertices |     // Apply node transformations to vertex data
                                     aiProcess_ValidateDataStructure;     // Validate the imported scene
     const aiScene* aiScene = importer.ReadFile(fileName, postProcessFlags);
     if (aiScene == nullptr)
@@ -104,9 +106,13 @@ ref<Scene> AssimpImporter::loadScene(const std::string& fileName)
         if (aiMat->Get(AI_MATKEY_ROUGHNESS_FACTOR, roughnessFactor) == AI_SUCCESS)
             material.roughnessFactor = roughnessFactor;
 
+        float emmisive; // TODO: this may have some bugs
+        if (aiMat->Get(AI_MATKEY_EMISSIVE_INTENSITY, emmisive) == AI_SUCCESS)
+            material.emissiveFactor = glm::vec3(emmisive);
+
         // Log material information
-        LOG_INFO(
-            "Loaded material '{}': baseColor({}, {}, {}, {}), metallic={}, roughness={}",
+        LOG_DEBUG(
+            "Loaded material '{}': baseColor({}, {}, {}, {}), metallic={}, roughness={}, emissive=({}, {}, {})",
             //  material.name,
             matName.C_Str(),
             material.baseColorFactor.r,
@@ -114,7 +120,10 @@ ref<Scene> AssimpImporter::loadScene(const std::string& fileName)
             material.baseColorFactor.b,
             material.baseColorFactor.a,
             material.metallicFactor,
-            material.roughnessFactor
+            material.roughnessFactor,
+            material.emissiveFactor.r,
+            material.emissiveFactor.g,
+            material.emissiveFactor.b
         );
 
         scene->materials.push_back(std::move(material));
@@ -126,7 +135,7 @@ ref<Scene> AssimpImporter::loadScene(const std::string& fileName)
         // Material defaultMaterial("DefaultMaterial");
         Material defaultMaterial;
         scene->materials.push_back(std::move(defaultMaterial));
-        LOG_INFO("Created default material");
+        LOG_DEBUG("Created default material");
     }
     return scene;
 }

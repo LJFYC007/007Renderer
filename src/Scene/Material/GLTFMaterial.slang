@@ -13,13 +13,15 @@ float pdfHemisphere(float3 normal, float3 direction)
 struct GLTFMaterial
 {
     float4 baseColorFactor;
+    float3 emissiveFactor;
     float metallicFactor = 1.f;
     float roughnessFactor = 0.f;
 
     // Constructor to initialize the material with a color
-    __init(float4 baseColor, float metallic, float roughness)
+    __init(float4 baseColor, float3 emissive, float metallic, float roughness)
     {
         baseColorFactor = baseColor;
+        emissiveFactor = emissive;
         metallicFactor = metallic;
         roughnessFactor = roughness;
     }
