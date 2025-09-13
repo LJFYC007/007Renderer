@@ -19,3 +19,19 @@ struct Ray
 
     RayDesc toRayDesc() { return RayDesc(origin, tMin, dir, tMax); }
 }
+
+float3
+computeRayOrigin(float3 pos, float3 normal)
+{
+    const float origin = 1.f / 16.f;
+    const float fScale = 3.f / 65536.f;
+    const float iScale = 3 * 256.f;
+
+    // Per-component integer offset to bit representation of fp32 position.
+    int3 iOff = int3(normal * iScale);
+    float3 iPos = asfloat(asint(pos) + select(pos < 0.f, -iOff, iOff));
+
+    // Select per-component between small fixed offset or above variable offset depending on distance to origin.
+    float3 fOff = normal * fScale;
+    return select(abs(pos) < origin, pos + fOff, iPos);
+}

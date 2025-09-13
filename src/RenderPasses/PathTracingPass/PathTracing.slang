@@ -21,7 +21,6 @@ RWTexture2D<float4> result;
 struct Payload
 {
     float3 color;
-    float3 origin;
     uint depth;
     TinyUniformSampleGenerator sampleGen;
 };
@@ -39,7 +38,6 @@ struct Payload
     payload.color = float3(0, 0, 0);
     payload.depth = 1;
     payload.sampleGen = TinyUniformSampleGenerator(launchID, frameCount);
-    payload.origin = ray.origin;
 
     TraceRay(gScene.rtAccel, RAY_FLAG_NONE, 0xFF, 0, 0, 0, ray.toRayDesc(), payload);
 
@@ -87,6 +85,8 @@ struct Payload
     float3 normal2 = gScene.vertices[i2].normal;
 
     float3 hitNormal = normalize(w * normal0 + u * normal1 + v * normal2);
+    if (dot(hitNormal, WorldRayDirection()) > 0.0f)
+        hitNormal = -hitNormal; // Ensure normal faces against the ray
     float3 hitPoint = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
 
     // Calculate tangent space vectors
@@ -114,12 +114,16 @@ struct Payload
 
     // Gram-Schmidt orthogonalization to ensure orthonormal tangent space
     tangent = normalize(tangent - dot(tangent, hitNormal) * hitNormal);
-    bitangent = normalize(cross(hitNormal, tangent));
+    // Preserve original bitangent direction but ensure orthogonality
+    float3 computedBitangent = cross(hitNormal, tangent);
+    if (dot(computedBitangent, bitangent) < 0.0f)
+        computedBitangent = -computedBitangent;
+    bitangent = computedBitangent;
 
     ShadingData sd;
     sd.normal = hitNormal;
-    sd.position = hitPoint + hitNormal * 0.001f; // Small offset to avoid self-intersection
-    sd.V = payload.origin - hitPoint;
+    sd.position = computeRayOrigin(hitPoint, hitNormal);
+    sd.V = normalize(WorldRayOrigin() - hitPoint);
     sd.T = tangent;
     sd.B = bitangent;
 
@@ -148,9 +152,8 @@ struct Payload
     bouncePayload.color = float3(0, 0, 0);
     bouncePayload.depth = payload.depth + 1;
     bouncePayload.sampleGen = payload.sampleGen;
-    bouncePayload.origin = bounceRay.origin;
 
     TraceRay(gScene.rtAccel, RAY_FLAG_NONE, 0xFF, 0, 0, 0, bounceRay.toRayDesc(), bouncePayload);
 
-    payload.color = material.baseColor * bouncePayload.color;
+    payload.color = sample.weight * bouncePayload.color;
 }

@@ -47,7 +47,7 @@ RenderData PathTracingPass::execute(const RenderData& input)
 
 void PathTracingPass::renderUI()
 {
-    GUI::SliderFloat("gColor", &gColorSlider, 0.0f, 1.0f);
+    GUI::SliderFloat("gColor", &gColorSlider, 0.0f, 5.0f);
 }
 
 void PathTracingPass::prepareResources()

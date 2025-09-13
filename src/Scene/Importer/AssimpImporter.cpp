@@ -106,9 +106,10 @@ ref<Scene> AssimpImporter::loadScene(const std::string& fileName)
         if (aiMat->Get(AI_MATKEY_ROUGHNESS_FACTOR, roughnessFactor) == AI_SUCCESS)
             material.roughnessFactor = roughnessFactor;
 
-        float emmisive; // TODO: this may have some bugs
-        if (aiMat->Get(AI_MATKEY_EMISSIVE_INTENSITY, emmisive) == AI_SUCCESS)
-            material.emissiveFactor = glm::vec3(emmisive);
+        aiColor3D emissive; // TODO: this may have some bugs
+        float emissiveIntensity;
+        if (aiMat->Get(AI_MATKEY_COLOR_EMISSIVE, emissive) == AI_SUCCESS && aiMat->Get(AI_MATKEY_EMISSIVE_INTENSITY, emissiveIntensity) == AI_SUCCESS)
+            material.emissiveFactor = glm::vec3(emissive.r, emissive.g, emissive.b) * emissiveIntensity;
 
         // Log material information
         LOG_DEBUG(
