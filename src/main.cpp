@@ -63,7 +63,6 @@ int main()
         // 5. Setup GUI with original ImGui
         // -------------------------
         bool notDone = true;
-        static int counter = 0;
 
         while (notDone)
         {
@@ -108,10 +107,9 @@ int main()
             RenderData accumulatePassOutput = accumulatePass.execute(pathTracingOutput);
 
             // Set texture for display
-            ID3D12Resource* d3d12Texture =
-                static_cast<ID3D12Resource*>(accumulatePassOutput["output"]->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource));
+            nvrhi::TextureHandle imageTexture = nvrhi::TextureHandle(static_cast<nvrhi::ITexture*>(accumulatePassOutput["output"].Get()));
+            ID3D12Resource* d3d12Texture = static_cast<ID3D12Resource*>(imageTexture->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource));
             window.SetDisplayTexture(d3d12Texture);
-            ExrUtils::saveTextureToExr(device, d3d12Texture, "output.exr", width, height);
 
             // Custom ImGui content before window render
             bool renderResult = window.RenderBegin();
@@ -127,10 +125,8 @@ int main()
 
             GUI::Begin("Settings");
             GUI::Text("This is some useful text.");
-            if (GUI::Button("Button"))
-                counter++;
-            GUI::SameLine();
-            GUI::Text("counter = %d", counter);
+            if (GUI::Button("Save image"))
+                ExrUtils::saveTextureToExr(device, imageTexture, "output.exr");
             GUI::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / GUI::GetIO().Framerate, GUI::GetIO().Framerate);
             scene->camera->renderUI();
             scene->camera->handleInput();
