@@ -45,7 +45,7 @@ int main()
         // 4. Setup triangle geometry for ray tracing
         // -------------------------
         AssimpImporter importer(device);
-        ref<Scene> scene = importer.loadScene(std::string(PROJECT_DIR) + "/media/cornell_box/cornell_box.gltf");
+        ref<Scene> scene = importer.loadScene(std::string(PROJECT_DIR) + "/media/cornell_box.gltf");
         if (!scene)
         {
             LOG_ERROR("Failed to load scene from file.");
