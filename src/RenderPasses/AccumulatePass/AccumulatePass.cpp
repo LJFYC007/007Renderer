@@ -9,8 +9,7 @@ AccumulatePass::AccumulatePass(ref<Device> device) : RenderPass(device)
 
 RenderData AccumulatePass::execute(const RenderData& input)
 {
-    nvrhi::ITexture* texture = dynamic_cast<nvrhi::ITexture*>(input["output"].Get());
-    nvrhi::TextureHandle inputTexture = texture;
+    nvrhi::TextureHandle inputTexture = dynamic_cast<nvrhi::ITexture*>(input["output"].Get());
     uint2 resolution = uint2(inputTexture->getDesc().width, inputTexture->getDesc().height);
     if (resolution.x != width || resolution.y != height)
     {

@@ -7,6 +7,7 @@
 #include "Scene/Importer/AssimpImporter.h"
 #include "RenderPasses/PathTracingPass/PathTracingPass.h"
 #include "RenderPasses/AccumulatePass/AccumulatePass.h"
+#include "RenderPasses/ErrorMeasure/ErrorMeasure.h"
 #include "Utils/Math/Math.h"
 #include "Utils/Logger.h"
 #include "Utils/GUI.h"
@@ -56,6 +57,7 @@ int main()
 
         PathTracingPass pathTracingPass(device);
         AccumulatePass accumulatePass(device);
+        ErrorMeasure errorMeasurePass(device);
         pathTracingPass.setScene(scene);
         accumulatePass.setScene(scene);
 
@@ -105,9 +107,10 @@ int main()
 
             RenderData pathTracingOutput = pathTracingPass.execute();
             RenderData accumulatePassOutput = accumulatePass.execute(pathTracingOutput);
+            RenderData errorMeasureOutput = errorMeasurePass.execute(accumulatePassOutput);
 
             // Set texture for display
-            nvrhi::TextureHandle imageTexture = nvrhi::TextureHandle(static_cast<nvrhi::ITexture*>(accumulatePassOutput["output"].Get()));
+            nvrhi::TextureHandle imageTexture = dynamic_cast<nvrhi::ITexture*>(errorMeasureOutput["output"].Get());
             ID3D12Resource* d3d12Texture = static_cast<ID3D12Resource*>(imageTexture->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource));
             window.SetDisplayTexture(d3d12Texture);
 
@@ -132,6 +135,7 @@ int main()
             scene->camera->handleInput();
             pathTracingPass.renderUI();
             accumulatePass.renderUI();
+            errorMeasurePass.renderUI();
             GUI::End();
 
             if (GUI::IsKeyPressed(ImGuiKey_Escape))
