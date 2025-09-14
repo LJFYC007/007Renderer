@@ -10,7 +10,9 @@ cbuffer PerFrameCB
     uint reset; // TODO: use bool, instead of uint
 };
 
-[shader("compute")][numthreads(16, 16, 1)] void main(uint3 dispatchThreadID : SV_DispatchThreadID)
+[shader("compute")]
+[numthreads(16, 16, 1)]
+void main(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     uint2 id = dispatchThreadID.xy;
     if (id.x >= gWidth || id.y >= gHeight)

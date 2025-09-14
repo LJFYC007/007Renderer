@@ -25,7 +25,8 @@ struct Payload
     TinyUniformSampleGenerator sampleGen;
 };
 
-[shader("raygeneration")] void rayGenMain()
+[shader("raygeneration")]
+void rayGenMain()
 {
     uint2 launchID = DispatchRaysIndex().xy;
     if (launchID.x >= gWidth || launchID.y >= gHeight)
@@ -44,13 +45,15 @@ struct Payload
     result[launchID] = float4(payload.color, 1.0);
 }
 
-    [shader("miss")] void missMain(inout Payload payload)
+[shader("miss")]
+void missMain(inout Payload payload)
 {
     // Sky color as environment lighting
     payload.color = float3(gColor);
 }
 
-[shader("closesthit")] void closestHitMain(inout Payload payload, BuiltInTriangleIntersectionAttributes attribs)
+[shader("closesthit")]
+void closestHitMain(inout Payload payload, BuiltInTriangleIntersectionAttributes attribs)
 {
     if (payload.depth >= maxDepth)
     {
