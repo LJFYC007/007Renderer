@@ -55,6 +55,18 @@ if(TARGET uninstall)
 endif()
 
 # ----------------------------------------------------------------------------
+# TinyEXR support
+# ----------------------------------------------------------------------------
+set(TINYEXR_DIR "${CMAKE_SOURCE_DIR}/external/tinyexr")
+add_library(tinyexr INTERFACE)
+target_include_directories(tinyexr INTERFACE ${TINYEXR_DIR})
+# Use miniz for compression instead of system zlib to avoid dependency issues
+option(USE_TINYEXR_MINIZ "Use bundled miniz with TinyEXR" ON)
+add_library(miniz STATIC ${TINYEXR_DIR}/miniz.c)
+target_include_directories(miniz PUBLIC ${TINYEXR_DIR})
+set_target_properties(tinyexr PROPERTIES FOLDER "External")
+
+# ----------------------------------------------------------------------------
 # GLM support
 # ----------------------------------------------------------------------------
 set(GLM_ENABLE_EXPERIMENTAL ON CACHE BOOL "Enable GLM experimental features")
@@ -130,6 +142,8 @@ target_link_libraries(007Core PUBLIC
     ${IMGUI_LIBRARIES}
     spdlog::spdlog
     assimp
+    miniz
+    tinyexr
 )
 
 # ----------------------------------------------------------------------------
@@ -149,6 +163,7 @@ target_compile_definitions(007Core PUBLIC
     $<$<CONFIG:Release>:SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_INFO>
     $<$<CONFIG:Debug>:_DEBUG>
     $<$<CONFIG:Release>:NDEBUG>
+    TINYEXR_USE_MINIZ=1
 )
 
 # ----------------------------------------------------------------------------

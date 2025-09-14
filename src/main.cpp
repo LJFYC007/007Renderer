@@ -10,6 +10,7 @@
 #include "Utils/Math/Math.h"
 #include "Utils/Logger.h"
 #include "Utils/GUI.h"
+#include "Utils/ExrUtils.h"
 #include "Scene/Camera/Camera.h"
 
 int main()
@@ -110,6 +111,7 @@ int main()
             ID3D12Resource* d3d12Texture =
                 static_cast<ID3D12Resource*>(accumulatePassOutput["output"]->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource));
             window.SetDisplayTexture(d3d12Texture);
+            ExrUtils::saveTextureToExr(device, d3d12Texture, "output.exr", width, height);
 
             // Custom ImGui content before window render
             bool renderResult = window.RenderBegin();

@@ -1,3 +1,4 @@
+#pragma once
 #include <gtest/gtest.h>
 
 #include "Core/Device.h"
@@ -28,7 +29,3 @@ public:
 private:
     static ref<Device> device;
 };
-
-ref<Device> BasicTestEnvironment::device = nullptr;
-// Register the global test environment
-::testing::Environment* const basicEnv = ::testing::AddGlobalTestEnvironment(new BasicTestEnvironment);
