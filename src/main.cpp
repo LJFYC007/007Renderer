@@ -126,7 +126,7 @@ int main()
             GUI::Begin("Settings");
             GUI::Text("This is some useful text.");
             if (GUI::Button("Save image"))
-                ExrUtils::saveTextureToExr(device, imageTexture, "output.exr");
+                ExrUtils::saveTextureToExr(device, imageTexture, std::string(PROJECT_DIR) + "/output.exr");
             GUI::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / GUI::GetIO().Framerate, GUI::GetIO().Framerate);
             scene->camera->renderUI();
             scene->camera->handleInput();

@@ -25,7 +25,7 @@ TEST_F(PathTracerTest, Basic)
     const uint height = 1080;
 
     AssimpImporter importer(device);
-    ref<Scene> scene = importer.loadScene(std::string(PROJECT_DIR) + "/media/cornell_box/cornell_box.gltf");
+    ref<Scene> scene = importer.loadScene(std::string(PROJECT_DIR) + "/media/cornell_box.gltf");
     if (!scene)
         FAIL() << "Failed to load scene from file.";
     scene->buildAccelStructs();
