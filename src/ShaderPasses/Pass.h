@@ -31,8 +31,6 @@ public:
     BindingSlot operator[](const std::string& name) { return BindingSlot(m_BindingSetManager.get(), name); }
 
 protected:
-    void trackingResourceState(nvrhi::CommandListHandle commandList);
-
     ref<Device> m_Device;
     ref<BindingSetManager> m_BindingSetManager; // Manages binding sets and layouts
 };

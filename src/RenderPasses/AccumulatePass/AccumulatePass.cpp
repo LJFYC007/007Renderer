@@ -53,7 +53,8 @@ void AccumulatePass::prepareResources()
                                          .setFormat(nvrhi::Format::RGBA32_FLOAT)
                                          .setInitialState(nvrhi::ResourceStates::UnorderedAccess)
                                          .setDebugName("output")
-                                         .setIsUAV(true);
+                                         .setIsUAV(true)
+                                         .setKeepInitialState(true);
     textureOut = m_Device->getDevice()->createTexture(textureDesc);
     textureDesc.setDebugName("accumulateTexture");
     accumulateTexture = m_Device->getDevice()->createTexture(textureDesc);

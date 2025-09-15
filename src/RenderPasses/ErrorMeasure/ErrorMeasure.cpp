@@ -17,7 +17,8 @@ ErrorMeasure::ErrorMeasure(ref<Device> device) : RenderPass(device)
                                          .setFormat(nvrhi::Format::RGBA32_FLOAT)
                                          .setInitialState(nvrhi::ResourceStates::UnorderedAccess)
                                          .setDebugName("differenceTexture")
-                                         .setIsUAV(true);
+                                         .setIsUAV(true)
+                                         .setKeepInitialState(true);
     pDifferenceTexture = m_Device->getDevice()->createTexture(textureDesc);
 }
 

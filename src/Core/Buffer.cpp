@@ -22,6 +22,7 @@ bool Buffer::initialize(
     desc.cpuAccess = nvrhi::CpuAccessMode::None;
     desc.canHaveUAVs = isUAV;
     desc.isConstantBuffer = isConstantBuffer;
+    desc.keepInitialState = true;
 
     buffer = device->getDevice()->createBuffer(desc);
 
@@ -38,7 +39,6 @@ void Buffer::upload(ref<Device> device, const void* data, size_t size)
 
     auto uploadCmd = device->getCommandList();
     uploadCmd->open();
-    uploadCmd->beginTrackingBufferState(buffer, nvrhi::ResourceStates::ShaderResource);
     uploadCmd->writeBuffer(buffer, data, size);
     uploadCmd->close();
     device->getDevice()->executeCommandList(uploadCmd);
@@ -48,7 +48,6 @@ void Buffer::updateData(ref<Device> device, const void* data, size_t size)
 {
     if (!buffer || !data)
         return;
-
     upload(device, data, size);
 }
 
@@ -62,6 +61,7 @@ Buffer Buffer::createReadback(ref<Device> device, size_t size)
     desc.initialState = nvrhi::ResourceStates::CopyDest;
     desc.cpuAccess = nvrhi::CpuAccessMode::Read;
     desc.debugName = "ReadbackBuffer";
+    desc.keepInitialState = true;
 
     buf.buffer = device->getDevice()->createBuffer(desc);
     return buf;
@@ -73,16 +73,12 @@ std::vector<uint8_t> Buffer::readback(ref<Device> device) const
     nvrhi::CommandListHandle commandList = device->getCommandList();
 
     std::vector<uint8_t> result(byteSize);
-    commandList->open();
-    commandList->beginTrackingBufferState(buffer, nvrhi::ResourceStates::CopySource);
-
     auto staging = createReadback(device, byteSize);
-    commandList->beginTrackingBufferState(staging.buffer, nvrhi::ResourceStates::CopyDest);
-
+    commandList->open();
     commandList->copyBuffer(staging.buffer, 0, buffer, 0, byteSize);
     commandList->close();
-    nvrhiDevice->executeCommandList(commandList);
-    nvrhiDevice->waitForIdle();
+    uint64_t fenceValue = nvrhiDevice->executeCommandList(commandList);
+    nvrhiDevice->queueWaitForCommandList(nvrhi::CommandQueue::Graphics, nvrhi::CommandQueue::Graphics, fenceValue);
 
     void* mapped = nvrhiDevice->mapBuffer(staging.buffer, nvrhi::CpuAccessMode::Read);
     if (mapped)

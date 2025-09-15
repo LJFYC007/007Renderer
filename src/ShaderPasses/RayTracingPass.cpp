@@ -69,8 +69,6 @@ void RayTracingPass::execute(uint32_t width, uint32_t height, uint32_t depth)
     auto commandList = m_Device->getCommandList();
     auto nvrhiDevice = m_Device->getDevice();
     commandList->open();
-    trackingResourceState(commandList);
-
     commandList->setRayTracingState(m_rtState);
     nvrhi::rt::DispatchRaysArguments args;
     args.setDimensions(width, height, depth);

@@ -56,11 +56,7 @@ int main()
         // Create render graph
         auto renderGraph = RenderGraphBuilder::createDefaultGraph(device);
         renderGraph->setScene(scene);
-        if (!renderGraph->build())
-        {
-            LOG_ERROR("Failed to build render graph!");
-            return 1;
-        }
+        renderGraph->build();
 
         // -------------------------
         // 5. Setup GUI with original ImGui

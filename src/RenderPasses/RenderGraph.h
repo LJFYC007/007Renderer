@@ -24,7 +24,7 @@ struct RenderGraphNode
 {
     std::string name;
     ref<RenderPass> pass;
-    std::unordered_set<std::string> dependencies; // Passes this node depends on
+    std::unordered_set<uint> dependencies; // Node indices this node depends on
 
     RenderGraphNode(const std::string& nodeName, ref<RenderPass> renderPass) : name(nodeName), pass(renderPass) {}
 };
@@ -39,7 +39,7 @@ public:
     void addConnection(const std::string& fromPass, const std::string& fromOutput, const std::string& toPass, const std::string& toInput);
 
     // Build and validate the graph
-    bool build();
+    void build();
 
     // Execute the entire render graph
     RenderData execute();
@@ -51,16 +51,19 @@ public:
     void renderUI();
 
 private:
+    bool topologicalSort();
+
+    RenderData executePass(int nodeIndex);
+
+    int findNode(const std::string& name);
+
+    void renderGraphVisualization();
+
     ref<Device> mpDevice;
     ref<Scene> mpScene;
 
     std::vector<RenderGraphNode> mNodes;
     std::vector<RenderGraphConnection> mConnections;
-    std::vector<std::string> mExecutionOrder; // Topologically sorted pass names
-
-    bool topologicalSort();
-
-    // Execution helpers
-    RenderData executePass(int nodeIndex, const std::unordered_map<std::string, RenderData>& intermediateResults);
-    int findNode(const std::string& name);
+    std::vector<uint> mExecutionOrder; // Topologically sorted node indices
+    std::unordered_map<std::string, RenderData> intermediateResults;
 };

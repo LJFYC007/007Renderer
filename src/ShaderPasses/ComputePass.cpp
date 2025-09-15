@@ -49,7 +49,6 @@ void ComputePass::dispatch(uint32_t width, uint32_t height, uint32_t depth)
     auto nvrhiDevice = m_Device->getDevice();
     auto commandList = m_Device->getCommandList();
     commandList->open();
-    trackingResourceState(commandList);
 
     nvrhi::ComputeState state;
     state.pipeline = m_Pipeline;

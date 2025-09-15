@@ -122,7 +122,7 @@ nvrhi::TextureHandle ExrUtils::loadExrToTexture(ref<Device> device, const std::s
                            .setIsRenderTarget(false)
                            .setIsUAV(true)
                            .setInitialState(nvrhi::ResourceStates::UnorderedAccess)
-                           .setKeepInitialState(false)
+                           .setKeepInitialState(true)
                            .setDebugName("EXR Loaded Texture");
 
     // Create NVRHI texture
@@ -150,28 +150,16 @@ void ExrUtils::copyTextureDataToCPU(ref<Device> device, nvrhi::TextureHandle tex
     // Copy from GPU texture to staging texture
     nvrhi::DeviceHandle nvrhiDevice = device->getDevice();
     nvrhi::CommandListHandle commandList = device->getCommandList();
-    commandList->open();
-
     nvrhi::TextureSlice slice;
-    nvrhi::ResourceStates currentState;
-    if (desc.isUAV)
-        currentState = nvrhi::ResourceStates::UnorderedAccess;
-    else if (desc.isRenderTarget)
-        currentState = nvrhi::ResourceStates::RenderTarget;
-    else if (desc.isShaderResource)
-        currentState = nvrhi::ResourceStates::ShaderResource;
-    else
-        currentState = nvrhi::ResourceStates::Common;
 
-    commandList->beginTrackingTextureState(texture, nvrhi::AllSubresources, currentState);
+    commandList->open();
     commandList->setTextureState(texture, nvrhi::AllSubresources, nvrhi::ResourceStates::CopySource);
     commandList->copyTexture(stagingTexture, slice, texture, slice);
-    commandList->setTextureState(texture, nvrhi::AllSubresources, currentState);
     commandList->close();
 
     // Execute using the correct API - single command list
     uint64_t fenceValue = nvrhiDevice->executeCommandList(commandList);
-    nvrhiDevice->waitForIdle();
+    nvrhiDevice->queueWaitForCommandList(nvrhi::CommandQueue::Graphics, nvrhi::CommandQueue::Graphics, fenceValue);
 
     // Map staging texture and copy data
     size_t rowPitch;
@@ -221,27 +209,15 @@ void ExrUtils::copyCPUDataToTexture(ref<Device> device, nvrhi::TextureHandle& te
     // Copy from staging texture to GPU texture
     nvrhi::DeviceHandle nvrhiDevice = device->getDevice();
     nvrhi::CommandListHandle commandList = device->getCommandList();
+
     commandList->open();
-
-    nvrhi::ResourceStates currentState;
-    if (desc.isUAV)
-        currentState = nvrhi::ResourceStates::UnorderedAccess;
-    else if (desc.isRenderTarget)
-        currentState = nvrhi::ResourceStates::RenderTarget;
-    else if (desc.isShaderResource)
-        currentState = nvrhi::ResourceStates::ShaderResource;
-    else
-        currentState = nvrhi::ResourceStates::Common;
-
-    commandList->beginTrackingTextureState(texture, nvrhi::AllSubresources, currentState);
     commandList->setTextureState(texture, nvrhi::AllSubresources, nvrhi::ResourceStates::CopyDest);
     commandList->copyTexture(texture, slice, stagingTexture, slice);
-    commandList->setTextureState(texture, nvrhi::AllSubresources, currentState);
     commandList->close();
 
     // Execute command list and wait for completion
     uint64_t fenceValue = nvrhiDevice->executeCommandList(commandList);
-    nvrhiDevice->waitForIdle();
+    nvrhiDevice->queueWaitForCommandList(nvrhi::CommandQueue::Graphics, nvrhi::CommandQueue::Graphics, fenceValue);
 }
 
 uint32_t ExrUtils::getChannelCount(nvrhi::Format format)

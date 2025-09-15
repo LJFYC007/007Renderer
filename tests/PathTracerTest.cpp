@@ -34,8 +34,7 @@ TEST_F(PathTracerTest, Basic)
     // Create render graph
     auto renderGraph = RenderGraphBuilder::createDefaultGraph(device);
     renderGraph->setScene(scene);
-    if (!renderGraph->build())
-        FAIL() << "Failed to build render graph!";
+    renderGraph->build();
 
     renderGraph->setScene(scene);
     RenderData finalOutput = renderGraph->execute();
