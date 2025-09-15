@@ -12,6 +12,11 @@ public:
 
     void renderUI() override;
 
+    // RenderGraph interface
+    std::string getName() const override { return "PathTracing"; }
+    std::vector<RenderPassInput> getInputs() const override { return {}; } // No inputs, generates from scene
+    std::vector<RenderPassOutput> getOutputs() const override { return {RenderPassOutput("output", RenderDataType::Texture2D)}; }
+
 private:
     void prepareResources();
 

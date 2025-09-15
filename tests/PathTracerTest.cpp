@@ -1,8 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "Scene/Importer/AssimpImporter.h"
-#include "RenderPasses/PathTracingPass/PathTracingPass.h"
-#include "RenderPasses/AccumulatePass/AccumulatePass.h"
+#include "RenderPasses/RenderGraphBuilder.h"
 #include "Utils/ExrUtils.h"
 #include "Environment.h"
 
@@ -32,12 +31,14 @@ TEST_F(PathTracerTest, Basic)
     scene->camera = make_ref<Camera>(width, height, float3(0.f, 0.f, -5.f), float3(0.f, 0.f, -6.f), glm::radians(45.0f));
     scene->camera->calculateCameraParameters();
 
-    PathTracingPass pathTracingPass(device);
-    AccumulatePass accumulatePass(device);
-    pathTracingPass.setScene(scene);
-    accumulatePass.setScene(scene);
-    RenderData pathTracingOutput = pathTracingPass.execute();
-    RenderData accumulatePassOutput = accumulatePass.execute(pathTracingOutput);
-    nvrhi::TextureHandle imageTexture = nvrhi::TextureHandle(static_cast<nvrhi::ITexture*>(accumulatePassOutput["output"].Get()));
+    // Create render graph
+    auto renderGraph = RenderGraphBuilder::createDefaultGraph(device);
+    renderGraph->setScene(scene);
+    if (!renderGraph->build())
+        FAIL() << "Failed to build render graph!";
+
+    renderGraph->setScene(scene);
+    RenderData finalOutput = renderGraph->execute();
+    nvrhi::TextureHandle imageTexture = nvrhi::TextureHandle(static_cast<nvrhi::ITexture*>(finalOutput["ErrorMeasure.output"].Get()));
     ExrUtils::saveTextureToExr(device, imageTexture, "output.exr");
 }

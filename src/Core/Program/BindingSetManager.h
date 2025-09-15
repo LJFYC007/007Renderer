@@ -4,7 +4,6 @@
 #include <unordered_map>
 
 #include "Core/Device.h"
-#include "Core/Pointer.h"
 #include "Core/Program/ReflectionInfo.h"
 
 class BindingSetManager

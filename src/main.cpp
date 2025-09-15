@@ -5,9 +5,7 @@
 #include "Core/Device.h"
 #include "Core/Window.h"
 #include "Scene/Importer/AssimpImporter.h"
-#include "RenderPasses/PathTracingPass/PathTracingPass.h"
-#include "RenderPasses/AccumulatePass/AccumulatePass.h"
-#include "RenderPasses/ErrorMeasure/ErrorMeasure.h"
+#include "RenderPasses/RenderGraphBuilder.h"
 #include "Utils/Math/Math.h"
 #include "Utils/Logger.h"
 #include "Utils/GUI.h"
@@ -55,11 +53,14 @@ int main()
         scene->buildAccelStructs();
         scene->camera = make_ref<Camera>(width, height, float3(0.f, 0.f, -5.f), float3(0.f, 0.f, -6.f), glm::radians(45.0f));
 
-        PathTracingPass pathTracingPass(device);
-        AccumulatePass accumulatePass(device);
-        ErrorMeasure errorMeasurePass(device);
-        pathTracingPass.setScene(scene);
-        accumulatePass.setScene(scene);
+        // Create render graph
+        auto renderGraph = RenderGraphBuilder::createDefaultGraph(device);
+        renderGraph->setScene(scene);
+        if (!renderGraph->build())
+        {
+            LOG_ERROR("Failed to build render graph!");
+            return 1;
+        }
 
         // -------------------------
         // 5. Setup GUI with original ImGui
@@ -93,24 +94,19 @@ int main()
                 height = windowSize.y;
                 scene->camera->setWidth(width);
                 scene->camera->setHeight(height);
-                pathTracingPass.setScene(scene);
-                accumulatePass.setScene(scene);
+                renderGraph->setScene(scene);
                 LOG_DEBUG("Resized texture to {}x{}", width, height);
             }
 
             if (scene->camera->dirty)
-            {
-                pathTracingPass.setScene(scene);
-                accumulatePass.setScene(scene);
-            }
+                renderGraph->setScene(scene);
             scene->camera->calculateCameraParameters();
 
-            RenderData pathTracingOutput = pathTracingPass.execute();
-            RenderData accumulatePassOutput = accumulatePass.execute(pathTracingOutput);
-            RenderData errorMeasureOutput = errorMeasurePass.execute(accumulatePassOutput);
+            // Execute render graph
+            RenderData finalOutput = renderGraph->execute();
 
             // Set texture for display
-            nvrhi::TextureHandle imageTexture = dynamic_cast<nvrhi::ITexture*>(errorMeasureOutput["output"].Get());
+            nvrhi::TextureHandle imageTexture = dynamic_cast<nvrhi::ITexture*>(finalOutput["ErrorMeasure.output"].Get());
             ID3D12Resource* d3d12Texture = static_cast<ID3D12Resource*>(imageTexture->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource));
             window.SetDisplayTexture(d3d12Texture);
 
@@ -127,15 +123,16 @@ int main()
             GUI::SetNextWindowSize(ImVec2(io.DisplaySize.x * 0.3f, io.DisplaySize.y * 0.5f), ImGuiCond_Once);
 
             GUI::Begin("Settings");
-            GUI::Text("This is some useful text.");
             if (GUI::Button("Save image"))
                 ExrUtils::saveTextureToExr(device, imageTexture, std::string(PROJECT_DIR) + "/output.exr");
             GUI::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / GUI::GetIO().Framerate, GUI::GetIO().Framerate);
-            scene->camera->renderUI();
-            scene->camera->handleInput();
-            pathTracingPass.renderUI();
-            accumulatePass.renderUI();
-            errorMeasurePass.renderUI();
+
+            if (GUI::CollapsingHeader("Camera Controls"))
+            {
+                scene->camera->renderUI();
+                scene->camera->handleInput();
+            }
+            renderGraph->renderUI();
             GUI::End();
 
             if (GUI::IsKeyPressed(ImGuiKey_Escape))

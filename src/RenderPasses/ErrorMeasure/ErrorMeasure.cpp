@@ -7,7 +7,7 @@ ErrorMeasure::ErrorMeasure(ref<Device> device) : RenderPass(device)
     pass = make_ref<ComputePass>(device, "/src/RenderPasses/ErrorMeasure/ErrorMeasure.slang", "main");
 
     // Load reference texture from EXR file
-    pReferenceTexture = ExrUtils::loadExrToTexture(device, std::string(PROJECT_DIR) + "/reference.exr");
+    pReferenceTexture = ExrUtils::loadExrToTexture(device, std::string(PROJECT_DIR) + "/media/reference.exr");
     width = pReferenceTexture->getDesc().width;
     height = pReferenceTexture->getDesc().height;
 
@@ -27,7 +27,7 @@ RenderData ErrorMeasure::execute(const RenderData& input)
     uint2 resolution = uint2(pSourceTexture->getDesc().width, pSourceTexture->getDesc().height);
     if (resolution.x != width || resolution.y != height)
     {
-        LOG_ERROR("Resolution mismatch: source({}x{}) vs reference({}x{})", resolution.x, resolution.y, width, height);
+        LOG_WARN("Resolution mismatch: source({}x{}) vs reference({}x{})", resolution.x, resolution.y, width, height);
         RenderData output;
         output.setResource("output", pSourceTexture);
         selectedOutput = OutputId::Source; // Fallback to source
