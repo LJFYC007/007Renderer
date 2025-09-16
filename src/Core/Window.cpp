@@ -237,6 +237,11 @@ ImTextureID Window::GetDisplayTextureImGuiHandle() const
     return mDisplayImGuiHandle;
 }
 
+ID3D12Resource* Window::GetCurrentDisplayTexture() const
+{
+    return mpCurrentDisplayTexture;
+}
+
 uint2 Window::GetWindowSize() const
 {
     RECT clientRect;

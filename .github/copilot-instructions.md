@@ -6,4 +6,12 @@ For the comments, I hope to use English comments entirely, keeping only some com
 
 For the answers, I hope you can provide detailed Chinese explanations, especially for complex topics. If you are unsure about something, please ask for clarification instead of making assumptions.
 
+Follow Falcor (NVIDIA rendering framework) class-internal naming conventions:
+
+- Member variables: prefix with `m` + PascalCase, e.g. mEnabled, mDirty.
+- Pointer members: prefix with `mp`, e.g. mpDevice, mpScene.
+- Static members: prefix with `s`, e.g. sCache, sApiHandle.
+- Constants: prefix with `k`, e.g. kDefaultFlags, kMaxCount.
+- Function params: pointer params start with `p` (pProgram, pState).
+
 To compile the project, use `C:\Scoop\shims\cmake.EXE --build e:/007Renderer/build/Debug --config Debug --target 007Renderer --`

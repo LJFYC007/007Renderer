@@ -25,6 +25,31 @@ find_package(ImGui REQUIRED)
 set_target_properties(imgui PROPERTIES FOLDER "External")
 
 # ----------------------------------------------------------------------------
+# ImGui node editor support
+# ----------------------------------------------------------------------------
+set(IMGUI_NODE_EDITOR_DIR "${CMAKE_SOURCE_DIR}/external/imgui-node-editor")
+add_library(imgui_node_editor STATIC
+    ${IMGUI_NODE_EDITOR_DIR}/imgui_node_editor.cpp
+    ${IMGUI_NODE_EDITOR_DIR}/imgui_node_editor_api.cpp
+    ${IMGUI_NODE_EDITOR_DIR}/imgui_canvas.cpp
+    ${IMGUI_NODE_EDITOR_DIR}/crude_json.cpp
+    ${IMGUI_NODE_EDITOR_DIR}/imgui_node_editor.h
+    ${IMGUI_NODE_EDITOR_DIR}/imgui_node_editor_internal.h
+    ${IMGUI_NODE_EDITOR_DIR}/imgui_canvas.h
+    ${IMGUI_NODE_EDITOR_DIR}/crude_json.h
+    ${IMGUI_NODE_EDITOR_DIR}/imgui_bezier_math.h
+    ${IMGUI_NODE_EDITOR_DIR}/imgui_extra_math.h
+)
+
+target_include_directories(imgui_node_editor PUBLIC
+    ${IMGUI_NODE_EDITOR_DIR}
+    ${IMGUI_INCLUDE_DIRS}
+)
+
+target_link_libraries(imgui_node_editor PUBLIC imgui)
+set_target_properties(imgui_node_editor PROPERTIES FOLDER "External")
+
+# ----------------------------------------------------------------------------
 # Spdlog support
 # ----------------------------------------------------------------------------
 set(SPDLOG_BUILD_SHARED OFF CACHE BOOL "" FORCE)
@@ -132,6 +157,7 @@ target_include_directories(007Core PUBLIC
     external/glm
     ${SLANG_INCLUDE_DIRS}
     ${IMGUI_INCLUDE_DIRS}
+    external/imgui-node-editor
 )
 
 target_link_libraries(007Core PUBLIC
@@ -140,6 +166,7 @@ target_link_libraries(007Core PUBLIC
     d3d12 dxgi dxguid
     ${SLANG_LIBRARIES}
     ${IMGUI_LIBRARIES}
+    imgui_node_editor
     spdlog::spdlog
     assimp
     miniz
