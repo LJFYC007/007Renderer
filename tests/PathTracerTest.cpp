@@ -10,20 +10,19 @@ class PathTracerTest : public ::testing::Test
 protected:
     void SetUp() override
     {
-        device = BasicTestEnvironment::getDevice();
-        ASSERT_NE(device, nullptr);
-        ASSERT_TRUE(device->isValid());
+        mpDevice = BasicTestEnvironment::getDevice();
+        ASSERT_NE(mpDevice, nullptr);
+        ASSERT_TRUE(mpDevice->isValid());
     }
 
-    ref<Device> device;
+    ref<Device> mpDevice;
 };
 
 TEST_F(PathTracerTest, Basic)
 {
     const uint width = 1920;
     const uint height = 1080;
-
-    AssimpImporter importer(device);
+    AssimpImporter importer(mpDevice);
     ref<Scene> scene = importer.loadScene(std::string(PROJECT_DIR) + "/media/cornell_box.gltf");
     if (!scene)
         FAIL() << "Failed to load scene from file.";
@@ -32,12 +31,11 @@ TEST_F(PathTracerTest, Basic)
     scene->camera->calculateCameraParameters();
 
     // Create render graph
-    auto renderGraph = RenderGraphBuilder::createDefaultGraph(device);
+    auto renderGraph = RenderGraphBuilder::createDefaultGraph(mpDevice);
     renderGraph->setScene(scene);
     renderGraph->build();
-
     renderGraph->setScene(scene);
     RenderData finalOutput = renderGraph->execute();
     nvrhi::TextureHandle imageTexture = nvrhi::TextureHandle(static_cast<nvrhi::ITexture*>(finalOutput["ErrorMeasure.output"].Get()));
-    ExrUtils::saveTextureToExr(device, imageTexture, "output.exr");
+    ExrUtils::saveTextureToExr(mpDevice, imageTexture, "output.exr");
 }

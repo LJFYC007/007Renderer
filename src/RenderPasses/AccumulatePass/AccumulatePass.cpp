@@ -1,61 +1,60 @@
 #include "AccumulatePass.h"
 #include "Utils/Math/Math.h"
 
-AccumulatePass::AccumulatePass(ref<Device> device) : RenderPass(device)
+AccumulatePass::AccumulatePass(ref<Device> pDevice) : RenderPass(pDevice)
 {
-    cbPerFrame.initialize(device, &perFrameData, sizeof(PerFrameCB), nvrhi::ResourceStates::ConstantBuffer, false, true, "PerFrameCB");
-    pass = make_ref<ComputePass>(device, "/src/RenderPasses/AccumulatePass/AccumulatePass.slang", "main");
+    mCbPerFrame.initialize(pDevice, &mPerFrameData, sizeof(PerFrameCB), nvrhi::ResourceStates::ConstantBuffer, false, true, "PerFrameCB");
+    mpPass = make_ref<ComputePass>(pDevice, "/src/RenderPasses/AccumulatePass/AccumulatePass.slang", "main");
 }
 
 RenderData AccumulatePass::execute(const RenderData& input)
 {
-    nvrhi::TextureHandle inputTexture = dynamic_cast<nvrhi::ITexture*>(input["output"].Get());
-    uint2 resolution = uint2(inputTexture->getDesc().width, inputTexture->getDesc().height);
-    if (resolution.x != width || resolution.y != height)
+    nvrhi::TextureHandle pInputTexture = dynamic_cast<nvrhi::ITexture*>(input["output"].Get());
+    uint2 resolution = uint2(pInputTexture->getDesc().width, pInputTexture->getDesc().height);
+    if (resolution.x != mWidth || resolution.y != mHeight)
     {
-        width = resolution.x;
-        height = resolution.y;
+        mWidth = resolution.x;
+        mHeight = resolution.y;
         prepareResources();
     }
 
-    perFrameData.gWidth = width;
-    perFrameData.gHeight = height;
-    perFrameData.reset = reset;
-    if (reset)
+    mPerFrameData.gWidth = mWidth;
+    mPerFrameData.gHeight = mHeight;
+    mPerFrameData.reset = mReset;
+    if (mReset)
     {
-        frameCount = 0;
-        reset = false;
+        mFrameCount = 0;
+        mReset = false;
     }
-    perFrameData.frameCount = ++frameCount;
-
+    mPerFrameData.frameCount = ++mFrameCount;
     RenderData output;
-    output.setResource("output", textureOut);
-    cbPerFrame.updateData(m_Device, &perFrameData, sizeof(PerFrameCB));
-    (*pass)["PerFrameCB"] = cbPerFrame.getHandle();
-    (*pass)["input"] = inputTexture;
-    (*pass)["accumulateTexture"] = accumulateTexture;
-    (*pass)["output"] = textureOut;
-    pass->execute(width, height, 1);
+    output.setResource("output", mTextureOut);
+    mCbPerFrame.updateData(mpDevice, &mPerFrameData, sizeof(PerFrameCB));
+    (*mpPass)["PerFrameCB"] = mCbPerFrame.getHandle();
+    (*mpPass)["input"] = pInputTexture;
+    (*mpPass)["accumulateTexture"] = mAccumulateTexture;
+    (*mpPass)["output"] = mTextureOut;
+    mpPass->execute(mWidth, mHeight, 1);
     return output;
 }
 
 void AccumulatePass::renderUI()
 {
     if (GUI::Button("Reset Accumulation"))
-        reset = true;
+        mReset = true;
 }
 
 void AccumulatePass::prepareResources()
 {
     nvrhi::TextureDesc textureDesc = nvrhi::TextureDesc()
-                                         .setWidth(width)
-                                         .setHeight(height)
+                                         .setWidth(mWidth)
+                                         .setHeight(mHeight)
                                          .setFormat(nvrhi::Format::RGBA32_FLOAT)
                                          .setInitialState(nvrhi::ResourceStates::UnorderedAccess)
                                          .setDebugName("output")
                                          .setIsUAV(true)
                                          .setKeepInitialState(true);
-    textureOut = m_Device->getDevice()->createTexture(textureDesc);
+    mTextureOut = mpDevice->getDevice()->createTexture(textureDesc);
     textureDesc.setDebugName("accumulateTexture");
-    accumulateTexture = m_Device->getDevice()->createTexture(textureDesc);
+    mAccumulateTexture = mpDevice->getDevice()->createTexture(textureDesc);
 }

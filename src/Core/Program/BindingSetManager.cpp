@@ -1,65 +1,62 @@
 #include "BindingSetManager.h"
 #include "Utils/Logger.h"
 
-BindingSetManager::BindingSetManager(ref<Device> device, std::vector<ReflectionInfo> reflectionInfo) : m_device(device)
+BindingSetManager::BindingSetManager(ref<Device> pDevice, std::vector<ReflectionInfo> reflectionInfo) : mpDevice(pDevice)
 {
-    m_spaces.resize(m_space);
+    mSpaces.resize(mSpace);
 
     // Group reflection info by binding space
     for (const auto& info : reflectionInfo)
     {
         uint32_t space = info.bindingSpace;
-        uint32_t index = static_cast<uint32_t>(m_spaces[space].layoutItems.size());
+        uint32_t index = static_cast<uint32_t>(mSpaces[space].layoutItems.size());
 
-        m_spaces[space].layoutItems.push_back(info.bindingLayoutItem);
-        m_spaces[space].bindingSetItems.push_back(info.bindingSetItem);
-        m_resourceMap[info.name] = {space, index};
+        mSpaces[space].layoutItems.push_back(info.bindingLayoutItem);
+        mSpaces[space].bindingSetItems.push_back(info.bindingSetItem);
+        mResourceMap[info.name] = {space, index};
     }
 
     // Create binding layouts for each space
-    for (uint32_t space = 0; space < m_space; ++space)
+    for (uint32_t space = 0; space < mSpace; ++space)
     {
-        if (m_spaces[space].layoutItems.empty())
+        if (mSpaces[space].layoutItems.empty())
             continue;
 
         nvrhi::BindingLayoutDesc layoutDesc;
         layoutDesc.visibility = nvrhi::ShaderType::All;
         layoutDesc.registerSpace = space;
-        layoutDesc.bindings = m_spaces[space].layoutItems;
-        m_spaces[space].bindingLayout = m_device->getDevice()->createBindingLayout(layoutDesc);
+        layoutDesc.bindings = mSpaces[space].layoutItems;
+        mSpaces[space].bindingLayout = mpDevice->getDevice()->createBindingLayout(layoutDesc);
     }
 }
 
 std::vector<nvrhi::BindingSetHandle> BindingSetManager::getBindingSets()
 {
     std::vector<nvrhi::BindingSetHandle> result;
-    result.resize(m_space);
+    result.resize(mSpace);
 
-    for (uint32_t space = 0; space < m_space; ++space)
+    for (uint32_t space = 0; space < mSpace; ++space)
     {
-        if (m_spaces[space].layoutItems.empty())
+        if (mSpaces[space].layoutItems.empty())
         {
             result[space] = nullptr;
             continue;
         }
 
         nvrhi::BindingSetDesc bindingSetDesc;
-        bindingSetDesc.bindings = m_spaces[space].bindingSetItems;
+        bindingSetDesc.bindings = mSpaces[space].bindingSetItems;
 
         size_t hash = 0;
         nvrhi::hash_combine(hash, bindingSetDesc);
-        nvrhi::hash_combine(hash, m_spaces[space].bindingLayout);
+        nvrhi::hash_combine(hash, mSpaces[space].bindingLayout);
 
-        if (m_spaces[space].bindingSets.find(hash) != m_spaces[space].bindingSets.end())
-        {
-            result[space] = m_spaces[space].bindingSets[hash];
-        }
-        else
+        if (mSpaces[space].currentHash != hash)
         {
             LOG_DEBUG("[BindingSetManager] Creating new binding set for space {} with hash: {}", space, hash);
-            m_spaces[space].bindingSets[hash] = m_device->getDevice()->createBindingSet(bindingSetDesc, m_spaces[space].bindingLayout);
-            result[space] = m_spaces[space].bindingSets[hash];
+            mSpaces[space].bindingSet = mpDevice->getDevice()->createBindingSet(bindingSetDesc, mSpaces[space].bindingLayout);
+            mSpaces[space].currentHash = hash;
         }
+        result[space] = mSpaces[space].bindingSet;
     }
 
     return result;
@@ -68,19 +65,19 @@ std::vector<nvrhi::BindingSetHandle> BindingSetManager::getBindingSets()
 std::vector<nvrhi::BindingLayoutHandle> BindingSetManager::getBindingLayouts()
 {
     std::vector<nvrhi::BindingLayoutHandle> result;
-    result.resize(m_space);
-    for (uint32_t space = 0; space < m_space; ++space)
-        result[space] = m_spaces[space].bindingLayout;
+    result.resize(mSpace);
+    for (uint32_t space = 0; space < mSpace; ++space)
+        result[space] = mSpaces[space].bindingLayout;
     return result;
 }
 
 void BindingSetManager::setResourceHandle(const std::string& name, nvrhi::ResourceHandle resource)
 {
-    auto it = m_resourceMap.find(name);
-    if (it == m_resourceMap.end())
+    auto it = mResourceMap.find(name);
+    if (it == mResourceMap.end())
         LOG_ERROR_RETURN("[BindingSetManager] Resource '{}' not found in layout", name);
 
     uint32_t space = it->second.first;
     uint32_t index = it->second.second;
-    m_spaces[space].bindingSetItems[index].resourceHandle = resource;
+    mSpaces[space].bindingSetItems[index].resourceHandle = resource;
 }

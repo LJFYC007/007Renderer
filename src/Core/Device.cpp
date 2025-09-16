@@ -9,24 +9,24 @@
         return false;                        \
     }
 
-Device::Device() : m_isInitialized(false)
+Device::Device() : mIsInitialized(false)
 {
-    m_messageCallback = make_ref<MessageCallback>();
+    mpMessageCallback = make_ref<MessageCallback>();
 }
 
 bool Device::initialize()
 {
-    if (m_isInitialized)
+    if (mIsInitialized)
         return true;
 
     // Enable debug layer in debug builds
 #ifdef _DEBUG
-    if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&m_pdx12Debug))))
-        m_pdx12Debug->EnableDebugLayer();
+    if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&mpDx12Debug))))
+        mpDx12Debug->EnableDebugLayer();
 #endif
 
     // Create DXGI factory
-    if (!SUCCEEDED(CreateDXGIFactory1(IID_PPV_ARGS(&m_dxgiFactory))))
+    if (!SUCCEEDED(CreateDXGIFactory1(IID_PPV_ARGS(&mpDxgiFactory))))
     {
         LOG_ERROR("Failed to create DXGI factory");
         return false;
@@ -38,39 +38,39 @@ bool Device::initialize()
         return false;
     if (!createNVRHIDevice())
         return false;
-    m_commandList = m_nvrhiDevice->createCommandList(m_CmdParams);
+    mCommandList = mNvrhiDevice->createCommandList(mCmdParams);
 
-    m_isInitialized = true;
+    mIsInitialized = true;
     LOG_INFO("Device initialization completed successfully");
     return true;
 }
 
 void Device::shutdown()
 {
-    if (!m_isInitialized)
+    if (!mIsInitialized)
         return;
 
     LOG_INFO("Shutting down devices...");
 
-    if (m_nvrhiDevice)
+    if (mNvrhiDevice)
     {
-        m_nvrhiDevice->waitForIdle();
-        m_nvrhiDevice = nullptr;
+        mNvrhiDevice->waitForIdle();
+        mNvrhiDevice = nullptr;
     }
 
-    m_commandQueue.Reset();
-    m_adapter.Reset();
-    m_d3d12Device.Reset();
+    mpCommandQueue.Reset();
+    mpAdapter.Reset();
+    mpD3d12Device.Reset();
 
 #ifdef _DEBUG
-    if (m_pdx12Debug)
+    if (mpDx12Debug)
     {
-        m_pdx12Debug->Release();
-        m_pdx12Debug = nullptr;
+        mpDx12Debug->Release();
+        mpDx12Debug = nullptr;
     }
 #endif
 
-    m_isInitialized = false;
+    mIsInitialized = false;
     LOG_INFO("Device shutdown completed");
 }
 
@@ -79,18 +79,16 @@ bool Device::createD3D12Device()
     // Try to find a hardware adapter first
     for (UINT adapterIndex = 0;; ++adapterIndex)
     {
-        if (FAILED(m_dxgiFactory->EnumAdapters1(adapterIndex, &m_adapter)))
+        if (FAILED(mpDxgiFactory->EnumAdapters1(adapterIndex, &mpAdapter)))
             break;
 
         DXGI_ADAPTER_DESC1 desc;
-        m_adapter->GetDesc1(&desc);
+        mpAdapter->GetDesc1(&desc);
 
         // Skip software adapters
         if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
-            continue;
-
-        // Try to create device with this adapter
-        if (SUCCEEDED(D3D12CreateDevice(m_adapter.Get(), D3D_FEATURE_LEVEL_12_0, IID_PPV_ARGS(&m_d3d12Device))))
+            continue; // Try to create device with this adapter
+        if (SUCCEEDED(D3D12CreateDevice(mpAdapter.Get(), D3D_FEATURE_LEVEL_12_0, IID_PPV_ARGS(&mpD3d12Device))))
         {
             // Convert wide string to regular string for logging
             std::wstring wstr(desc.Description);
@@ -101,14 +99,14 @@ bool Device::createD3D12Device()
             return true;
         }
 
-        m_adapter.Reset();
+        mpAdapter.Reset();
     }
 
     // If no hardware adapter worked, try WARP (software renderer)
     LOG_WARN("No hardware adapter found, trying WARP (software renderer)...");
-    if (SUCCEEDED(m_dxgiFactory->EnumWarpAdapter(IID_PPV_ARGS(&m_adapter))))
+    if (SUCCEEDED(mpDxgiFactory->EnumWarpAdapter(IID_PPV_ARGS(&mpAdapter))))
     {
-        CHECKHR(D3D12CreateDevice(m_adapter.Get(), D3D_FEATURE_LEVEL_12_0, IID_PPV_ARGS(&m_d3d12Device)));
+        CHECKHR(D3D12CreateDevice(mpAdapter.Get(), D3D_FEATURE_LEVEL_12_0, IID_PPV_ARGS(&mpD3d12Device)));
         LOG_INFO("Using WARP software adapter");
         return true;
     }
@@ -122,19 +120,19 @@ bool Device::createCommandQueue()
     D3D12_COMMAND_QUEUE_DESC queueDesc = {};
     queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
     queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
-    CHECKHR(m_d3d12Device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_commandQueue)));
+    CHECKHR(mpD3d12Device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&mpCommandQueue)));
     return true;
 }
 
 bool Device::createNVRHIDevice()
 {
     nvrhi::d3d12::DeviceDesc deviceDesc;
-    deviceDesc.pDevice = m_d3d12Device.Get();
-    deviceDesc.errorCB = m_messageCallback.get();
-    deviceDesc.pGraphicsCommandQueue = m_commandQueue.Get();
+    deviceDesc.pDevice = mpD3d12Device.Get();
+    deviceDesc.errorCB = mpMessageCallback.get();
+    deviceDesc.pGraphicsCommandQueue = mpCommandQueue.Get();
 
-    m_nvrhiDevice = nvrhi::d3d12::createDevice(deviceDesc);
-    if (!m_nvrhiDevice)
+    mNvrhiDevice = nvrhi::d3d12::createDevice(deviceDesc);
+    if (!mNvrhiDevice)
     {
         LOG_ERROR("Failed to create NVRHI device");
         return false;

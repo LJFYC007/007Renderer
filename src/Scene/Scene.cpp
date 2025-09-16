@@ -3,8 +3,8 @@
 
 void Scene::buildAccelStructs()
 {
-    auto nvrhiDevice = m_device->getDevice();
-    auto commandList = m_device->getCommandList();
+    auto nvrhiDevice = mpDevice->getDevice();
+    auto commandList = mpDevice->getCommandList();
     size_t vertexBufferSize = vertices.size() * sizeof(Vertex);
     size_t indexBufferSize = indices.size() * sizeof(uint32_t);
 
@@ -18,8 +18,8 @@ void Scene::buildAccelStructs()
                                              .setCanHaveRawViews(true)
                                              .setIsAccelStructBuildInput(true)
                                              .setStructStride(sizeof(Vertex));
-    m_vertexBuffer = nvrhiDevice->createBuffer(vertexBufferDesc);
-    if (!m_vertexBuffer)
+    mVertexBuffer = nvrhiDevice->createBuffer(vertexBufferDesc);
+    if (!mVertexBuffer)
         LOG_ERROR_RETURN("Failed to create vertex buffer for scene");
 
     // Create index buffer for acceleration structure build input
@@ -32,8 +32,8 @@ void Scene::buildAccelStructs()
                                             .setCanHaveRawViews(true)
                                             .setIsAccelStructBuildInput(true)
                                             .setStructStride(sizeof(uint32_t));
-    m_indexBuffer = nvrhiDevice->createBuffer(indexBufferDesc);
-    if (!m_indexBuffer)
+    mIndexBuffer = nvrhiDevice->createBuffer(indexBufferDesc);
+    if (!mIndexBuffer)
         LOG_ERROR_RETURN("Failed to create index buffer for scene");
 
     // Create mesh buffer for shader access
@@ -45,8 +45,8 @@ void Scene::buildAccelStructs()
                                            .setDebugName("Scene Mesh Buffer")
                                            .setCanHaveRawViews(true)
                                            .setStructStride(sizeof(Mesh));
-    m_meshBuffer = nvrhiDevice->createBuffer(meshBufferDesc);
-    if (!m_meshBuffer)
+    mMeshBuffer = nvrhiDevice->createBuffer(meshBufferDesc);
+    if (!mMeshBuffer)
         LOG_ERROR_RETURN("Failed to create mesh buffer for scene");
 
     // Create triangleToMesh buffer for shader access
@@ -58,8 +58,8 @@ void Scene::buildAccelStructs()
                                                      .setDebugName("Scene TriangleToMesh Buffer")
                                                      .setCanHaveRawViews(true)
                                                      .setStructStride(sizeof(uint32_t));
-    m_triangleToMeshBuffer = nvrhiDevice->createBuffer(triangleToMeshBufferDesc);
-    if (!m_triangleToMeshBuffer)
+    mTriangleToMeshBuffer = nvrhiDevice->createBuffer(triangleToMeshBufferDesc);
+    if (!mTriangleToMeshBuffer)
         LOG_ERROR_RETURN("Failed to create triangleToMesh buffer for scene");
 
     // Create material buffer for shader access
@@ -71,51 +71,45 @@ void Scene::buildAccelStructs()
                                                .setDebugName("Scene Material Buffer")
                                                .setCanHaveRawViews(true)
                                                .setStructStride(sizeof(Material));
-    m_materialBuffer = nvrhiDevice->createBuffer(materialBufferDesc);
-    if (!m_materialBuffer)
-        LOG_ERROR_RETURN("Failed to create material buffer for scene");
-
-    // BLAS descriptor
+    mMaterialBuffer = nvrhiDevice->createBuffer(materialBufferDesc);
+    if (!mMaterialBuffer)
+        LOG_ERROR_RETURN("Failed to create material buffer for scene"); // BLAS descriptor
     auto blasDesc = nvrhi::rt::AccelStructDesc().setDebugName("BLAS").setIsTopLevel(false);
-    m_blas = nvrhiDevice->createAccelStruct(blasDesc);
-    if (!m_blas)
+    mBlas = nvrhiDevice->createAccelStruct(blasDesc);
+    if (!mBlas)
         LOG_ERROR_RETURN("Failed to create BLAS");
 
     auto tlasDesc = nvrhi::rt::AccelStructDesc().setDebugName("TLAS").setIsTopLevel(true).setTopLevelMaxInstances(1);
-    m_tlas = nvrhiDevice->createAccelStruct(tlasDesc);
-    if (!m_tlas)
+    mTlas = nvrhiDevice->createAccelStruct(tlasDesc);
+    if (!mTlas)
         LOG_ERROR_RETURN("Failed to create TLAS");
 
     // Build the acceleration structures
-    commandList->open();
-
-    // Upload the vertex and index data
-    commandList->writeBuffer(m_vertexBuffer, vertices.data(), vertices.size() * sizeof(Vertex));
-    commandList->writeBuffer(m_indexBuffer, indices.data(), indices.size() * sizeof(uint32_t));
-    commandList->writeBuffer(m_meshBuffer, meshes.data(), meshes.size() * sizeof(Mesh));
-    commandList->writeBuffer(m_triangleToMeshBuffer, triangleToMesh.data(), triangleToMesh.size() * sizeof(uint32_t));
-    commandList->writeBuffer(m_materialBuffer, materials.data(), materials.size() * sizeof(Material));
-
-    // Build the BLAS
+    commandList->open(); // Upload the vertex and index data
+    commandList->writeBuffer(mVertexBuffer, vertices.data(), vertices.size() * sizeof(Vertex));
+    commandList->writeBuffer(mIndexBuffer, indices.data(), indices.size() * sizeof(uint32_t));
+    commandList->writeBuffer(mMeshBuffer, meshes.data(), meshes.size() * sizeof(Mesh));
+    commandList->writeBuffer(mTriangleToMeshBuffer, triangleToMesh.data(), triangleToMesh.size() * sizeof(uint32_t));
+    commandList->writeBuffer(mMaterialBuffer, materials.data(), materials.size() * sizeof(Material)); // Build the BLAS
     auto triangles = nvrhi::rt::GeometryTriangles()
-                         .setVertexBuffer(m_vertexBuffer)
+                         .setVertexBuffer(mVertexBuffer)
                          .setVertexFormat(nvrhi::Format::RGB32_FLOAT)
                          .setVertexCount(static_cast<uint32_t>(vertices.size()))
                          .setVertexStride(sizeof(Vertex))
-                         .setIndexBuffer(m_indexBuffer)
+                         .setIndexBuffer(mIndexBuffer)
                          .setIndexFormat(nvrhi::Format::R32_UINT)
                          .setIndexCount(static_cast<uint32_t>(indices.size()));
 
     auto geometryDesc = nvrhi::rt::GeometryDesc().setTriangles(triangles).setFlags(nvrhi::rt::GeometryFlags::Opaque);
-    commandList->buildBottomLevelAccelStruct(m_blas, &geometryDesc, 1);
+    commandList->buildBottomLevelAccelStruct(mBlas, &geometryDesc, 1);
 
     auto instanceDesc = nvrhi::rt::InstanceDesc()
-                            .setBLAS(m_blas)
+                            .setBLAS(mBlas)
                             .setFlags(nvrhi::rt::InstanceFlags::TriangleCullDisable)
                             .setTransform(nvrhi::rt::c_IdentityTransform)
                             .setInstanceMask(0xFF);
 
-    commandList->buildTopLevelAccelStruct(m_tlas, &instanceDesc, 1);
+    commandList->buildTopLevelAccelStruct(mTlas, &instanceDesc, 1);
 
     commandList->close();
     nvrhiDevice->executeCommandList(commandList);

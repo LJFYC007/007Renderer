@@ -32,36 +32,33 @@ public:
 
     // Initialize D3D12 and NVRHI devices
     bool initialize();
-    void shutdown();
-
-    // Getters
-    ComPtr<ID3D12Device> getD3D12Device() const { return m_d3d12Device; }
-    ComPtr<ID3D12CommandQueue> getCommandQueue() const { return m_commandQueue; }
-    nvrhi::CommandListHandle getCommandList() const { return m_commandList; }
-    nvrhi::DeviceHandle getDevice() const { return m_nvrhiDevice; }
+    void shutdown(); // Getters
+    ComPtr<ID3D12Device> getD3D12Device() const { return mpD3d12Device; }
+    ComPtr<ID3D12CommandQueue> getCommandQueue() const { return mpCommandQueue; }
+    nvrhi::CommandListHandle getCommandList() const { return mCommandList; }
+    nvrhi::DeviceHandle getDevice() const { return mNvrhiDevice; }
 
     // Check if device is valid
-    bool isValid() const { return m_d3d12Device && m_nvrhiDevice; }
+    bool isValid() const { return mpD3d12Device && mNvrhiDevice; }
 
 private:
     // Helper methods
     bool createD3D12Device();
     bool createNVRHIDevice();
     bool createCommandQueue();
+    ComPtr<ID3D12Device> mpD3d12Device;
+    ComPtr<ID3D12CommandQueue> mpCommandQueue;
+    nvrhi::CommandListHandle mCommandList;
+    ComPtr<IDXGIFactory4> mpDxgiFactory;
+    ComPtr<IDXGIAdapter1> mpAdapter;
+    nvrhi::DeviceHandle mNvrhiDevice;
+    nvrhi::CommandListParameters mCmdParams;
 
-    ComPtr<ID3D12Device> m_d3d12Device;
-    ComPtr<ID3D12CommandQueue> m_commandQueue;
-    nvrhi::CommandListHandle m_commandList;
-    ComPtr<IDXGIFactory4> m_dxgiFactory;
-    ComPtr<IDXGIAdapter1> m_adapter;
-    nvrhi::DeviceHandle m_nvrhiDevice;
-    nvrhi::CommandListParameters m_CmdParams;
-
-    ref<MessageCallback> m_messageCallback;
-    bool m_isInitialized = false;
+    ref<MessageCallback> mpMessageCallback;
+    bool mIsInitialized = false;
 
 #ifdef _DEBUG
-    ID3D12Debug* m_pdx12Debug = nullptr;
-    ID3D12InfoQueue* m_infoQueue = nullptr;
+    ID3D12Debug* mpDx12Debug = nullptr;
+    ID3D12InfoQueue* mpInfoQueue = nullptr;
 #endif
 };

@@ -13,19 +13,17 @@ public:
     {
         Logger::init();
         Logger::get()->set_level(spdlog::level::off); // Disable logging for tests
-        device = make_ref<Device>();
-        if (!device->initialize())
+        sDevice = make_ref<Device>();
+        if (!sDevice->initialize())
             FAIL() << "Failed to initialize device for Buffer tests";
     }
-
     void TearDown() override
     {
-        device.reset();
+        sDevice.reset();
         spdlog::shutdown();
     }
-
-    static ref<Device> getDevice() { return device; }
+    static ref<Device> getDevice() { return sDevice; }
 
 private:
-    static ref<Device> device;
+    static ref<Device> sDevice;
 };

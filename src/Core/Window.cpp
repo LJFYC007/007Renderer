@@ -39,46 +39,52 @@ Window::Window(ComPtr<ID3D12Device> device, ComPtr<ID3D12CommandQueue> commandQu
 {
     // Make process DPI aware and obtain main monitor scale
     ImGui_ImplWin32_EnableDpiAwareness();
-    main_scale = ImGui_ImplWin32_GetDpiScaleForMonitor(::MonitorFromPoint(POINT{0, 0}, MONITOR_DEFAULTTOPRIMARY));
+    mMainScale = ImGui_ImplWin32_GetDpiScaleForMonitor(::MonitorFromPoint(POINT{0, 0}, MONITOR_DEFAULTTOPRIMARY));
     std::wstring wTitle(windowDesc.title.begin(), windowDesc.title.end());
 
     // Create application window
-    wc = {sizeof(wc), CS_CLASSDC, WndProc, 0L, 0L, GetModuleHandle(nullptr), nullptr, nullptr, nullptr, nullptr, L"ImGui Example", nullptr};
-    ::RegisterClassExW(&wc);
-    hwnd = ::CreateWindowW(
-        wc.lpszClassName, wTitle.c_str(), WS_OVERLAPPEDWINDOW, 100, 100, windowDesc.width, windowDesc.height, nullptr, nullptr, wc.hInstance, nullptr
+    mWc = {sizeof(mWc), CS_CLASSDC, WndProc, 0L, 0L, GetModuleHandle(nullptr), nullptr, nullptr, nullptr, nullptr, L"ImGui Example", nullptr};
+    ::RegisterClassExW(&mWc);
+    mHwnd = ::CreateWindowW(
+        mWc.lpszClassName,
+        wTitle.c_str(),
+        WS_OVERLAPPEDWINDOW,
+        100,
+        100,
+        windowDesc.width,
+        windowDesc.height,
+        nullptr,
+        nullptr,
+        mWc.hInstance,
+        nullptr
     );
 
     g_pd3dDevice = device;
     g_pd3dCommandQueue = commandQueue;
-    m_enableVSync = windowDesc.enableVSync;
-
-    // Initialize Direct3D
-    if (!CreateDeviceD3D(hwnd))
+    mEnableVSync = windowDesc.enableVSync; // Initialize Direct3D
+    if (!CreateDeviceD3D(mHwnd))
     {
         CleanupDeviceD3D();
-        ::UnregisterClassW(wc.lpszClassName, wc.hInstance);
+        ::UnregisterClassW(mWc.lpszClassName, mWc.hInstance);
         return;
-    }
-
-    // Show the window
-    ::ShowWindow(hwnd, SW_SHOWDEFAULT);
-    ::UpdateWindow(hwnd);
+    } // Show the window
+    ::ShowWindow(mHwnd, SW_SHOWDEFAULT);
+    ::UpdateWindow(mHwnd);
 
     // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
-    io = &ImGui::GetIO();
-    (void)io;
-    io->ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
-    io->ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
-    io->ConfigFlags |= ImGuiConfigFlags_DockingEnable;     // Enable Docking
-    // io->ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;       // Enable Multi-Viewport / Platform Windows
-    // io->ConfigViewportsNoAutoMerge = true;
-    // io->ConfigViewportsNoTaskBarIcon = true;
+    mpIo = &ImGui::GetIO();
+    (void)mpIo;
+    mpIo->ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
+    mpIo->ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
+    mpIo->ConfigFlags |= ImGuiConfigFlags_DockingEnable;     // Enable Docking
+    // mpIo->ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;       // Enable Multi-Viewport / Platform Windows
+    // mpIo->ConfigViewportsNoAutoMerge = true;
+    // mpIo->ConfigViewportsNoTaskBarIcon = true;
 
     std::string cousineFontPath = std::string(PROJECT_EXTERNAL_DIR) + "/imgui/misc/fonts/Cousine-Regular.ttf";
-    ImFont* cousineFont = io->Fonts->AddFontFromFileTTF(cousineFontPath.c_str(), 14.0f);
+    ImFont* cousineFont = mpIo->Fonts->AddFontFromFileTTF(cousineFontPath.c_str(), 14.0f);
 }
 
 void Window::PrepareResources()
@@ -88,23 +94,21 @@ void Window::PrepareResources()
 
     // Setup scaling
     ImGuiStyle& style = ImGui::GetStyle();
-    style.ScaleAllSizes(main_scale);    // Bake a fixed style scale. (until we have a solution for dynamic style scaling, changing this
-                                        // requires resetting Style + calling this again)
-    style.FontScaleDpi = main_scale;    // Set initial font scale. (using io->ConfigDpiScaleFonts=true makes this unnecessary. We leave both
-                                        // here for documentation purpose)
-    io->ConfigDpiScaleFonts = true;     // [Experimental] Automatically overwrite style.FontScaleDpi in Begin() when Monitor DPI changes. This
-                                        // will scale fonts but _NOT_ scale sizes/padding for now.
-    io->ConfigDpiScaleViewports = true; // [Experimental] Scale Dear ImGui and Platform Windows when Monitor DPI changes.
+    style.ScaleAllSizes(mMainScale);      // Bake a fixed style scale. (until we have a solution for dynamic style scaling, changing this
+                                          // requires resetting Style + calling this again)
+    style.FontScaleDpi = mMainScale;      // Set initial font scale. (using mpIo->ConfigDpiScaleFonts=true makes this unnecessary. We leave both
+                                          // here for documentation purpose)
+    mpIo->ConfigDpiScaleFonts = true;     // [Experimental] Automatically overwrite style.FontScaleDpi in Begin() when Monitor DPI changes. This
+                                          // will scale fonts but _NOT_ scale sizes/padding for now.
+    mpIo->ConfigDpiScaleViewports = true; // [Experimental] Scale Dear ImGui and Platform Windows when Monitor DPI changes.
 
     // When viewports are enabled we tweak WindowRounding/WindowBg so platform windows can look identical to regular ones.
-    if (io->ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+    if (mpIo->ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
     {
         style.WindowRounding = 0.0f;
         style.Colors[ImGuiCol_WindowBg].w = 1.0f;
-    }
-
-    // Setup Platform/Renderer backends
-    ImGui_ImplWin32_Init(hwnd);
+    } // Setup Platform/Renderer backends
+    ImGui_ImplWin32_Init(mHwnd);
 
     ImGui_ImplDX12_InitInfo init_info = {};
     init_info.Device = g_pd3dDevice.Get();
@@ -124,10 +128,10 @@ void Window::PrepareResources()
 
     // Prepare resources for display
     int descriptorSize = g_pd3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-    m_DisplaySrvCpuHandle = g_pd3dSrvDescHeap->GetCPUDescriptorHandleForHeapStart();
+    mDisplaySrvCpuHandle = g_pd3dSrvDescHeap->GetCPUDescriptorHandleForHeapStart();
 
-    g_pd3dSrvDescHeapAlloc.Alloc(&m_DisplaySrvCpuHandle, &m_DisplaySrvGpuHandle);
-    m_DisplayImGuiHandle = (ImTextureID)(intptr_t)m_DisplaySrvGpuHandle.ptr;
+    g_pd3dSrvDescHeapAlloc.Alloc(&mDisplaySrvCpuHandle, &mDisplaySrvGpuHandle);
+    mDisplayImGuiHandle = (ImTextureID)(intptr_t)mDisplaySrvGpuHandle.ptr;
 }
 
 bool Window::RenderBegin()
@@ -143,10 +147,8 @@ bool Window::RenderBegin()
             done = true;
     }
     if (done)
-        return false;
-
-    // Handle window screen locked
-    if ((g_SwapChainOccluded && g_pSwapChain->Present(0, DXGI_PRESENT_TEST) == DXGI_STATUS_OCCLUDED) || ::IsIconic(hwnd))
+        return false; // Handle window screen locked
+    if ((g_SwapChainOccluded && g_pSwapChain->Present(0, DXGI_PRESENT_TEST) == DXGI_STATUS_OCCLUDED) || ::IsIconic(mHwnd))
     {
         ::Sleep(10);
         return true;
@@ -188,21 +190,20 @@ void Window::RenderEnd()
     barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
     g_pd3dCommandList->ResourceBarrier(1, &barrier);
     g_pd3dCommandList->Close();
-
     g_pd3dCommandQueue->ExecuteCommandLists(1, (ID3D12CommandList* const*)&g_pd3dCommandList);
 
     // Update and Render additional Platform Windows
-    if (io->ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+    if (mpIo->ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
     {
         ImGui::UpdatePlatformWindows();
         ImGui::RenderPlatformWindowsDefault();
     }
 
     // Present
-    UINT syncInterval = m_enableVSync ? 1 : 0;
+    UINT syncInterval = mEnableVSync ? 1 : 0;
     UINT presentFlags = 0;
     // Use DXGI_PRESENT_ALLOW_TEARING for variable refresh rate displays when V-Sync is off
-    if (!m_enableVSync)
+    if (!mEnableVSync)
         presentFlags = DXGI_PRESENT_ALLOW_TEARING;
     HRESULT hr = g_pSwapChain->Present(syncInterval, presentFlags);
     g_SwapChainOccluded = (hr == DXGI_STATUS_OCCLUDED);
@@ -217,7 +218,7 @@ void Window::SetDisplayTexture(ID3D12Resource* texture)
 {
     if (!texture)
         return;
-    m_CurrentDisplayTexture = texture;
+    mpCurrentDisplayTexture = texture;
 
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
     srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
@@ -227,19 +228,19 @@ void Window::SetDisplayTexture(ID3D12Resource* texture)
     srvDesc.Texture2D.MostDetailedMip = 0;
     srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
 
-    g_pd3dDevice->CreateShaderResourceView(texture, &srvDesc, m_DisplaySrvCpuHandle);
-    m_DisplayImGuiHandle = (ImTextureID)(intptr_t)m_DisplaySrvGpuHandle.ptr;
+    g_pd3dDevice->CreateShaderResourceView(texture, &srvDesc, mDisplaySrvCpuHandle);
+    mDisplayImGuiHandle = (ImTextureID)(intptr_t)mDisplaySrvGpuHandle.ptr;
 }
 
 ImTextureID Window::GetDisplayTextureImGuiHandle() const
 {
-    return m_DisplayImGuiHandle;
+    return mDisplayImGuiHandle;
 }
 
 uint2 Window::GetWindowSize() const
 {
     RECT clientRect;
-    GetClientRect(hwnd, &clientRect);
+    GetClientRect(mHwnd, &clientRect);
     uint width = static_cast<uint32_t>(clientRect.right - clientRect.left);
     uint height = static_cast<uint32_t>(clientRect.bottom - clientRect.top);
     return uint2(width, height);
@@ -253,10 +254,9 @@ void Window::CleanupResources()
     ImGui_ImplDX12_Shutdown();
     ImGui_ImplWin32_Shutdown();
     ImGui::DestroyContext();
-
     CleanupDeviceD3D();
-    ::DestroyWindow(hwnd);
-    ::UnregisterClassW(wc.lpszClassName, wc.hInstance);
+    ::DestroyWindow(mHwnd);
+    ::UnregisterClassW(mWc.lpszClassName, mWc.hInstance);
 }
 
 // Helper functions

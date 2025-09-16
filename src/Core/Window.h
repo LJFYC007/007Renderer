@@ -58,15 +58,15 @@ public:
 
 private:
     // Internal state
-    float main_scale;
-    HWND hwnd;
-    WNDCLASSEXW wc;
-    ImGuiIO* io;
-    bool m_enableVSync;
+    float mMainScale;
+    HWND mHwnd;
+    WNDCLASSEXW mWc;
+    ImGuiIO* mpIo;
+    bool mEnableVSync;
 
     // Display texture and descriptor handles
-    ID3D12Resource* m_CurrentDisplayTexture = nullptr;
-    ImTextureID m_DisplayImGuiHandle = (ImTextureID)0;
-    D3D12_CPU_DESCRIPTOR_HANDLE m_DisplaySrvCpuHandle = {};
-    D3D12_GPU_DESCRIPTOR_HANDLE m_DisplaySrvGpuHandle = {};
+    ID3D12Resource* mpCurrentDisplayTexture = nullptr;
+    ImTextureID mDisplayImGuiHandle = (ImTextureID)0;
+    D3D12_CPU_DESCRIPTOR_HANDLE mDisplaySrvCpuHandle = {};
+    D3D12_GPU_DESCRIPTOR_HANDLE mDisplaySrvGpuHandle = {};
 };

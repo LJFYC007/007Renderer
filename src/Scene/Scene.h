@@ -31,19 +31,19 @@ public:
     ref<Camera> camera;
     std::string name;
 
-    Scene(ref<Device> device) : m_device(device) {}
+    Scene(ref<Device> pDevice) : mpDevice(pDevice) {}
 
     void buildAccelStructs();
 
-    nvrhi::rt::AccelStructHandle getBLAS() const { return m_blas; }
-    nvrhi::rt::AccelStructHandle getTLAS() const { return m_tlas; }
+    nvrhi::rt::AccelStructHandle getBLAS() const { return mBlas; }
+    nvrhi::rt::AccelStructHandle getTLAS() const { return mTlas; }
 
     // Get geometry buffers for shader access
-    nvrhi::BufferHandle getVertexBuffer() const { return m_vertexBuffer; }
-    nvrhi::BufferHandle getIndexBuffer() const { return m_indexBuffer; }
-    nvrhi::BufferHandle getMaterialBuffer() const { return m_materialBuffer; }
-    nvrhi::BufferHandle getMeshBuffer() const { return m_meshBuffer; }
-    nvrhi::BufferHandle getTriangleToMeshBuffer() const { return m_triangleToMeshBuffer; }
+    nvrhi::BufferHandle getVertexBuffer() const { return mVertexBuffer; }
+    nvrhi::BufferHandle getIndexBuffer() const { return mIndexBuffer; }
+    nvrhi::BufferHandle getMaterialBuffer() const { return mMaterialBuffer; }
+    nvrhi::BufferHandle getMeshBuffer() const { return mMeshBuffer; }
+    nvrhi::BufferHandle getTriangleToMeshBuffer() const { return mTriangleToMeshBuffer; }
 
     // Get material by index
     const Material& getMaterial(uint32_t index) const
@@ -55,12 +55,12 @@ public:
     }
 
 private:
-    ref<Device> m_device;
-    nvrhi::BufferHandle m_vertexBuffer;
-    nvrhi::BufferHandle m_indexBuffer;
-    nvrhi::BufferHandle m_materialBuffer;
-    nvrhi::BufferHandle m_meshBuffer;
-    nvrhi::BufferHandle m_triangleToMeshBuffer;
-    nvrhi::rt::AccelStructHandle m_blas;
-    nvrhi::rt::AccelStructHandle m_tlas;
+    ref<Device> mpDevice;
+    nvrhi::BufferHandle mVertexBuffer;
+    nvrhi::BufferHandle mIndexBuffer;
+    nvrhi::BufferHandle mMaterialBuffer;
+    nvrhi::BufferHandle mMeshBuffer;
+    nvrhi::BufferHandle mTriangleToMeshBuffer;
+    nvrhi::rt::AccelStructHandle mBlas;
+    nvrhi::rt::AccelStructHandle mTlas;
 };

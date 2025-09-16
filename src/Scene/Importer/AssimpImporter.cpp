@@ -15,18 +15,18 @@ ref<Scene> AssimpImporter::loadScene(const std::string& fileName)
                                     aiProcess_CalcTangentSpace |         // Calculate tangent and bitangent vectors
                                     aiProcess_JoinIdenticalVertices |    // Remove duplicate vertices
                                     aiProcess_ImproveCacheLocality |     // Optimize vertex cache locality
-                                    aiProcess_RemoveRedundantMaterials | // Remove unused materials
-                                    aiProcess_OptimizeMeshes |           // Reduce mesh count
+                                    aiProcess_RemoveRedundantMaterials | // Remove unused materials aiProcess_OptimizeMeshes |           // Reduce
+                                                                         // mesh count
                                     aiProcess_PreTransformVertices |     // Apply node transformations to vertex data
                                     aiProcess_ValidateDataStructure;     // Validate the imported scene
-    const aiScene* aiScene = importer.ReadFile(fileName, postProcessFlags);
+    const aiScene* aiScene = mImporter.ReadFile(fileName, postProcessFlags);
     if (aiScene == nullptr)
     {
-        LOG_ERROR("Assimp failed to load file: {}", importer.GetErrorString());
+        LOG_ERROR("Assimp failed to load file: {}", mImporter.GetErrorString());
         return nullptr;
     }
 
-    ref<Scene> scene = make_ref<Scene>(m_device);
+    ref<Scene> scene = make_ref<Scene>(mpDevice);
     // Load meshes
     scene->meshes.reserve(aiScene->mNumMeshes);
     for (unsigned int i = 0; i < aiScene->mNumMeshes; ++i)

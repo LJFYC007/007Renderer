@@ -6,7 +6,7 @@
 class Pass
 {
 public:
-    Pass(ref<Device> device) : m_Device(device) {};
+    Pass(ref<Device> pDevice) : mpDevice(pDevice) {};
 
     virtual void execute(uint32_t width, uint32_t height, uint32_t depth) = 0;
 
@@ -14,23 +14,23 @@ public:
     class BindingSlot
     {
     public:
-        BindingSlot(BindingSetManager* mgr, const std::string& name) : m_Manager(mgr), m_Name(name) {}
+        BindingSlot(BindingSetManager* pMgr, const std::string& name) : mpManager(pMgr), mName(name) {}
 
         BindingSlot& operator=(const nvrhi::ResourceHandle& resource)
         {
-            if (m_Manager)
-                m_Manager->setResourceHandle(m_Name, resource);
+            if (mpManager)
+                mpManager->setResourceHandle(mName, resource);
             return *this;
         }
 
     private:
-        BindingSetManager* m_Manager;
-        std::string m_Name;
+        BindingSetManager* mpManager;
+        std::string mName;
     };
 
-    BindingSlot operator[](const std::string& name) { return BindingSlot(m_BindingSetManager.get(), name); }
+    BindingSlot operator[](const std::string& name) { return BindingSlot(mpBindingSetManager.get(), name); }
 
 protected:
-    ref<Device> m_Device;
-    ref<BindingSetManager> m_BindingSetManager; // Manages binding sets and layouts
+    ref<Device> mpDevice;
+    ref<BindingSetManager> mpBindingSetManager; // Manages binding sets and layouts
 };

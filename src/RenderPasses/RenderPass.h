@@ -36,13 +36,13 @@ struct RenderPassOutput
 class RenderPass
 {
 public:
-    RenderPass(ref<Device> device) : m_Device(device) {};
+    RenderPass(ref<Device> pDevice) : mpDevice(pDevice) {};
 
     virtual RenderData execute(const RenderData& input = RenderData()) = 0;
 
     virtual void renderUI() = 0;
 
-    virtual void setScene(ref<Scene> scene) { m_Scene = scene; }
+    virtual void setScene(ref<Scene> pScene) { mpScene = pScene; }
 
     // Get input/output interface declarations
     virtual std::vector<RenderPassInput> getInputs() const { return {}; }
@@ -52,6 +52,6 @@ public:
     virtual std::string getName() const = 0;
 
 protected:
-    ref<Device> m_Device;
-    ref<Scene> m_Scene;
+    ref<Device> mpDevice;
+    ref<Scene> mpScene;
 };

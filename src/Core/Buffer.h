@@ -24,15 +24,14 @@ public:
     void updateData(ref<Device> device, const void* data, size_t size);
 
     std::vector<uint8_t> readback(ref<Device> device) const;
-
-    nvrhi::BufferHandle getHandle() const { return buffer; }
-    size_t getSize() const { return byteSize; }
+    nvrhi::BufferHandle getHandle() const { return mBuffer; }
+    size_t getSize() const { return mByteSize; }
 
 private:
     static Buffer createReadback(ref<Device> device, size_t size);
 
     void upload(ref<Device> device, const void* data, size_t size);
 
-    nvrhi::BufferHandle buffer;
-    size_t byteSize = 0;
+    nvrhi::BufferHandle mBuffer;
+    size_t mByteSize = 0;
 };

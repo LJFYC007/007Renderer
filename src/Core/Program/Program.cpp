@@ -2,7 +2,7 @@
 
 void Program::initializeSession(const std::string& profile)
 {
-    slang::createGlobalSession(m_GlobalSession.writeRef());
+    slang::createGlobalSession(mGlobalSession.writeRef());
 
 #ifdef _DEBUG
     LOG_INFO("[Program] Using DEBUG compilation options with profile: {}", profile);
@@ -21,7 +21,7 @@ void Program::initializeSession(const std::string& profile)
 
     slang::TargetDesc targetDesc = {};
     targetDesc.format = SLANG_DXIL;
-    targetDesc.profile = m_GlobalSession->findProfile(profile.c_str());
+    targetDesc.profile = mGlobalSession->findProfile(profile.c_str());
     targetDesc.compilerOptionEntries = debugOptions;
     targetDesc.compilerOptionEntryCount = optionCount;
 
@@ -33,7 +33,7 @@ void Program::initializeSession(const std::string& profile)
     sessionDesc.searchPaths = searchPaths;
     sessionDesc.searchPathCount = 2;
 
-    auto sessionResult = m_GlobalSession->createSession(sessionDesc, m_Session.writeRef());
+    auto sessionResult = mGlobalSession->createSession(sessionDesc, mSession.writeRef());
     if (SLANG_FAILED(sessionResult))
         LOG_ERROR("[Slang] Failed to create session with result: {}", sessionResult);
 }
@@ -50,82 +50,77 @@ Program::Program(
     initializeSession(profile);
 
     // Load module
-    Slang::ComPtr<slang::IModule> module;
-    Slang::ComPtr<slang::IBlob> diagnostics;
-    module = m_Session->loadModule(filePath.c_str(), diagnostics.writeRef());
-    if (diagnostics && diagnostics->getBufferSize() > 0)
-        LOG_DEBUG("[Program] Compilation diagnostics: {}", (const char*)diagnostics->getBufferPointer());
-    if (!module)
-        LOG_ERROR_RETURN("[Slang] Failed to load module: {}", filePath);
-
-    // Create entry points and collect them
+    Slang::ComPtr<slang::IModule> pModule;
+    Slang::ComPtr<slang::IBlob> pDiagnostics;
+    pModule = mSession->loadModule(filePath.c_str(), pDiagnostics.writeRef());
+    if (pDiagnostics && pDiagnostics->getBufferSize() > 0)
+        LOG_DEBUG("[Program] Compilation diagnostics: {}", (const char*)pDiagnostics->getBufferPointer());
+    if (!pModule)
+        LOG_ERROR_RETURN("[Slang] Failed to load module: {}", filePath); // Create entry points and collect them
     std::vector<Slang::ComPtr<slang::IEntryPoint>> slangEntryPoints;
     slangEntryPoints.reserve(entryPoints.size());
 
     for (const std::pair<std::string, nvrhi::ShaderType>& entryPoint : entryPoints)
     {
-        Slang::ComPtr<slang::IEntryPoint> slangEntryPoint;
-        if (SLANG_FAILED(module->findEntryPointByName(entryPoint.first.c_str(), slangEntryPoint.writeRef())))
+        Slang::ComPtr<slang::IEntryPoint> pSlangEntryPoint;
+        if (SLANG_FAILED(pModule->findEntryPointByName(entryPoint.first.c_str(), pSlangEntryPoint.writeRef())))
             LOG_ERROR_RETURN("[Slang] Failed to find entry point: {}", entryPoint.first);
-        slangEntryPoints.push_back(slangEntryPoint);
+        slangEntryPoints.push_back(pSlangEntryPoint);
     }
 
     // Create composite component type with module and all entry points
     std::vector<slang::IComponentType*> components;
     components.reserve(1 + slangEntryPoints.size());
-    components.push_back(module);
+    components.push_back(pModule);
     for (auto& entryPoint : slangEntryPoints)
         components.push_back(entryPoint);
 
-    Slang::ComPtr<slang::IComponentType> program;
-    if (SLANG_FAILED(m_Session->createCompositeComponentType(components.data(), static_cast<SlangInt>(components.size()), program.writeRef())))
+    Slang::ComPtr<slang::IComponentType> pProgram;
+    if (SLANG_FAILED(mSession->createCompositeComponentType(components.data(), static_cast<SlangInt>(components.size()), pProgram.writeRef())))
         LOG_ERROR_RETURN("[Slang] Failed to create composite component type");
 
     // Link program
-    if (SLANG_FAILED(program->link(m_LinkedProgram.writeRef())))
-        LOG_ERROR_RETURN("[Slang] Failed to link program");
-
-    // Get program layout with diagnostics
-    m_ProgramLayout = m_LinkedProgram->getLayout(0, diagnostics.writeRef());
-    if (!m_ProgramLayout)
+    if (SLANG_FAILED(pProgram->link(mLinkedProgram.writeRef())))
+        LOG_ERROR_RETURN("[Slang] Failed to link program"); // Get program layout with diagnostics
+    mpProgramLayout = mLinkedProgram->getLayout(0, pDiagnostics.writeRef());
+    if (!mpProgramLayout)
     {
-        if (diagnostics && diagnostics->getBufferSize() > 0)
-            LOG_ERROR("[Slang] Program layout diagnostics: {}", (const char*)diagnostics->getBufferPointer());
+        if (pDiagnostics && pDiagnostics->getBufferSize() > 0)
+            LOG_ERROR("[Slang] Program layout diagnostics: {}", (const char*)pDiagnostics->getBufferPointer());
         LOG_ERROR_RETURN("[Slang] Failed to get program layout");
     }
 
     // Create shaders for each entry point
-    m_Shaders.clear();
-    m_Shaders.reserve(entryPoints.size());
-    m_EntryPointToShaderIndex.clear();
-
+    mShaders.clear();
+    mShaders.reserve(entryPoints.size());
+    mEntryPointToShaderIndex.clear();
     uint32_t entryPointIndex = 0;
     for (const auto& entryPoint : entryPoints)
     {
         const auto& entryPointName = entryPoint.first;
         const auto& entryPointType = entryPoint.second;
 
-        Slang::ComPtr<slang::IBlob> kernelBlob;
-        Slang::ComPtr<slang::IBlob> diagnosticBlob;
+        Slang::ComPtr<slang::IBlob> pKernelBlob;
+        Slang::ComPtr<slang::IBlob> pDiagnosticBlob;
 
-        if (SLANG_FAILED(m_LinkedProgram->getEntryPointCode(entryPointIndex, 0, kernelBlob.writeRef(), diagnosticBlob.writeRef())))
+        if (SLANG_FAILED(mLinkedProgram->getEntryPointCode(entryPointIndex, 0, pKernelBlob.writeRef(), pDiagnosticBlob.writeRef())))
         {
-            if (diagnosticBlob && diagnosticBlob->getBufferSize() > 0)
-                LOG_ERROR("[Slang] Entry point diagnostics for {}: {}", entryPointName, (const char*)diagnosticBlob->getBufferPointer());
+            if (pDiagnosticBlob && pDiagnosticBlob->getBufferSize() > 0)
+                LOG_ERROR("[Slang] Entry point diagnostics for {}: {}", entryPointName, (const char*)pDiagnosticBlob->getBufferPointer());
             LOG_ERROR_RETURN("[Slang] Failed to get entry point code for {}", entryPointName);
         }
 
-        LOG_DEBUG("[Program] Compiled entry point {}: {} bytes", entryPointName, kernelBlob->getBufferSize());
+        LOG_DEBUG("[Program] Compiled entry point {}: {} bytes", entryPointName, pKernelBlob->getBufferSize());
 
         nvrhi::ShaderDesc desc;
         desc.entryName = entryPointName.c_str(); // Determine shader type based on entry point name
         desc.shaderType = entryPointType;
-        auto shader = device->createShader(desc, kernelBlob->getBufferPointer(), kernelBlob->getBufferSize());
-        if (!shader)
+        auto pShader = device->createShader(desc, pKernelBlob->getBufferPointer(), pKernelBlob->getBufferSize());
+        if (!pShader)
             LOG_ERROR_RETURN("[Program] Failed to create shader for entry point: {}", entryPointName);
 
-        m_Shaders.push_back(shader);
-        m_EntryPointToShaderIndex[entryPointName] = entryPointIndex;
+        mShaders.push_back(pShader);
+        mEntryPointToShaderIndex[entryPointName] = entryPointIndex;
         entryPointIndex++;
     }
 
@@ -134,43 +129,43 @@ Program::Program(
 
 void Program::printReflectionInfo() const
 {
-    if (!m_ProgramLayout)
+    if (!mpProgramLayout)
         LOG_DEBUG_RETURN("[Program] No program layout available for reflection");
     LOG_DEBUG("[Program] Printing shader reflection information");
 
-    auto globalScopeLayout = m_ProgramLayout->getGlobalParamsVarLayout();
-    if (globalScopeLayout)
+    auto pGlobalScopeLayout = mpProgramLayout->getGlobalParamsVarLayout();
+    if (pGlobalScopeLayout)
     {
         LOG_DEBUG("[Program] Global Scope:");
-        printScope(globalScopeLayout, 1);
+        printScope(pGlobalScopeLayout, 1);
     }
 
-    auto entryPointCount = m_ProgramLayout->getEntryPointCount();
+    auto entryPointCount = mpProgramLayout->getEntryPointCount();
     for (unsigned int i = 0; i < entryPointCount; i++)
     {
-        auto entryPoint = m_ProgramLayout->getEntryPointByIndex(i);
-        LOG_DEBUG("[Program] Entry Point {}: {}", i, entryPoint->getName());
+        auto pEntryPoint = mpProgramLayout->getEntryPointByIndex(i);
+        LOG_DEBUG("[Program] Entry Point {}: {}", i, pEntryPoint->getName());
 
-        auto entryPointLayout = entryPoint->getVarLayout();
-        if (entryPointLayout)
-            printScope(entryPointLayout, 1);
+        auto pEntryPointLayout = pEntryPoint->getVarLayout();
+        if (pEntryPointLayout)
+            printScope(pEntryPointLayout, 1);
     }
 }
 
-void Program::printScope(slang::VariableLayoutReflection* scopeVarLayout, int indent) const
+void Program::printScope(slang::VariableLayoutReflection* pScopeVarLayout, int indent) const
 {
     std::string indentStr(indent * 2, ' ');
-    auto scopeTypeLayout = scopeVarLayout->getTypeLayout();
-    switch (scopeTypeLayout->getKind())
+    auto pScopeTypeLayout = pScopeVarLayout->getTypeLayout();
+    switch (pScopeTypeLayout->getKind())
     {
     case slang::TypeReflection::Kind::Struct:
     {
         LOG_DEBUG("{}parameters:", indentStr);
-        int paramCount = scopeTypeLayout->getFieldCount();
+        int paramCount = pScopeTypeLayout->getFieldCount();
         for (int i = 0; i < paramCount; i++)
         {
-            auto param = scopeTypeLayout->getFieldByIndex(i);
-            printVarLayout(param, indent + 1);
+            auto pParam = pScopeTypeLayout->getFieldByIndex(i);
+            printVarLayout(pParam, indent + 1);
         }
     }
     break;
@@ -178,67 +173,67 @@ void Program::printScope(slang::VariableLayoutReflection* scopeVarLayout, int in
     case slang::TypeReflection::Kind::ConstantBuffer:
     {
         LOG_DEBUG("{}automatically-introduced constant buffer:", indentStr);
-        printOffsets(scopeTypeLayout->getContainerVarLayout(), indent + 1);
-        printScope(scopeTypeLayout->getElementVarLayout(), indent + 1);
+        printOffsets(pScopeTypeLayout->getContainerVarLayout(), indent + 1);
+        printScope(pScopeTypeLayout->getElementVarLayout(), indent + 1);
     }
     break;
 
     case slang::TypeReflection::Kind::ParameterBlock:
     {
         LOG_DEBUG("automatically-introduced parameter block:", indentStr);
-        printOffsets(scopeTypeLayout->getContainerVarLayout(), indent + 1);
-        printScope(scopeTypeLayout->getElementVarLayout(), indent + 1);
+        printOffsets(pScopeTypeLayout->getContainerVarLayout(), indent + 1);
+        printScope(pScopeTypeLayout->getElementVarLayout(), indent + 1);
     }
     break;
 
     default:
-        LOG_WARN("[Program] Unsupported scope type kind for printing: {}", static_cast<int>(scopeTypeLayout->getKind()));
+        LOG_WARN("[Program] Unsupported scope type kind for printing: {}", static_cast<int>(pScopeTypeLayout->getKind()));
         break;
     }
 }
 
-void Program::printVarLayout(slang::VariableLayoutReflection* varLayout, int indent) const
+void Program::printVarLayout(slang::VariableLayoutReflection* pVarLayout, int indent) const
 {
     std::string indentStr(indent * 2, ' ');
-    LOG_DEBUG("{}name: {}", indentStr, varLayout->getName());
-    printRelativeOffsets(varLayout, indent + 1);
+    LOG_DEBUG("{}name: {}", indentStr, pVarLayout->getName());
+    printRelativeOffsets(pVarLayout, indent + 1);
     LOG_DEBUG("{}type layout:", indentStr);
-    printTypeLayout(varLayout->getTypeLayout(), indent + 1);
+    printTypeLayout(pVarLayout->getTypeLayout(), indent + 1);
 }
 
-void Program::printTypeLayout(slang::TypeLayoutReflection* typeLayout, int indent) const
+void Program::printTypeLayout(slang::TypeLayoutReflection* pTypeLayout, int indent) const
 {
     std::string indentStr(indent * 2, ' ');
-    LOG_DEBUG("{}name: {}", indentStr, typeLayout->getName() ? typeLayout->getName() : "None");
-    LOG_DEBUG("{}kind: {}", indentStr, printKind(typeLayout->getKind()));
-    printSizes(typeLayout, indent + 1);
+    LOG_DEBUG("{}name: {}", indentStr, pTypeLayout->getName() ? pTypeLayout->getName() : "None");
+    LOG_DEBUG("{}kind: {}", indentStr, printKind(pTypeLayout->getKind()));
+    printSizes(pTypeLayout, indent + 1);
 
-    switch (typeLayout->getKind())
+    switch (pTypeLayout->getKind())
     {
     case slang::TypeReflection::Kind::Struct:
     {
         LOG_DEBUG("{}fields:", indentStr);
-        int fieldCount = typeLayout->getFieldCount();
+        int fieldCount = pTypeLayout->getFieldCount();
         for (int i = 0; i < fieldCount; i++)
         {
-            auto field = typeLayout->getFieldByIndex(i);
-            printVarLayout(field, indent + 1);
+            auto pField = pTypeLayout->getFieldByIndex(i);
+            printVarLayout(pField, indent + 1);
         }
     }
     break;
 
     case slang::TypeReflection::Kind::Array:
     {
-        LOG_DEBUG("{}element count: {}", indentStr, typeLayout->getElementCount());
+        LOG_DEBUG("{}element count: {}", indentStr, pTypeLayout->getElementCount());
         LOG_DEBUG("{}element type layout: ", indentStr);
-        printTypeLayout(typeLayout->getElementTypeLayout(), indent + 1);
+        printTypeLayout(pTypeLayout->getElementTypeLayout(), indent + 1);
     }
     break;
 
     case slang::TypeReflection::Kind::Vector:
     {
         LOG_DEBUG("{}element type layout: ", indentStr);
-        printTypeLayout(typeLayout->getElementTypeLayout(), indent + 1);
+        printTypeLayout(pTypeLayout->getElementTypeLayout(), indent + 1);
     }
     break;
 
@@ -247,26 +242,26 @@ void Program::printTypeLayout(slang::TypeLayoutReflection* typeLayout, int inden
     case slang::TypeReflection::Kind::TextureBuffer:
     case slang::TypeReflection::Kind::ShaderStorageBuffer:
     {
-        auto containerVarLayout = typeLayout->getContainerVarLayout();
-        auto elementVarLayout = typeLayout->getElementVarLayout();
+        auto pContainerVarLayout = pTypeLayout->getContainerVarLayout();
+        auto pElementVarLayout = pTypeLayout->getElementVarLayout();
 
         LOG_DEBUG("{}container", indentStr);
-        printOffsets(containerVarLayout, indent + 1);
+        printOffsets(pContainerVarLayout, indent + 1);
 
         LOG_DEBUG("{}element: ", indentStr);
-        printOffsets(elementVarLayout, indent + 1);
+        printOffsets(pElementVarLayout, indent + 1);
 
         LOG_DEBUG("{}type layout: ", indentStr);
-        printTypeLayout(elementVarLayout->getTypeLayout(), indent + 1);
+        printTypeLayout(pElementVarLayout->getTypeLayout(), indent + 1);
     }
     break;
 
     case slang::TypeReflection::Kind::Resource:
     {
-        if ((typeLayout->getResourceShape() & SLANG_RESOURCE_BASE_SHAPE_MASK) == SLANG_STRUCTURED_BUFFER)
+        if ((pTypeLayout->getResourceShape() & SLANG_RESOURCE_BASE_SHAPE_MASK) == SLANG_STRUCTURED_BUFFER)
         {
             LOG_DEBUG("{}element type layout: ", indentStr);
-            printTypeLayout(typeLayout->getElementTypeLayout(), indent + 1);
+            printTypeLayout(pTypeLayout->getElementTypeLayout(), indent + 1);
         }
         else
         {
@@ -316,26 +311,26 @@ CumulativeOffset Program::calculateCumulativeOffset(slang::ParameterCategory lay
 }
 */
 
-void Program::printRelativeOffsets(slang::VariableLayoutReflection* varLayout, int indent) const
+void Program::printRelativeOffsets(slang::VariableLayoutReflection* pVarLayout, int indent) const
 {
     std::string indentStr(indent * 2, ' ');
     LOG_DEBUG("{}relative offsets: ", indentStr);
-    int usedLayoutUnitCount = varLayout->getCategoryCount();
+    int usedLayoutUnitCount = pVarLayout->getCategoryCount();
     for (int i = 0; i < usedLayoutUnitCount; i++)
     {
-        auto layoutUnit = varLayout->getCategoryByIndex(i);
-        printOffset(varLayout, layoutUnit, indent + 1);
+        auto layoutUnit = pVarLayout->getCategoryByIndex(i);
+        printOffset(pVarLayout, layoutUnit, indent + 1);
     }
 }
 
-void Program::printOffset(slang::VariableLayoutReflection* varLayout, slang::ParameterCategory layoutUnit, int indent) const
+void Program::printOffset(slang::VariableLayoutReflection* pVarLayout, slang::ParameterCategory layoutUnit, int indent) const
 {
     std::string indentStr(indent * 2, ' ');
-    size_t offset = varLayout->getOffset(layoutUnit);
+    size_t offset = pVarLayout->getOffset(layoutUnit);
     LOG_DEBUG("{}value: {}", indentStr, offset);
     LOG_DEBUG("{}unit: {}", indentStr, printLayoutUnit(layoutUnit));
 
-    size_t spaceOffset = varLayout->getBindingSpace(layoutUnit);
+    size_t spaceOffset = pVarLayout->getBindingSpace(layoutUnit);
     switch (layoutUnit)
     {
     case slang::ParameterCategory::ConstantBuffer:
@@ -349,36 +344,34 @@ void Program::printOffset(slang::VariableLayoutReflection* varLayout, slang::Par
     }
 }
 
-void Program::printOffsets(slang::VariableLayoutReflection* varLayout, int indent) const
+void Program::printOffsets(slang::VariableLayoutReflection* pVarLayout, int indent) const
 {
     std::string indentStr(indent * 2, ' ');
     LOG_DEBUG("{}offsets:", indentStr);
-    printRelativeOffsets(varLayout, indent + 1);
+    printRelativeOffsets(pVarLayout, indent + 1);
 }
 
-void Program::printSize(slang::TypeLayoutReflection* typeLayout, slang::ParameterCategory layoutUnit, int indent) const
+void Program::printSize(slang::TypeLayoutReflection* pTypeLayout, slang::ParameterCategory layoutUnit, int indent) const
 {
     std::string indentStr(indent * 2, ' ');
-    size_t size = typeLayout->getSize(layoutUnit);
+    size_t size = pTypeLayout->getSize(layoutUnit);
     LOG_DEBUG("{}value: {}", indentStr, size);
     LOG_DEBUG("{}unit: {}", indentStr, printLayoutUnit(layoutUnit));
 }
 
-void Program::printSizes(slang::TypeLayoutReflection* typeLayout, int indent) const
+void Program::printSizes(slang::TypeLayoutReflection* pTypeLayout, int indent) const
 {
     std::string indentStr(indent * 2, ' ');
-    int usedLayoutUnitCount = typeLayout->getCategoryCount();
+    int usedLayoutUnitCount = pTypeLayout->getCategoryCount();
     for (int i = 0; i < usedLayoutUnitCount; i++)
     {
-        auto layoutUnit = typeLayout->getCategoryByIndex(i);
-        printSize(typeLayout, layoutUnit, indent + 1);
-    }
-
-    // Alignment and stride
-    if (typeLayout->getSize() != 0)
+        auto layoutUnit = pTypeLayout->getCategoryByIndex(i);
+        printSize(pTypeLayout, layoutUnit, indent + 1);
+    } // Alignment and stride
+    if (pTypeLayout->getSize() != 0)
     {
-        LOG_DEBUG("{}alignment in bytes: {}", indentStr, typeLayout->getAlignment());
-        LOG_DEBUG("{}stride in bytes: {}", indentStr, typeLayout->getStride());
+        LOG_DEBUG("{}alignment in bytes: {}", indentStr, pTypeLayout->getAlignment());
+        LOG_DEBUG("{}stride in bytes: {}", indentStr, pTypeLayout->getStride());
     }
 }
 
@@ -467,78 +460,77 @@ std::string Program::printLayoutUnit(slang::ParameterCategory layoutUnit) const
 
 bool Program::generateBindingLayout()
 {
-    if (!m_ProgramLayout)
+    if (!mpProgramLayout)
     {
         LOG_ERROR("[Program] No program layout available for binding generation");
         return false;
     }
-    m_ReflectionInfo.clear();
+    mReflectionInfo.clear();
 
     // Process global parameters
-    auto globalScopeLayout = m_ProgramLayout->getGlobalParamsVarLayout();
-    if (!processParameterGroup(globalScopeLayout))
+    auto pGlobalScopeLayout = mpProgramLayout->getGlobalParamsVarLayout();
+    if (!processParameterGroup(pGlobalScopeLayout))
         return false;
 
     // Process entry point parameters
-    auto entryPointCount = m_ProgramLayout->getEntryPointCount();
+    auto entryPointCount = mpProgramLayout->getEntryPointCount();
     for (unsigned int i = 0; i < entryPointCount; i++)
     {
-        auto entryPoint = m_ProgramLayout->getEntryPointByIndex(i);
-        auto entryPointLayout = entryPoint->getVarLayout();
-        if (!processParameterGroup(entryPointLayout))
+        auto pEntryPoint = mpProgramLayout->getEntryPointByIndex(i);
+        auto pEntryPointLayout = pEntryPoint->getVarLayout();
+        if (!processParameterGroup(pEntryPointLayout))
             return false;
     }
     return true;
 }
 
-bool Program::processParameterGroup(slang::VariableLayoutReflection* varLayout)
+bool Program::processParameterGroup(slang::VariableLayoutReflection* pVarLayout)
 {
-    if (!varLayout)
+    if (!pVarLayout)
         return true;
-    auto typeLayout = varLayout->getTypeLayout();
-    if (!typeLayout)
+    auto pTypeLayout = pVarLayout->getTypeLayout();
+    if (!pTypeLayout)
         return true;
 
     // Handle struct types (parameter groups)
-    if (typeLayout->getKind() == slang::TypeReflection::Kind::Struct)
+    if (pTypeLayout->getKind() == slang::TypeReflection::Kind::Struct)
     {
-        auto fieldCount = typeLayout->getFieldCount();
+        auto fieldCount = pTypeLayout->getFieldCount();
         for (unsigned int i = 0; i < fieldCount; i++)
         {
-            auto fieldLayout = typeLayout->getFieldByIndex(i);
-            if (!processParameter(fieldLayout))
+            auto pFieldLayout = pTypeLayout->getFieldByIndex(i);
+            if (!processParameter(pFieldLayout))
                 return false;
         }
     }
     else
-        return processParameter(varLayout);
+        return processParameter(pVarLayout);
     return true;
 }
 
-bool Program::processParameter(slang::VariableLayoutReflection* varLayout, int bindingSpaceOffset, std::string prefix)
+bool Program::processParameter(slang::VariableLayoutReflection* pVarLayout, int bindingSpaceOffset, std::string prefix)
 {
-    if (!varLayout)
+    if (!pVarLayout)
         return true;
-    auto typeLayout = varLayout->getTypeLayout();
-    if (!typeLayout)
+    auto pTypeLayout = pVarLayout->getTypeLayout();
+    if (!pTypeLayout)
         return true;
 
-    const char* paramName = varLayout->getName();
-    if (!paramName)
+    const char* pParamName = pVarLayout->getName();
+    if (!pParamName)
         return true;
-    std::string paramNameStr(paramName);
-    auto bindingSlot = varLayout->getBindingIndex();
+    std::string paramNameStr(pParamName);
+    auto bindingSlot = pVarLayout->getBindingIndex();
 
     // Create binding layout item based on resource type
     nvrhi::BindingLayoutItem layoutItem;
     nvrhi::BindingSetItem bindingItem;
-
-    switch (typeLayout->getKind())
+    switch (pTypeLayout->getKind())
     {
     case slang::TypeReflection::Kind::Resource:
     {
-        auto resourceShape = typeLayout->getResourceShape();
-        auto resourceAccess = typeLayout->getResourceAccess();
+        auto resourceShape = pTypeLayout->getResourceShape();
+        auto resourceAccess = pTypeLayout->getResourceAccess();
         switch (resourceShape)
         {
         case SLANG_TEXTURE_1D:
@@ -608,20 +600,20 @@ bool Program::processParameter(slang::VariableLayoutReflection* varLayout, int b
     }
     case slang::TypeReflection::Kind::ParameterBlock:
     {
-        auto bindingSpace = varLayout->getOffset(slang::ParameterCategory::SubElementRegisterSpace) + bindingSpaceOffset;
+        auto bindingSpace = pVarLayout->getOffset(slang::ParameterCategory::SubElementRegisterSpace) + bindingSpaceOffset;
         LOG_DEBUG("[ShaderBinding] Processing parameter block: {} at slot {} in space {}", paramNameStr, bindingSlot, bindingSpace);
 
         // ParameterBlock creates its own binding space - process its contents recursively
-        auto elementTypeLayout = typeLayout->getElementTypeLayout();
-        if (elementTypeLayout)
+        auto pElementTypeLayout = pTypeLayout->getElementTypeLayout();
+        if (pElementTypeLayout)
         {
-            auto fieldCount = elementTypeLayout->getFieldCount();
+            auto fieldCount = pElementTypeLayout->getFieldCount();
             LOG_DEBUG("[ShaderBinding] ParameterBlock {} contains {} fields: ", paramNameStr, fieldCount);
 
             for (unsigned int i = 0; i < fieldCount; i++)
             {
-                auto fieldLayout = elementTypeLayout->getFieldByIndex(i);
-                if (!processParameter(fieldLayout, bindingSpace, paramNameStr + "."))
+                auto pFieldLayout = pElementTypeLayout->getFieldByIndex(i);
+                if (!processParameter(pFieldLayout, bindingSpace, paramNameStr + "."))
                     return false;
             }
         }
@@ -643,16 +635,16 @@ bool Program::processParameter(slang::VariableLayoutReflection* varLayout, int b
     reflectionInfo.bindingLayoutItem = layoutItem;
     reflectionInfo.bindingSetItem = bindingItem;
     reflectionInfo.bindingSpace = bindingSpaceOffset;
-    m_ReflectionInfo.push_back(reflectionInfo);
+    mReflectionInfo.push_back(reflectionInfo);
 
     return true;
 }
 
 nvrhi::ShaderHandle Program::getShader(const std::string& entryPoint) const
 {
-    auto it = m_EntryPointToShaderIndex.find(entryPoint);
-    if (it != m_EntryPointToShaderIndex.end())
-        return m_Shaders[it->second];
+    auto it = mEntryPointToShaderIndex.find(entryPoint);
+    if (it != mEntryPointToShaderIndex.end())
+        return mShaders[it->second];
 
     LOG_WARN("[Program] Entry point '{}' not found", entryPoint);
     return nullptr;

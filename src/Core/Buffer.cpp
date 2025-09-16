@@ -3,8 +3,8 @@
 #include <iostream>
 
 bool Buffer::initialize(
-    ref<Device> device,
-    const void* data,
+    ref<Device> pDevice,
+    const void* pData,
     size_t size,
     nvrhi::ResourceStates initState,
     bool isUAV,
@@ -12,7 +12,7 @@ bool Buffer::initialize(
     const std::string& name
 )
 {
-    byteSize = size;
+    mByteSize = size;
 
     nvrhi::BufferDesc desc;
     desc.byteSize = size;
@@ -23,38 +23,36 @@ bool Buffer::initialize(
     desc.canHaveUAVs = isUAV;
     desc.isConstantBuffer = isConstantBuffer;
     desc.keepInitialState = true;
+    mBuffer = pDevice->getDevice()->createBuffer(desc);
+    if (pData)
+        upload(pDevice, pData, size);
 
-    buffer = device->getDevice()->createBuffer(desc);
-
-    if (data)
-        upload(device, data, size);
-
-    return buffer;
+    return mBuffer;
 }
 
-void Buffer::upload(ref<Device> device, const void* data, size_t size)
+void Buffer::upload(ref<Device> pDevice, const void* pData, size_t size)
 {
-    if (!buffer)
+    if (!mBuffer)
         return;
 
-    auto uploadCmd = device->getCommandList();
-    uploadCmd->open();
-    uploadCmd->writeBuffer(buffer, data, size);
-    uploadCmd->close();
-    device->getDevice()->executeCommandList(uploadCmd);
+    auto pUploadCmd = pDevice->getCommandList();
+    pUploadCmd->open();
+    pUploadCmd->writeBuffer(mBuffer, pData, size);
+    pUploadCmd->close();
+    pDevice->getDevice()->executeCommandList(pUploadCmd);
 }
 
-void Buffer::updateData(ref<Device> device, const void* data, size_t size)
+void Buffer::updateData(ref<Device> pDevice, const void* pData, size_t size)
 {
-    if (!buffer || !data)
+    if (!mBuffer || !pData)
         return;
-    upload(device, data, size);
+    upload(pDevice, pData, size);
 }
 
-Buffer Buffer::createReadback(ref<Device> device, size_t size)
+Buffer Buffer::createReadback(ref<Device> pDevice, size_t size)
 {
     Buffer buf;
-    buf.byteSize = size;
+    buf.mByteSize = size;
 
     nvrhi::BufferDesc desc;
     desc.byteSize = size;
@@ -62,29 +60,28 @@ Buffer Buffer::createReadback(ref<Device> device, size_t size)
     desc.cpuAccess = nvrhi::CpuAccessMode::Read;
     desc.debugName = "ReadbackBuffer";
     desc.keepInitialState = true;
-
-    buf.buffer = device->getDevice()->createBuffer(desc);
+    buf.mBuffer = pDevice->getDevice()->createBuffer(desc);
     return buf;
 }
 
-std::vector<uint8_t> Buffer::readback(ref<Device> device) const
+std::vector<uint8_t> Buffer::readback(ref<Device> pDevice) const
 {
-    nvrhi::DeviceHandle nvrhiDevice = device->getDevice();
-    nvrhi::CommandListHandle commandList = device->getCommandList();
+    nvrhi::DeviceHandle pNvrhiDevice = pDevice->getDevice();
+    nvrhi::CommandListHandle pCommandList = pDevice->getCommandList();
 
-    std::vector<uint8_t> result(byteSize);
-    auto staging = createReadback(device, byteSize);
-    commandList->open();
-    commandList->copyBuffer(staging.buffer, 0, buffer, 0, byteSize);
-    commandList->close();
-    uint64_t fenceValue = nvrhiDevice->executeCommandList(commandList);
-    nvrhiDevice->queueWaitForCommandList(nvrhi::CommandQueue::Graphics, nvrhi::CommandQueue::Graphics, fenceValue);
+    std::vector<uint8_t> result(mByteSize);
+    auto staging = createReadback(pDevice, mByteSize);
+    pCommandList->open();
+    pCommandList->copyBuffer(staging.mBuffer, 0, mBuffer, 0, mByteSize);
+    pCommandList->close();
+    uint64_t fenceValue = pNvrhiDevice->executeCommandList(pCommandList);
+    pNvrhiDevice->queueWaitForCommandList(nvrhi::CommandQueue::Graphics, nvrhi::CommandQueue::Graphics, fenceValue);
 
-    void* mapped = nvrhiDevice->mapBuffer(staging.buffer, nvrhi::CpuAccessMode::Read);
-    if (mapped)
+    void* pMapped = pNvrhiDevice->mapBuffer(staging.mBuffer, nvrhi::CpuAccessMode::Read);
+    if (pMapped)
     {
-        std::memcpy(result.data(), mapped, byteSize);
-        nvrhiDevice->unmapBuffer(staging.buffer);
+        std::memcpy(result.data(), pMapped, mByteSize);
+        pNvrhiDevice->unmapBuffer(staging.mBuffer);
     }
     return result;
 }

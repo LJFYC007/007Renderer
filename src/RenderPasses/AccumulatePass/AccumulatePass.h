@@ -6,16 +6,16 @@
 class AccumulatePass : public RenderPass
 {
 public:
-    AccumulatePass(ref<Device> device);
+    AccumulatePass(ref<Device> pDevice);
 
     RenderData execute(const RenderData& input) override;
 
     void renderUI() override;
 
-    void setScene(ref<Scene> scene) override
+    void setScene(ref<Scene> pScene) override
     {
-        m_Scene = scene;
-        reset = true;
+        mpScene = pScene;
+        mReset = true;
     }
 
     // RenderGraph interface
@@ -26,10 +26,10 @@ public:
 private:
     void prepareResources();
 
-    uint32_t width = 0;
-    uint32_t height = 0;
-    uint32_t frameCount = 0;
-    bool reset = false;
+    uint32_t mWidth = 0;
+    uint32_t mHeight = 0;
+    uint32_t mFrameCount = 0;
+    bool mReset = false;
 
     struct PerFrameCB
     {
@@ -37,10 +37,10 @@ private:
         uint32_t gHeight;
         uint32_t frameCount;
         uint32_t reset;
-    } perFrameData;
+    } mPerFrameData;
 
-    Buffer cbPerFrame;
-    nvrhi::TextureHandle textureOut;
-    nvrhi::TextureHandle accumulateTexture;
-    ref<ComputePass> pass;
+    Buffer mCbPerFrame;
+    nvrhi::TextureHandle mTextureOut;
+    nvrhi::TextureHandle mAccumulateTexture;
+    ref<ComputePass> mpPass;
 };

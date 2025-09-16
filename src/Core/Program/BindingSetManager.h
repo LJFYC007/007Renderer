@@ -24,11 +24,12 @@ private:
         nvrhi::BindingLayoutHandle bindingLayout;
         std::vector<nvrhi::BindingLayoutItem> layoutItems;
         std::vector<nvrhi::BindingSetItem> bindingSetItems;
-        std::unordered_map<size_t, nvrhi::BindingSetHandle> bindingSets;
+        nvrhi::BindingSetHandle bindingSet;
+        size_t currentHash = 0;
     };
 
-    ref<Device> m_device;
-    std::vector<SpaceData> m_spaces;
-    std::unordered_map<std::string, std::pair<uint32_t, uint32_t>> m_resourceMap;
-    uint32_t m_space = 8;
+    ref<Device> mpDevice;
+    std::vector<SpaceData> mSpaces;
+    std::unordered_map<std::string, std::pair<uint32_t, uint32_t>> mResourceMap;
+    uint32_t mSpace = 8;
 };

@@ -6,7 +6,7 @@
 class ErrorMeasure : public RenderPass
 {
 public:
-    ErrorMeasure(ref<Device> device);
+    ErrorMeasure(ref<Device> pDevice);
 
     enum class OutputId
     {
@@ -27,19 +27,19 @@ public:
 private:
     void prepareResources();
 
-    uint32_t width = 0;
-    uint32_t height = 0;
-    OutputId selectedOutput = OutputId::Difference;
+    uint32_t mWidth = 0;
+    uint32_t mHeight = 0;
+    OutputId mSelectedOutput = OutputId::Difference;
 
     struct PerFrameCB
     {
         uint32_t gWidth;
         uint32_t gHeight;
-    } perFrameData;
+    } mPerFrameData;
 
-    Buffer cbPerFrame;
-    nvrhi::TextureHandle pSourceTexture;
-    nvrhi::TextureHandle pReferenceTexture;
-    nvrhi::TextureHandle pDifferenceTexture;
-    ref<ComputePass> pass;
+    Buffer mCbPerFrame;
+    nvrhi::TextureHandle mpSourceTexture;
+    nvrhi::TextureHandle mpReferenceTexture;
+    nvrhi::TextureHandle mpDifferenceTexture;
+    ref<ComputePass> mpPass;
 };

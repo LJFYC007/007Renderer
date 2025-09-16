@@ -13,11 +13,11 @@ TODO: use our logger instead of Assimp's
 class AssimpImporter
 {
 public:
-    AssimpImporter(ref<Device> device) : m_device(device) {}
+    AssimpImporter(ref<Device> pDevice) : mpDevice(pDevice) {}
 
     ref<Scene> loadScene(const std::string& fileName);
 
 private:
-    Assimp::Importer importer;
-    ref<Device> m_device;
+    Assimp::Importer mImporter;
+    ref<Device> mpDevice;
 };

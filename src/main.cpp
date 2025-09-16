@@ -27,12 +27,10 @@ int main()
         return 1;
     }
 
-    uint32_t width = 2424;
-    uint32_t height = 1223;
-    // Create window with configuration
+    // Create imgui window with configuration
     Window::desc windowDesc;
-    windowDesc.width = width;
-    windowDesc.height = height;
+    windowDesc.width = 2424;
+    windowDesc.height = 1223;
     windowDesc.title = "007Renderer";
     windowDesc.enableVSync = false;
 
@@ -51,6 +49,8 @@ int main()
             return 1;
         }
         scene->buildAccelStructs();
+
+        uint width = 1920, height = 1080;
         scene->camera = make_ref<Camera>(width, height, float3(0.f, 0.f, -5.f), float3(0.f, 0.f, -6.f), glm::radians(45.0f));
 
         // Create render graph

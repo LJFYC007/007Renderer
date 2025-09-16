@@ -9,14 +9,14 @@
 #include "Core/Device.h"
 #include "Utils/Logger.h"
 
-void ExrUtils::saveTextureToExr(ref<Device> device, nvrhi::TextureHandle texture, const std::string& filePath)
+void ExrUtils::saveTextureToExr(ref<Device> pDevice, nvrhi::TextureHandle texture, const std::string& filePath)
 {
-    if (!device || !texture)
+    if (!pDevice || !texture)
         LOG_ERROR_RETURN("Invalid device or texture");
 
     const auto& desc = texture->getDesc();
     std::vector<float> imageData;
-    copyTextureDataToCPU(device, texture, imageData);
+    copyTextureDataToCPU(pDevice, texture, imageData);
 
     // Prepare EXR image data
     EXRHeader header;
@@ -90,9 +90,9 @@ void ExrUtils::saveTextureToExr(ref<Device> device, nvrhi::TextureHandle texture
     LOG_INFO("Successfully saved EXR file: {}", filePath);
 }
 
-nvrhi::TextureHandle ExrUtils::loadExrToTexture(ref<Device> device, const std::string& filePath)
+nvrhi::TextureHandle ExrUtils::loadExrToTexture(ref<Device> pDevice, const std::string& filePath)
 {
-    if (!device)
+    if (!pDevice)
     {
         LOG_ERROR("Invalid device");
         return nullptr;
@@ -123,10 +123,8 @@ nvrhi::TextureHandle ExrUtils::loadExrToTexture(ref<Device> device, const std::s
                            .setIsUAV(true)
                            .setInitialState(nvrhi::ResourceStates::UnorderedAccess)
                            .setKeepInitialState(true)
-                           .setDebugName("EXR Loaded Texture");
-
-    // Create NVRHI texture
-    nvrhi::TextureHandle texture = device->getDevice()->createTexture(textureDesc);
+                           .setDebugName("EXR Loaded Texture"); // Create NVRHI texture
+    nvrhi::TextureHandle texture = pDevice->getDevice()->createTexture(textureDesc);
     if (!texture)
     {
         LOG_ERROR("Failed to create NVRHI texture");
@@ -134,22 +132,22 @@ nvrhi::TextureHandle ExrUtils::loadExrToTexture(ref<Device> device, const std::s
         return nullptr;
     }
 
-    copyCPUDataToTexture(device, texture, std::vector<float>(imageData, imageData + width * height * 4));
+    copyCPUDataToTexture(pDevice, texture, std::vector<float>(imageData, imageData + width * height * 4));
     free(imageData);
     LOG_INFO("Successfully loaded EXR file: {}", filePath);
     return texture;
 }
 
-void ExrUtils::copyTextureDataToCPU(ref<Device> device, nvrhi::TextureHandle texture, std::vector<float>& outData)
+void ExrUtils::copyTextureDataToCPU(ref<Device> pDevice, nvrhi::TextureHandle texture, std::vector<float>& outData)
 {
     auto desc = texture->getDesc();
-    nvrhi::StagingTextureHandle stagingTexture = device->getDevice()->createStagingTexture(desc, nvrhi::CpuAccessMode::Read);
+    nvrhi::StagingTextureHandle stagingTexture = pDevice->getDevice()->createStagingTexture(desc, nvrhi::CpuAccessMode::Read);
     if (!stagingTexture)
         LOG_ERROR_RETURN("Failed to create staging texture");
 
     // Copy from GPU texture to staging texture
-    nvrhi::DeviceHandle nvrhiDevice = device->getDevice();
-    nvrhi::CommandListHandle commandList = device->getCommandList();
+    nvrhi::DeviceHandle nvrhiDevice = pDevice->getDevice();
+    nvrhi::CommandListHandle commandList = pDevice->getCommandList();
     nvrhi::TextureSlice slice;
 
     commandList->open();
@@ -163,7 +161,7 @@ void ExrUtils::copyTextureDataToCPU(ref<Device> device, nvrhi::TextureHandle tex
 
     // Map staging texture and copy data
     size_t rowPitch;
-    void* mappedData = device->getDevice()->mapStagingTexture(stagingTexture, slice, nvrhi::CpuAccessMode::Read, &rowPitch);
+    void* mappedData = pDevice->getDevice()->mapStagingTexture(stagingTexture, slice, nvrhi::CpuAccessMode::Read, &rowPitch);
     if (!mappedData)
         LOG_ERROR_RETURN("Failed to map staging texture");
 
@@ -178,20 +176,20 @@ void ExrUtils::copyTextureDataToCPU(ref<Device> device, nvrhi::TextureHandle tex
         memcpy(dstRow, srcRow, desc.width * channelCount * sizeof(float));
     }
 
-    device->getDevice()->unmapStagingTexture(stagingTexture);
+    pDevice->getDevice()->unmapStagingTexture(stagingTexture);
 }
 
-void ExrUtils::copyCPUDataToTexture(ref<Device> device, nvrhi::TextureHandle& texture, const std::vector<float> inData)
+void ExrUtils::copyCPUDataToTexture(ref<Device> pDevice, nvrhi::TextureHandle& texture, const std::vector<float> inData)
 {
     auto desc = texture->getDesc();
-    nvrhi::StagingTextureHandle stagingTexture = device->getDevice()->createStagingTexture(desc, nvrhi::CpuAccessMode::Write);
+    nvrhi::StagingTextureHandle stagingTexture = pDevice->getDevice()->createStagingTexture(desc, nvrhi::CpuAccessMode::Write);
     if (!stagingTexture)
         LOG_ERROR_RETURN("Failed to create staging texture for upload");
 
     // Map staging texture and copy data
     nvrhi::TextureSlice slice;
     size_t rowPitch;
-    void* mappedData = device->getDevice()->mapStagingTexture(stagingTexture, slice, nvrhi::CpuAccessMode::Write, &rowPitch);
+    void* mappedData = pDevice->getDevice()->mapStagingTexture(stagingTexture, slice, nvrhi::CpuAccessMode::Write, &rowPitch);
     if (!mappedData)
         LOG_ERROR_RETURN("Failed to map staging texture for upload");
 
@@ -204,11 +202,11 @@ void ExrUtils::copyCPUDataToTexture(ref<Device> device, nvrhi::TextureHandle& te
         memcpy(dstRow, srcRow, desc.width * channelCount * sizeof(float));
     }
 
-    device->getDevice()->unmapStagingTexture(stagingTexture);
+    pDevice->getDevice()->unmapStagingTexture(stagingTexture);
 
     // Copy from staging texture to GPU texture
-    nvrhi::DeviceHandle nvrhiDevice = device->getDevice();
-    nvrhi::CommandListHandle commandList = device->getCommandList();
+    nvrhi::DeviceHandle nvrhiDevice = pDevice->getDevice();
+    nvrhi::CommandListHandle commandList = pDevice->getCommandList();
 
     commandList->open();
     commandList->setTextureState(texture, nvrhi::AllSubresources, nvrhi::ResourceStates::CopyDest);

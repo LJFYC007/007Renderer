@@ -20,10 +20,9 @@ public:
     );
 
     nvrhi::ShaderHandle getShader(const std::string& entryPoint) const;
-
-    slang::ProgramLayout* getProgramLayout() const { return m_ProgramLayout; }
-    const std::vector<nvrhi::ShaderHandle>& getShaders() const { return m_Shaders; }
-    std::vector<ReflectionInfo> getReflectionInfo() const { return m_ReflectionInfo; }
+    slang::ProgramLayout* getProgramLayout() const { return mpProgramLayout; }
+    const std::vector<nvrhi::ShaderHandle>& getShaders() const { return mShaders; }
+    std::vector<ReflectionInfo> getReflectionInfo() const { return mReflectionInfo; }
 
     // Debugging utility to print reflection information
     void printReflectionInfo() const;
@@ -34,21 +33,21 @@ private:
     // Initialize session for Slang compilation
     void initializeSession(const std::string& profile);
 
-    void printScope(slang::VariableLayoutReflection* scopeVarLayout, int indent) const;
+    void printScope(slang::VariableLayoutReflection* pScopeVarLayout, int indent) const;
 
-    void printVarLayout(slang::VariableLayoutReflection* varLayout, int indent) const;
+    void printVarLayout(slang::VariableLayoutReflection* pVarLayout, int indent) const;
 
-    void printTypeLayout(slang::TypeLayoutReflection* typeLayout, int indent) const;
+    void printTypeLayout(slang::TypeLayoutReflection* pTypeLayout, int indent) const;
 
-    void printRelativeOffsets(slang::VariableLayoutReflection* varLayout, int indent) const;
+    void printRelativeOffsets(slang::VariableLayoutReflection* pVarLayout, int indent) const;
 
-    void printOffset(slang::VariableLayoutReflection* varLayout, slang::ParameterCategory layoutUnit, int indent) const;
+    void printOffset(slang::VariableLayoutReflection* pVarLayout, slang::ParameterCategory layoutUnit, int indent) const;
 
-    void printOffsets(slang::VariableLayoutReflection* varLayout, int indent) const;
+    void printOffsets(slang::VariableLayoutReflection* pVarLayout, int indent) const;
 
-    void printSize(slang::TypeLayoutReflection* typeLayout, slang::ParameterCategory layoutUnit, int indent) const;
+    void printSize(slang::TypeLayoutReflection* pTypeLayout, slang::ParameterCategory layoutUnit, int indent) const;
 
-    void printSizes(slang::TypeLayoutReflection* typeLayout, int indent) const;
+    void printSizes(slang::TypeLayoutReflection* pTypeLayout, int indent) const;
 
     std::string printKind(slang::TypeReflection::Kind kind) const;
 
@@ -57,14 +56,13 @@ private:
     bool processParameterGroup(slang::VariableLayoutReflection* varLayout);
 
     bool processParameter(slang::VariableLayoutReflection* varLayout, int bindingSpaceOffset = 0, std::string prefix = "");
+    Slang::ComPtr<slang::IGlobalSession> mGlobalSession;
+    Slang::ComPtr<slang::ISession> mSession;
+    Slang::ComPtr<slang::ICompileRequest> mCompileRequest;
+    Slang::ComPtr<slang::IComponentType> mLinkedProgram;
+    slang::ProgramLayout* mpProgramLayout;
 
-    Slang::ComPtr<slang::IGlobalSession> m_GlobalSession;
-    Slang::ComPtr<slang::ISession> m_Session;
-    Slang::ComPtr<slang::ICompileRequest> m_CompileRequest;
-    Slang::ComPtr<slang::IComponentType> m_LinkedProgram;
-    slang::ProgramLayout* m_ProgramLayout;
-
-    std::vector<nvrhi::ShaderHandle> m_Shaders;                        // All shaders
-    std::unordered_map<std::string, size_t> m_EntryPointToShaderIndex; // Map entry point names to shader indices
-    std::vector<ReflectionInfo> m_ReflectionInfo;
+    std::vector<nvrhi::ShaderHandle> mShaders;                        // All shaders
+    std::unordered_map<std::string, size_t> mEntryPointToShaderIndex; // Map entry point names to shader indices
+    std::vector<ReflectionInfo> mReflectionInfo;
 };

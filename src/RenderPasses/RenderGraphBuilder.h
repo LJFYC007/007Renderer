@@ -7,19 +7,19 @@
 class RenderGraphBuilder
 {
 public:
-    static ref<RenderGraph> createDefaultGraph(ref<Device> device)
+    static ref<RenderGraph> createDefaultGraph(ref<Device> pDevice)
     {
-        auto graph = make_ref<RenderGraph>(device);
+        auto pGraph = make_ref<RenderGraph>(pDevice);
 
         // Add passes
-        graph->addPass("PathTracing", make_ref<PathTracingPass>(device));
-        graph->addPass("Accumulate", make_ref<AccumulatePass>(device));
-        graph->addPass("ErrorMeasure", make_ref<ErrorMeasure>(device));
+        pGraph->addPass("PathTracing", make_ref<PathTracingPass>(pDevice));
+        pGraph->addPass("Accumulate", make_ref<AccumulatePass>(pDevice));
+        pGraph->addPass("ErrorMeasure", make_ref<ErrorMeasure>(pDevice));
 
         // Add connections following current logic:
-        graph->addConnection("PathTracing", "output", "Accumulate", "output");
-        graph->addConnection("Accumulate", "output", "ErrorMeasure", "output");
+        pGraph->addConnection("PathTracing", "output", "Accumulate", "output");
+        pGraph->addConnection("Accumulate", "output", "ErrorMeasure", "output");
 
-        return graph;
+        return pGraph;
     }
 };
