@@ -1,6 +1,7 @@
 #include <iostream>
 
 #include "Window.h"
+#include "Utils/imgui_spectrum.h"
 
 namespace
 {
@@ -83,8 +84,7 @@ Window::Window(ComPtr<ID3D12Device> device, ComPtr<ID3D12CommandQueue> commandQu
 void Window::PrepareResources()
 {
     // Setup Dear ImGui style
-    ImGui::StyleColorsDark();
-    // ImGui::StyleColorsLight();
+    ImGui::Spectrum::StyleColorsSpectrum();
 
     // Setup scaling
     ImGuiStyle& style = ImGui::GetStyle();
@@ -157,10 +157,6 @@ bool Window::RenderBegin()
     ImGui_ImplDX12_NewFrame();
     ImGui_ImplWin32_NewFrame();
     ImGui::NewFrame();
-
-    // Add background image
-    ImDrawList* bg = ImGui::GetBackgroundDrawList();
-    bg->AddImage(m_DisplayImGuiHandle, ImVec2(0, 0), ImGui::GetIO().DisplaySize);
     return true;
 }
 
@@ -233,6 +229,11 @@ void Window::SetDisplayTexture(ID3D12Resource* texture)
 
     g_pd3dDevice->CreateShaderResourceView(texture, &srvDesc, m_DisplaySrvCpuHandle);
     m_DisplayImGuiHandle = (ImTextureID)(intptr_t)m_DisplaySrvGpuHandle.ptr;
+}
+
+ImTextureID Window::GetDisplayTextureImGuiHandle() const
+{
+    return m_DisplayImGuiHandle;
 }
 
 uint2 Window::GetWindowSize() const

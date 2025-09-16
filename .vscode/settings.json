@@ -2,6 +2,7 @@
     "files.associations": {
         "*.slang": "slang",
         "*.cs.slang": "slang",
+        "*.rt.slang": "slang",
         "algorithm": "cpp",
         "array": "cpp",
         "atomic": "cpp",
@@ -104,7 +105,8 @@
         "ranges": "cpp",
         "scoped_allocator": "cpp",
         "strstream": "cpp",
-        "valarray": "cpp"
+        "valarray": "cpp",
+        "*.rh": "cpp"
     },
     "cmake.generator": "Ninja",
     "cmake.buildDirectory": "${workspaceFolder}/build/${buildType}",

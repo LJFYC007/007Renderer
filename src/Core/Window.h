@@ -48,6 +48,7 @@ public:
     bool RenderBegin();
     void RenderEnd();
     void SetDisplayTexture(ID3D12Resource* texture);
+    ImTextureID GetDisplayTextureImGuiHandle() const;
     uint2 GetWindowSize() const;
 
     // Forward declarations of helper functions

@@ -27,8 +27,8 @@ int main()
         return 1;
     }
 
-    uint32_t width = 1920;
-    uint32_t height = 1080;
+    uint32_t width = 2424;
+    uint32_t height = 1223;
     // Create window with configuration
     Window::desc windowDesc;
     windowDesc.width = width;
@@ -80,19 +80,7 @@ int main()
                 notDone = false;
                 break;
             }
-
             device->getDevice()->runGarbageCollection();
-
-            uint2 windowSize = window.GetWindowSize();
-            if (windowSize.x != width || windowSize.y != height)
-            {
-                width = windowSize.x;
-                height = windowSize.y;
-                scene->camera->setWidth(width);
-                scene->camera->setHeight(height);
-                renderGraph->setScene(scene);
-                LOG_DEBUG("Resized texture to {}x{}", width, height);
-            }
 
             if (scene->camera->dirty)
                 renderGraph->setScene(scene);
@@ -115,13 +103,23 @@ int main()
             }
 
             ImGuiIO& io = GUI::GetIO();
-            GUI::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Once);
-            GUI::SetNextWindowSize(ImVec2(io.DisplaySize.x * 0.3f, io.DisplaySize.y * 0.5f), ImGuiCond_Once);
+            // Create a full-screen window that contains the splitter
+            GUI::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
+            GUI::SetNextWindowSize(io.DisplaySize, ImGuiCond_Always);
+            GUI::Begin(
+                "MainWindow",
+                nullptr,
+                ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar |
+                    ImGuiWindowFlags_NoBringToFrontOnFocus
+            );
 
-            GUI::Begin("Settings");
+            // Left panel - Settings
+            static float splitterWidth = 450.0f;
+            GUI::BeginChild("Settings", ImVec2(splitterWidth, -1), true, ImGuiWindowFlags_NoScrollbar);
+
             if (GUI::Button("Save image"))
                 ExrUtils::saveTextureToExr(device, imageTexture, std::string(PROJECT_DIR) + "/output.exr");
-            GUI::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / GUI::GetIO().Framerate, GUI::GetIO().Framerate);
+            GUI::Text("%.3f ms/frame (%.1f FPS)", 1000.0f / GUI::GetIO().Framerate, GUI::GetIO().Framerate);
 
             if (GUI::CollapsingHeader("Camera Controls"))
             {
@@ -129,6 +127,70 @@ int main()
                 scene->camera->handleInput();
             }
             renderGraph->renderUI();
+            GUI::EndChild();
+
+            // Splitter
+            GUI::SameLine();
+            GUI::Button("##splitter", ImVec2(8.0f, -1));
+            if (GUI::IsItemActive())
+            {
+                float delta = GUI::GetIO().MouseDelta.x;
+                splitterWidth += delta;
+            }
+            GUI::SetItemTooltip("Drag to resize panels");
+            // Calculate the right panel size based on current layout
+            const float rightPanelWidth = io.DisplaySize.x - splitterWidth - 8.0f - GUI::GetStyle().WindowPadding.x * 2;
+            const float titleHeight = GUI::GetTextLineHeightWithSpacing() + GUI::GetStyle().ItemSpacing.y;
+            const float separatorHeight = GUI::GetStyle().ItemSpacing.y;
+            const float availableHeight = io.DisplaySize.y - GUI::GetStyle().WindowPadding.y * 4 - titleHeight - separatorHeight;
+
+            uint32_t targetWidth = (uint32_t)rightPanelWidth;
+            uint32_t targetHeight = (uint32_t)availableHeight;
+
+            // Track previous dimensions to detect any changes (splitter or window resize)
+            static uint32_t prevTargetWidth = 0;
+            static uint32_t prevTargetHeight = 0;
+            static bool isFirstFrame = true;
+
+            // Force dimensions update on first frame or when dimensions actually change
+            bool dimensionsChanged = isFirstFrame || (targetWidth != prevTargetWidth) || (targetHeight != prevTargetHeight);
+            // Update resolution when panel dimensions change (either from splitter or window resize)
+            if (dimensionsChanged)
+            {
+                width = targetWidth;
+                height = targetHeight;
+                scene->camera->setWidth(width);
+                scene->camera->setHeight(height);
+                renderGraph->setScene(scene);
+
+                if (isFirstFrame)
+                {
+                    LOG_DEBUG("First frame - Rendering resolution initialized to {}x{}", width, height);
+                    isFirstFrame = false;
+                }
+                else
+                    LOG_DEBUG(
+                        "Panel dimensions changed - Rendering resolution updated to {}x{} (prev: {}x{})",
+                        width,
+                        height,
+                        prevTargetWidth,
+                        prevTargetHeight
+                    );
+
+                prevTargetWidth = targetWidth;
+                prevTargetHeight = targetHeight;
+            }
+
+            // Right panel - Rendering display
+            GUI::SameLine();
+            GUI::BeginChild("Rendering", ImVec2(rightPanelWidth, -1), true);
+            GUI::Text("Rendering (%dx%d)", width, height);
+            GUI::Separator();
+            // Display the rendered image at actual resolution (1:1 pixel mapping)
+            ImTextureID textureId = window.GetDisplayTextureImGuiHandle();
+            GUI::Image(textureId, ImVec2((float)width, (float)height));
+            GUI::EndChild();
+
             GUI::End();
 
             if (GUI::IsKeyPressed(ImGuiKey_Escape))
