@@ -1,8 +1,25 @@
 #include <algorithm>
 #include <unordered_set>
+#include <string>
 
 #include "RenderGraph.h"
 #include "Utils/Logger.h"
+
+RenderGraph::RenderGraph(ref<Device> device) : mpDevice(device), mpEditorContext(nullptr), mNextId(1)
+{
+    ed::Config config;
+    config.SettingsFile = (std::string(PROJECT_LOG_DIR) + "/editor.json").c_str();
+    mpEditorContext = ed::CreateEditor(&config);
+    if (!mpEditorContext)
+        LOG_ERROR_RETURN("Failed to create node editor context");
+    
+    LOG_INFO("Node editor initialized successfully");
+}
+
+RenderGraph::~RenderGraph()
+{
+    ed::DestroyEditor(mpEditorContext);
+}
 
 void RenderGraph::addPass(const std::string& name, ref<RenderPass> pass)
 {
@@ -157,17 +174,9 @@ void RenderGraph::setScene(ref<Scene> scene)
 
 void RenderGraph::renderUI()
 {
-    // Render graph visualization
-    if (GUI::CollapsingHeader("Render Graph Visualization"))
-    {
-        renderGraphVisualization();
-    }
-
     for (auto& node : mNodes)
-    {
         if (GUI::CollapsingHeader(node.name.c_str()))
             node.pass->renderUI();
-    }
 }
 
 int RenderGraph::findNode(const std::string& name)
@@ -176,170 +185,463 @@ int RenderGraph::findNode(const std::string& name)
     return it != mNodes.end() ? static_cast<int>(&(*it) - &mNodes[0]) : -1;
 }
 
-void RenderGraph::renderGraphVisualization()
+void RenderGraph::renderNodeEditor()
 {
-    // Helper function to convert RenderDataType to string
-    auto renderDataTypeToString = [](RenderDataType type) -> const char*
+    if (!mpEditorContext)
+    {
+        GUI::Text("Node editor not initialized!");
+        return;
+    }
+
+    // Control panel
+    if (GUI::Button("Auto Layout"))
+        autoLayoutNodes();
+    GUI::SameLine();
+    if (GUI::Button("Center View"))
+    {
+        ed::SetCurrentEditor(mpEditorContext);
+        ed::NavigateToContent(0.0f);
+        ed::SetCurrentEditor(nullptr);
+    }
+    GUI::SameLine();
+    GUI::Text("Nodes: %zu | Connections: %zu", mNodes.size(), mConnections.size());
+    
+    GUI::Separator();
+    
+    ed::SetCurrentEditor(mpEditorContext);
+    
+    // Node editor styling
+    ed::PushStyleColor(ed::StyleColor_NodeBg, ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
+    ed::PushStyleColor(ed::StyleColor_NodeBorder, ImVec4(0.4f, 0.4f, 0.4f, 1.0f));
+    ed::PushStyleVar(ed::StyleVar_NodePadding, ImVec4(8, 4, 8, 8));
+    ed::PushStyleVar(ed::StyleVar_NodeRounding, 4.0f);
+    
+    ed::Begin("Node Editor", ImVec2(0.0f, 0.0f));
+    
+    // Initialize IDs and position nodes on first frame
+    initializeNodeIds();
+    static bool sFirstFrame = true;
+    if (sFirstFrame)
+    {
+        for (size_t i = 0; i < mNodes.size(); ++i)
+        {
+            ImVec2 pos = calculateNodePosition(mNodes[i].name, i);
+            ed::SetNodePosition(mNodeIds[mNodes[i].name], pos);
+        }
+        sFirstFrame = false;
+    }
+    
+    // Draw nodes and connections
+    drawNodes();
+    drawConnections();
+    handleNodeEditorInput();
+    
+    ed::End();
+    
+    // Cleanup styling
+    ed::PopStyleVar(2);
+    ed::PopStyleColor(2);
+    ed::SetCurrentEditor(nullptr);
+}
+
+ImVec2 RenderGraph::calculateNodePosition(const std::string& nodeName, size_t nodeIndex)
+{
+    const float kNodeSpacing = 250.0f;
+    const float kVerticalSpacing = 150.0f;
+    const float kStartX = 50.0f;
+    const float kStartY = 50.0f;
+    
+    // Try to position nodes based on their dependencies for better layout
+    int nodeIdx = findNode(nodeName);
+    if (nodeIdx != -1 && !mExecutionOrder.empty())
+    {
+        // Find position in execution order
+        auto execIt = std::find(mExecutionOrder.begin(), mExecutionOrder.end(), nodeIdx);
+        if (execIt != mExecutionOrder.end())
+        {
+            size_t execIndex = execIt - mExecutionOrder.begin();
+            float x = kStartX + (execIndex % 4) * kNodeSpacing;
+            float y = kStartY + (execIndex / 4) * kVerticalSpacing;
+            return ImVec2(x, y);
+        }
+    }
+    
+    // Fallback to simple grid layout
+    float x = kStartX + (nodeIndex % 3) * kNodeSpacing;
+    float y = kStartY + (nodeIndex / 3) * kVerticalSpacing;
+    return ImVec2(x, y);
+}
+
+void RenderGraph::initializeNodeIds()
+{
+    for (size_t i = 0; i < mNodes.size(); ++i)
+    {
+        const auto& node = mNodes[i];
+        if (mNodeIds.find(node.name) == mNodeIds.end())
+        {
+            mNodeIds[node.name] = mNextId++;
+            
+            // Create pin IDs for inputs
+            const auto& inputs = node.pass->getInputs();
+            mInputPinIds[node.name].clear();
+            for (size_t j = 0; j < inputs.size(); ++j)
+                mInputPinIds[node.name].push_back(mNextId++);
+            
+            // Create pin IDs for outputs
+            const auto& outputs = node.pass->getOutputs();
+            mOutputPinIds[node.name].clear();
+            for (size_t j = 0; j < outputs.size(); ++j)
+                mOutputPinIds[node.name].push_back(mNextId++);
+        }
+    }
+}
+
+// Removed positionNodesInitially - now using calculateNodePosition in renderNodeEditor
+
+void RenderGraph::drawNodes()
+{
+    auto getTypeString = [](RenderDataType type) -> const char*
     {
         switch (type)
         {
-        case RenderDataType::Texture2D:
-            return "Texture2D";
-        case RenderDataType::Buffer:
-            return "Buffer";
+        case RenderDataType::Texture2D: return "Texture2D";
+        case RenderDataType::Buffer:    return "Buffer";
         case RenderDataType::Unknown:
-            return "Unknown";
-        default:
-            return "Unknown";
+        default:                        return "Unknown";
         }
     };
 
-    GUI::Separator();
+    // Tooltip state for deferred rendering (following widgets-example pattern)
+    static bool sShowTooltip = false;
+    static std::string sTooltipText;
+    sShowTooltip = false;
 
-    // Display graph statistics
-    GUI::Text("Graph Statistics:");
-    GUI::BulletText("Nodes: %d", static_cast<int>(mNodes.size()));
-    GUI::BulletText("Connections: %d", static_cast<int>(mConnections.size()));
-    GUI::BulletText("Built: %s", mExecutionOrder.empty() ? "No" : "Yes");
-    GUI::Separator();
-
-    // Create a table for nodes and connections display
-    if (GUI::BeginTable("GraphVisualization", 2, ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersV))
+    int uniqueId = 1;
+    
+    for (const auto& node : mNodes)
     {
-        GUI::TableSetupColumn("Nodes", ImGuiTableColumnFlags_WidthFixed, 400.0f);
-        GUI::TableSetupColumn("Connections", ImGuiTableColumnFlags_WidthStretch);
-        GUI::TableHeadersRow();
-
-        GUI::TableNextRow();
-
-        // Left column: Nodes
-        GUI::TableNextColumn();
-        GUI::Text("Render Passes:");
-        GUI::Separator();
-
-        for (size_t i = 0; i < mNodes.size(); ++i)
-        {
-            const auto& node = mNodes[i];
-
-            // Node header with execution order info
-            GUI::PushID(static_cast<int>(i));
-            bool nodeExpanded = GUI::TreeNodeEx(node.name.c_str(), ImGuiTreeNodeFlags_DefaultOpen);
-
-            // Add execution order indicator
+        int nodeId = mNodeIds[node.name];
+        
+        ed::BeginNode(nodeId);
+            const auto& inputs = node.pass->getInputs();
+            const auto& outputs = node.pass->getOutputs();
+            
+            // Node title
+            GUI::Text("%s", node.name.c_str());
+            
+            // Pin layout: Input pin - spacer - Output pin
+            if (!inputs.empty())
+            {
+                ed::BeginPin(mInputPinIds[node.name][0], ed::PinKind::Input);
+                    GUI::Text("-> In");
+                ed::EndPin();
+            }
+            
             GUI::SameLine();
-            if (!mExecutionOrder.empty())
+            GUI::Dummy(ImVec2(150, 0));
+            GUI::SameLine();
+            
+            if (!outputs.empty())
             {
-                auto execIt = std::find(mExecutionOrder.begin(), mExecutionOrder.end(), i);
-                if (execIt != mExecutionOrder.end())
-                {
-                    int execOrder = static_cast<int>(execIt - mExecutionOrder.begin());
-                    GUI::TextColored(ImVec4(0.7f, 0.9f, 0.7f, 1.0f), "[Order: %d]", execOrder);
-                }
+                ed::BeginPin(mOutputPinIds[node.name][0], ed::PinKind::Output);
+                    GUI::Text("Out ->");
+                ed::EndPin();
             }
-
-            if (nodeExpanded)
+            
+            // Input details
+            if (!inputs.empty())
             {
-                GUI::Indent();
-
-                // Display inputs
-                const auto& inputs = node.pass->getInputs();
-                if (!inputs.empty())
+                GUI::Spacing();
+                GUI::Text("Inputs:");
+                for (size_t i = 0; i < inputs.size(); ++i)
                 {
-                    GUI::Text("Inputs:");
-                    for (const auto& input : inputs)
-                        GUI::BulletText("%s (%s)", input.name.c_str(), renderDataTypeToString(input.type));
-                }
-
-                // Display outputs
-                const auto& outputs = node.pass->getOutputs();
-                if (!outputs.empty())
-                {
-                    GUI::Text("Outputs:");
-                    for (const auto& output : outputs)
-                        GUI::BulletText("%s (%s)", output.name.c_str(), renderDataTypeToString(output.type));
-                }
-
-                // Display dependencies
-                if (!node.dependencies.empty())
-                {
-                    GUI::Text("Dependencies:");
-                    for (const auto& depIndex : node.dependencies)
-                        if (depIndex < mNodes.size())
-                            GUI::BulletText("%s", mNodes[depIndex].name.c_str());
-                }
-
-                GUI::Unindent();
-                GUI::TreePop();
-            }
-            GUI::PopID();
-        }
-
-        // Right column: Connections
-        GUI::TableNextColumn();
-        GUI::Text("Data Flow:");
-        GUI::Separator();
-
-        if (mConnections.empty())
-        {
-            GUI::Text("No connections");
-        }
-        else
-        {
-            // Group connections by from pass for better readability
-            std::unordered_map<std::string, std::vector<const RenderGraphConnection*>> connectionsBySource;
-            for (const auto& conn : mConnections)
-                connectionsBySource[conn.fromPass].push_back(&conn);
-
-            for (const auto& [fromPass, connections] : connectionsBySource)
-            {
-                GUI::PushID(fromPass.c_str());
-                if (GUI::TreeNodeEx(fromPass.c_str(), ImGuiTreeNodeFlags_DefaultOpen))
-                {
-                    GUI::Indent();
-                    for (const auto* conn : connections)
+                    GUI::PushID(uniqueId++);
+                    GUI::BulletText("%s (%s)", inputs[i].name.c_str(), getTypeString(inputs[i].type));
+                    if (GUI::IsItemHovered())
                     {
-                        // Color-coded connection display
-                        GUI::TextColored(ImVec4(0.8f, 0.8f, 0.6f, 1.0f), "%s", conn->fromOutput.c_str());
-                        GUI::SameLine();
-                        GUI::Text(" -> ");
-                        GUI::SameLine();
-                        GUI::TextColored(ImVec4(0.6f, 0.8f, 0.8f, 1.0f), "%s", conn->toPass.c_str());
-                        GUI::SameLine();
-                        GUI::Text(".");
-                        GUI::SameLine();
-                        GUI::TextColored(ImVec4(0.8f, 0.6f, 0.8f, 1.0f), "%s", conn->toInput.c_str());
+                        sShowTooltip = true;
+                        sTooltipText = "Input: " + inputs[i].name + 
+                                     "\nType: " + getTypeString(inputs[i].type) +
+                                     "\nOptional: " + (inputs[i].optional ? "Yes" : "No");
                     }
-                    GUI::Unindent();
-                    GUI::TreePop();
+                    GUI::PopID();
                 }
-                GUI::PopID();
             }
-        }
-
-        GUI::EndTable();
-    }
-
-    GUI::Separator();
-
-    // Execution order visualization
-    if (!mExecutionOrder.empty())
-    {
-        GUI::Text("Execution Order:");
-        for (size_t i = 0; i < mExecutionOrder.size(); ++i)
-        {
-            if (i > 0)
+            
+            // Output details  
+            if (!outputs.empty())
             {
-                GUI::SameLine();
-                GUI::Text(" -> ");
-                GUI::SameLine();
+                if (!inputs.empty()) GUI::Spacing();
+                GUI::Text("Outputs:");
+                for (size_t i = 0; i < outputs.size(); ++i)
+                {
+                    GUI::PushID(uniqueId++);
+                    GUI::BulletText("%s (%s)", outputs[i].name.c_str(), getTypeString(outputs[i].type));
+                    if (GUI::IsItemHovered())
+                    {
+                        sShowTooltip = true;
+                        sTooltipText = "Output: " + outputs[i].name + 
+                                     "\nType: " + getTypeString(outputs[i].type);
+                    }
+                    GUI::PopID();
+                }
             }
+            
+            // Minimum node width
+            GUI::Dummy(ImVec2(250, 1));
+            
+        ed::EndNode();
+    }
+    
+    // Deferred tooltip section (must be outside node drawing)
+    if (sShowTooltip)
+    {
+        ed::Suspend();
+        GUI::SetTooltip("%s", sTooltipText.c_str());
+        ed::Resume();
+    }
+}
 
-            const auto& nodeName = mNodes[mExecutionOrder[i]].name;
-            GUI::TextColored(ImVec4(0.9f, 0.7f, 0.5f, 1.0f), "%s", nodeName.c_str());
+void RenderGraph::drawConnections()
+{
+    // Initialize link IDs if needed
+    if (mLinkIds.empty())
+    {
+        for (const auto& conn : mConnections)
+        {
+            std::string key = conn.fromPass + "." + conn.fromOutput + "->" + conn.toPass + "." + conn.toInput;
+            mLinkIds[key] = mNextId++;
         }
     }
-    else
+    
+    // Draw all connections
+    for (const auto& conn : mConnections)
     {
-        GUI::TextColored(ImVec4(0.9f, 0.3f, 0.3f, 1.0f), "Graph not built - call build() first");
+        std::string key = conn.fromPass + "." + conn.fromOutput + "->" + conn.toPass + "." + conn.toInput;
+        
+        if (mLinkIds.find(key) == mLinkIds.end())
+            mLinkIds[key] = mNextId++;
+        
+        int fromPin = findOutputPinId(conn.fromPass, conn.fromOutput);
+        int toPin = findInputPinId(conn.toPass, conn.toInput);
+        
+        if (fromPin != -1 && toPin != -1)
+            ed::Link(mLinkIds[key], fromPin, toPin);
     }
+}
+
+int RenderGraph::findOutputPinId(const std::string& passName, const std::string& outputName)
+{
+    auto pinMapIt = mOutputPinIds.find(passName);
+    if (pinMapIt == mOutputPinIds.end())
+        return -1;
+        
+    auto nodeIt = std::find_if(mNodes.begin(), mNodes.end(),
+        [&passName](const RenderGraphNode& n) { return n.name == passName; });
+    if (nodeIt == mNodes.end())
+        return -1;
+        
+    const auto& outputs = nodeIt->pass->getOutputs();
+    for (size_t i = 0; i < outputs.size() && i < pinMapIt->second.size(); ++i)
+    {
+        if (outputs[i].name == outputName)
+            return pinMapIt->second[i];
+    }
+    
+    return -1;
+}
+
+int RenderGraph::findInputPinId(const std::string& passName, const std::string& inputName)
+{
+    auto pinMapIt = mInputPinIds.find(passName);
+    if (pinMapIt == mInputPinIds.end())
+        return -1;
+        
+    auto nodeIt = std::find_if(mNodes.begin(), mNodes.end(),
+        [&passName](const RenderGraphNode& n) { return n.name == passName; });
+    if (nodeIt == mNodes.end())
+        return -1;
+        
+    const auto& inputs = nodeIt->pass->getInputs();
+    for (size_t i = 0; i < inputs.size() && i < pinMapIt->second.size(); ++i)
+    {
+        if (inputs[i].name == inputName)
+            return pinMapIt->second[i];
+    }
+    
+    return -1;
+}
+
+void RenderGraph::handleNodeEditorInput()
+{
+    // Handle new connection creation
+    if (ed::BeginCreate())
+    {
+        ed::PinId inputPin, outputPin;
+        if (ed::QueryNewLink(&inputPin, &outputPin))
+        {
+            if (inputPin && outputPin)
+            {
+                std::string fromPass, fromOutput, toPass, toInput;
+                if (findConnectionDetails(outputPin, inputPin, fromPass, fromOutput, toPass, toInput))
+                {
+                    if (ed::AcceptNewItem())
+                    {
+                        addConnection(fromPass, fromOutput, toPass, toInput);
+                        mLinkIds.clear(); // Force regeneration
+                        build(); // Rebuild dependencies
+                    }
+                }
+                else
+                {
+                    ed::RejectNewItem(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), 2.0f);
+                }
+            }
+        }
+    }
+    ed::EndCreate();
+    
+    // Handle connection deletion
+    if (ed::BeginDelete())
+    {
+        ed::LinkId linkId;
+        while (ed::QueryDeletedLink(&linkId))
+        {
+            if (ed::AcceptDeletedItem())
+            {
+                removeConnectionByLinkId(linkId.Get());
+            }
+        }
+    }
+    ed::EndDelete();
+}
+
+void RenderGraph::removeConnectionByLinkId(int linkId)
+{
+    // Find the connection associated with this link ID
+    std::string connToRemove;
+    for (const auto& [connKey, id] : mLinkIds)
+    {
+        if (id == linkId)
+        {
+            connToRemove = connKey;
+            break;
+        }
+    }
+    
+    if (!connToRemove.empty())
+    {
+        // Parse connection key to find the actual connection
+        size_t arrowPos = connToRemove.find("->");
+        if (arrowPos != std::string::npos)
+        {
+            std::string fromPart = connToRemove.substr(0, arrowPos);
+            std::string toPart = connToRemove.substr(arrowPos + 2);
+            
+            size_t fromDotPos = fromPart.find('.');
+            size_t toDotPos = toPart.find('.');
+            
+            if (fromDotPos != std::string::npos && toDotPos != std::string::npos)
+            {
+                std::string fromPass = fromPart.substr(0, fromDotPos);
+                std::string fromOutput = fromPart.substr(fromDotPos + 1);
+                std::string toPass = toPart.substr(0, toDotPos);
+                std::string toInput = toPart.substr(toDotPos + 1);
+                
+                // Remove the connection
+                auto it = std::remove_if(mConnections.begin(), mConnections.end(),
+                    [&](const RenderGraphConnection& conn) {
+                        return conn.fromPass == fromPass && conn.fromOutput == fromOutput &&
+                               conn.toPass == toPass && conn.toInput == toInput;
+                    });
+                
+                if (it != mConnections.end())
+                {
+                    mConnections.erase(it, mConnections.end());
+                    mLinkIds.erase(connToRemove);
+                    build(); // Rebuild to update dependencies
+                }
+            }
+        }
+    }
+}
+
+bool RenderGraph::findConnectionDetails(ed::PinId outputPinId, ed::PinId inputPinId, 
+                                      std::string& fromPass, std::string& fromOutput, 
+                                      std::string& toPass, std::string& toInput)
+{
+    // Find output pin
+    for (const auto& [passName, pinIds] : mOutputPinIds)
+    {
+        for (size_t i = 0; i < pinIds.size(); ++i)
+        {
+            if (pinIds[i] == outputPinId.Get())
+            {
+                fromPass = passName;
+                int nodeIdx = findNode(passName);
+                if (nodeIdx != -1 && i < mNodes[nodeIdx].pass->getOutputs().size())
+                    fromOutput = mNodes[nodeIdx].pass->getOutputs()[i].name;
+                break;
+            }
+        }
+        if (!fromPass.empty()) break;
+    }
+    
+    // Find input pin
+    for (const auto& [passName, pinIds] : mInputPinIds)
+    {
+        for (size_t i = 0; i < pinIds.size(); ++i)
+        {
+            if (pinIds[i] == inputPinId.Get())
+            {
+                toPass = passName;
+                int nodeIdx = findNode(passName);
+                if (nodeIdx != -1 && i < mNodes[nodeIdx].pass->getInputs().size())
+                    toInput = mNodes[nodeIdx].pass->getInputs()[i].name;
+                break;
+            }
+        }
+        if (!toPass.empty()) break;
+    }
+    
+    // Validate connection
+    if (fromPass.empty() || fromOutput.empty() || toPass.empty() || toInput.empty())
+        return false;
+        
+    // Check if already exists
+    for (const auto& conn : mConnections)
+    {
+        if (conn.fromPass == fromPass && conn.fromOutput == fromOutput &&
+            conn.toPass == toPass && conn.toInput == toInput)
+            return false;
+    }
+    
+    return true;
+}
+
+void RenderGraph::autoLayoutNodes()
+{
+    if (!mpEditorContext || mNodes.empty())
+        return;
+        
+    ed::SetCurrentEditor(mpEditorContext);
+    
+    const float kSpacingX = 300.0f;
+    const float kSpacingY = 150.0f;
+    const float kStartX = 100.0f;
+    const float kStartY = 100.0f;
+    
+    // Simple grid layout
+    for (size_t i = 0; i < mNodes.size(); ++i)
+    {
+        const auto& nodeName = mNodes[i].name;
+        if (mNodeIds.find(nodeName) != mNodeIds.end())
+        {
+            float x = kStartX + (i % 3) * kSpacingX;
+            float y = kStartY + (i / 3) * kSpacingY;
+            ed::SetNodePosition(mNodeIds[nodeName], ImVec2(x, y));
+        }
+    }
+
+    ed::SetCurrentEditor(nullptr);
 }

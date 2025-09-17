@@ -2,6 +2,7 @@
 #include <imgui.h>
 #include <imgui_node_editor.h>
 #include <memory>
+#include <nvrhi/nvrhi.h>
 
 #include "Core/Pointer.h"
 
@@ -24,18 +25,16 @@ public:
         static constexpr float kMinEditorHeight = 100.0f;
     };
 
-    GUIManager();
-    ~GUIManager();
+    GUIManager(ref<Device> device) : mpDevice(device) {}
+    ~GUIManager() {}
 
     // Main layout function
-    void renderMainLayout(ref<Scene> scene, ref<RenderGraph> renderGraph, Window& window, uint32_t& renderWidth, uint32_t& renderHeight);
+    void renderMainLayout(ref<Scene> scene, ref<RenderGraph> renderGraph, nvrhi::TextureHandle image, Window& window, uint32_t& renderWidth, uint32_t& renderHeight);
 
     // Individual panel render functions
-    void renderSettingsPanel(ref<Scene> scene, ref<RenderGraph> renderGraph, Window& window);
+    void renderSettingsPanel(ref<Scene> scene, ref<RenderGraph> renderGraph, nvrhi::TextureHandle image, Window& window);
 
     void renderRenderingPanel(ImTextureID textureId, uint32_t renderWidth, uint32_t renderHeight);
-
-    void renderEditorPanel();
 
     // Getters
     const LayoutConfig& getLayoutConfig() const { return mLayoutConfig; }
@@ -48,10 +47,10 @@ private:
         uint32_t newHeight,
         uint32_t& renderWidth,
         uint32_t& renderHeight
-    );
-
+    );    
+    
+    ref<Device> mpDevice;
     LayoutConfig mLayoutConfig;
-    ed::EditorContext* mpEditorContext;
 
     // Tracking for dimension changes
     uint32_t mPrevRenderWidth = 0;

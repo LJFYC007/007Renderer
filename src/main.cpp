@@ -51,7 +51,7 @@ int main()
         renderGraph->setScene(scene);
         renderGraph->build();
 
-        GUIManager guiManager;
+        GUIManager guiManager(pDevice);
         bool notDone = true;
         while (notDone)
         {
@@ -90,7 +90,7 @@ int main()
                 break;
             }
 
-            guiManager.renderMainLayout(scene, renderGraph, window, width, height);
+            guiManager.renderMainLayout(scene, renderGraph, imageTexture, window, width, height);
             if (GUI::IsKeyPressed(ImGuiKey_Escape))
                 notDone = false; // Exit on Escape key
 

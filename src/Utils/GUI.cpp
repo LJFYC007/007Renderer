@@ -10,24 +10,7 @@
 #include "Scene/Camera/Camera.h"
 #include "RenderPasses/RenderGraph.h"
 
-GUIManager::GUIManager() : mpEditorContext(nullptr)
-{
-    // Initialize node editor
-    ed::Config config;
-    config.SettingsFile = "Simple.json";
-    mpEditorContext = ed::CreateEditor(&config);
-
-    if (!mpEditorContext)
-        LOG_ERROR_RETURN("Failed to create ImGui Node Editor context");
-    LOG_INFO("GUI Manager initialized successfully");
-}
-
-GUIManager::~GUIManager()
-{
-    ed::DestroyEditor(mpEditorContext);
-}
-
-void GUIManager::renderMainLayout(ref<Scene> scene, ref<RenderGraph> renderGraph, Window& window, uint32_t& renderWidth, uint32_t& renderHeight)
+void GUIManager::renderMainLayout(ref<Scene> scene, ref<RenderGraph> renderGraph, nvrhi::TextureHandle image, Window& window, uint32_t& renderWidth, uint32_t& renderHeight)
 {
     ImGuiIO& io = ImGui::GetIO();
 
@@ -37,8 +20,7 @@ void GUIManager::renderMainLayout(ref<Scene> scene, ref<RenderGraph> renderGraph
     ImGui::Begin(
         "MainWindow",
         nullptr,
-        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar |
-            ImGuiWindowFlags_NoBringToFrontOnFocus
+        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoBringToFrontOnFocus
     );
 
     const float windowPadding = ImGui::GetStyle().WindowPadding.x;
@@ -48,7 +30,7 @@ void GUIManager::renderMainLayout(ref<Scene> scene, ref<RenderGraph> renderGraph
     ImGui::BeginChild("TopRow", ImVec2(-1, topPanelsHeight), false, ImGuiWindowFlags_NoScrollbar);
     // Left panel - Settings
     ImGui::BeginChild("Settings", ImVec2(mLayoutConfig.splitterWidth, -1), true, ImGuiWindowFlags_NoScrollbar);
-    renderSettingsPanel(scene, renderGraph, window);
+    renderSettingsPanel(scene, renderGraph, image, window);
     ImGui::EndChild();
 
     // Vertical splitter between Settings and Rendering
@@ -70,7 +52,9 @@ void GUIManager::renderMainLayout(ref<Scene> scene, ref<RenderGraph> renderGraph
     uint32_t targetHeight = (uint32_t)(topPanelsHeight - ImGui::GetTextLineHeightWithSpacing() - ImGui::GetStyle().ItemSpacing.y * 2);
 
     // Update render dimensions if changed
-    updateRenderDimensions(scene, renderGraph, targetWidth, targetHeight, renderWidth, renderHeight); // Right panel - Rendering display
+    updateRenderDimensions(scene, renderGraph, targetWidth, targetHeight, renderWidth, renderHeight); 
+    
+    // Right panel - Rendering display
     ImGui::SameLine();
     ImGui::BeginChild("Rendering", ImVec2(rightPanelWidth, -1), true);
     ImTextureID textureId = window.GetDisplayTextureImGuiHandle();
@@ -88,33 +72,24 @@ void GUIManager::renderMainLayout(ref<Scene> scene, ref<RenderGraph> renderGraph
         // Clamp editor height
         mLayoutConfig.editorHeight = std::max(LayoutConfig::kMinEditorHeight, std::min(mLayoutConfig.editorHeight, io.DisplaySize.y - 200.0f));
     }
-    ImGui::SetItemTooltip("Drag to resize editor panel");
-
-    // Bottom panel - Node Editor (full width)
+    ImGui::SetItemTooltip("Drag to resize editor panel");    // Bottom panel - Node Editor (full width)
     ImGui::BeginChild("Editor", ImVec2(-1, mLayoutConfig.editorHeight), true);
-    renderEditorPanel();
+    renderGraph->renderNodeEditor();
     ImGui::EndChild();
 
     ImGui::End();
 }
 
-void GUIManager::renderSettingsPanel(ref<Scene> scene, ref<RenderGraph> renderGraph, Window& window)
+void GUIManager::renderSettingsPanel(ref<Scene> scene, ref<RenderGraph> renderGraph, nvrhi::TextureHandle image, Window& window)
 {
     // Save image button
     if (ImGui::Button("Save image"))
     {
         ID3D12Resource* currentTexture = window.GetCurrentDisplayTexture();
         if (currentTexture)
-        {
-            // Convert D3D12Resource to nvrhi::ITexture for ExrUtils
-            // This requires the nvrhi texture wrapper - we need to store this differently
-            // For now, log that save was requested
-            LOG_INFO("Save image requested - texture conversion needs implementation");
-        }
+            ExrUtils::saveTextureToExr(mpDevice, image, std::string(PROJECT_DIR) + "/output.exr");
         else
-        {
             LOG_ERROR("No texture available to save");
-        }
     }
 
     ImGui::Text("%.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
@@ -143,31 +118,6 @@ void GUIManager::renderRenderingPanel(ImTextureID textureId, uint32_t renderWidt
         ImGui::Text("No texture to display");
 }
 
-void GUIManager::renderEditorPanel()
-{
-    if (!mpEditorContext)
-        return;
-
-    ed::SetCurrentEditor(mpEditorContext);
-    ed::Begin("Node Editor", ImVec2(0.0, 0.0f));
-
-    int uniqueId = 1;
-    // Start drawing nodes
-    ed::BeginNode(uniqueId++);
-    ImGui::Text("Node A");
-    ed::BeginPin(uniqueId++, ed::PinKind::Input);
-    ImGui::Text("-> In");
-    ed::EndPin();
-    ImGui::SameLine();
-    ed::BeginPin(uniqueId++, ed::PinKind::Output);
-    ImGui::Text("Out ->");
-    ed::EndPin();
-    ed::EndNode();
-
-    ed::End();
-    ed::SetCurrentEditor(nullptr);
-}
-
 void GUIManager::updateRenderDimensions(
     ref<Scene> scene,
     ref<RenderGraph> renderGraph,
@@ -186,9 +136,8 @@ void GUIManager::updateRenderDimensions(
         {
             scene->camera->setWidth(renderWidth);
             scene->camera->setHeight(renderHeight);
+            scene->camera->dirty = true;
         }
-        if (renderGraph)
-            renderGraph->setScene(scene);
 
         if (mIsFirstFrame)
         {
