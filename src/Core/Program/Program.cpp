@@ -81,14 +81,14 @@ Program::Program(
 
     // Link program
     if (SLANG_FAILED(pProgram->link(mLinkedProgram.writeRef())))
-        LOG_ERROR_RETURN("[Slang] Failed to link program"); // Get program layout with diagnostics
+        LOG_ERROR_RETURN("[Slang] Failed to link program"); 
+    
+    // Get program layout with diagnostics
     mpProgramLayout = mLinkedProgram->getLayout(0, pDiagnostics.writeRef());
+    if (pDiagnostics && pDiagnostics->getBufferSize() > 0)
+        LOG_DEBUG("[Slang] Program layout diagnostics: {}", (const char*)pDiagnostics->getBufferPointer());
     if (!mpProgramLayout)
-    {
-        if (pDiagnostics && pDiagnostics->getBufferSize() > 0)
-            LOG_ERROR("[Slang] Program layout diagnostics: {}", (const char*)pDiagnostics->getBufferPointer());
         LOG_ERROR_RETURN("[Slang] Failed to get program layout");
-    }
 
     // Create shaders for each entry point
     mShaders.clear();

@@ -7,11 +7,13 @@ ComputePass::ComputePass(ref<Device> pDevice, const std::string& shaderPath, con
     std::unordered_map<std::string, nvrhi::ShaderType> entryPoints;
     entryPoints[entryPoint] = nvrhi::ShaderType::Compute;
 
-    Program program(pNvrhiDevice, std::string(PROJECT_DIR) + shaderPath, entryPoints, "cs_6_2");
+    std::string shaderVersion = getLatestComputeShaderVersion();
+    Program program(pNvrhiDevice, std::string(PROJECT_DIR) + shaderPath, entryPoints, shaderVersion);
     mShader = program.getShader(entryPoint);
     // program.printReflectionInfo();
     if (!program.generateBindingLayout())
         LOG_ERROR_RETURN("[ComputePass] Failed to generate binding layout from program");
+
     mpBindingSetManager = make_ref<BindingSetManager>(pDevice, program.getReflectionInfo());
     auto pProgramLayout = program.getProgramLayout();
     if (pProgramLayout && pProgramLayout->getEntryPointCount() > 0)
@@ -27,7 +29,9 @@ ComputePass::ComputePass(ref<Device> pDevice, const std::string& shaderPath, con
 
             LOG_DEBUG("[ComputePass] Work group size: {}x{}x{}", mWorkGroupSizeX, mWorkGroupSizeY, mWorkGroupSizeZ);
         }
-    } // Create compute pipeline
+    } 
+    
+    // Create compute pipeline
     nvrhi::ComputePipelineDesc pipelineDesc;
     std::vector<nvrhi::BindingLayoutHandle> bindingLayouts = mpBindingSetManager->getBindingLayouts();
     for (const auto& pLayout : bindingLayouts)
@@ -68,4 +72,42 @@ void ComputePass::execute(uint32_t width, uint32_t height, uint32_t depth)
 
     LOG_TRACE("[ComputePass] Total threads: {}x{}x{}, Thread groups: {}x{}x{}", width, height, depth, threadGroupX, threadGroupY, threadGroupZ);
     dispatch(threadGroupX, threadGroupY, threadGroupZ);
+}
+
+std::string ComputePass::getLatestComputeShaderVersion()
+{
+    auto pD3D12Device = mpDevice->getD3D12Device();
+    // Try shader models in descending order to find the highest supported one
+    const std::pair<D3D_SHADER_MODEL, std::string> shaderModels[] = {
+        { D3D_SHADER_MODEL_6_9, "cs_6_9" },
+        { D3D_SHADER_MODEL_6_8, "cs_6_8" },
+        { D3D_SHADER_MODEL_6_7, "cs_6_7" },
+        { D3D_SHADER_MODEL_6_6, "cs_6_6" },
+        { D3D_SHADER_MODEL_6_5, "cs_6_5" },
+        { D3D_SHADER_MODEL_6_4, "cs_6_4" },
+        { D3D_SHADER_MODEL_6_3, "cs_6_3" },
+        { D3D_SHADER_MODEL_6_2, "cs_6_2" },
+        { D3D_SHADER_MODEL_6_1, "cs_6_1" },
+        { D3D_SHADER_MODEL_6_0, "cs_6_0" },
+        { D3D_SHADER_MODEL_5_1, "cs_5_1" }
+    };
+
+    for (const auto& [model, version] : shaderModels)
+    {
+        D3D12_FEATURE_DATA_SHADER_MODEL shaderModelData = {};
+        shaderModelData.HighestShaderModel = model;
+        
+        HRESULT hr = pD3D12Device->CheckFeatureSupport(
+            D3D12_FEATURE_SHADER_MODEL, 
+            &shaderModelData, 
+            sizeof(shaderModelData)
+        );
+        
+        if (SUCCEEDED(hr) && shaderModelData.HighestShaderModel >= model)
+            return version;
+    }
+
+    // Fallback to 6.2 if nothing is supported (shouldn't happen on modern GPUs)
+    LOG_WARN("[ComputePass] No shader model detected, falling back to cs_6_2");
+    return "cs_6_2";
 }

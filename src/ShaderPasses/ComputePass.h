@@ -11,6 +11,8 @@ public:
 private:
     void dispatch(uint32_t width, uint32_t height, uint32_t depth);
 
+    std::string getLatestComputeShaderVersion();
+
     nvrhi::ShaderHandle mShader;
     nvrhi::ComputePipelineHandle mPipeline;
     uint32_t mWorkGroupSizeX = 1;

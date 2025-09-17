@@ -89,7 +89,9 @@ target_include_directories(tinyexr INTERFACE ${TINYEXR_DIR})
 option(USE_TINYEXR_MINIZ "Use bundled miniz with TinyEXR" ON)
 add_library(miniz STATIC ${TINYEXR_DIR}/miniz.c)
 target_include_directories(miniz PUBLIC ${TINYEXR_DIR})
+
 set_target_properties(tinyexr PROPERTIES FOLDER "External")
+set_target_properties(miniz PROPERTIES FOLDER "External")
 
 # ----------------------------------------------------------------------------
 # GLM support

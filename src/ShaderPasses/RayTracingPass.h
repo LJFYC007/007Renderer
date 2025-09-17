@@ -10,6 +10,8 @@ public:
     void execute(uint32_t width, uint32_t height, uint32_t depth) override;
 
 private:
+    std::string getLatestLibVersion();
+
     nvrhi::ShaderHandle mRayGenShader;
     nvrhi::ShaderHandle mMissShader;
     nvrhi::ShaderHandle mClosestHitShader;
