@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "Scene/Importer/AssimpImporter.h"
+#include "RenderPasses/RenderGraphEditor.h"
 #include "RenderPasses/RenderGraphBuilder.h"
 #include "Utils/ExrUtils.h"
 #include "Environment.h"
@@ -31,9 +32,8 @@ TEST_F(PathTracerTest, Basic)
     scene->camera->calculateCameraParameters();
 
     // Create render graph
+    RenderGraphEditor renderGraphEditor;
     auto renderGraph = RenderGraphBuilder::createDefaultGraph(mpDevice);
-    renderGraph->setScene(scene);
-    renderGraph->build();
     renderGraph->setScene(scene);
     RenderData finalOutput = renderGraph->execute();
     nvrhi::TextureHandle imageTexture = nvrhi::TextureHandle(static_cast<nvrhi::ITexture*>(finalOutput["ErrorMeasure.output"].Get()));

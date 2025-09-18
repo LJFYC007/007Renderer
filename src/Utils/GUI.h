@@ -9,6 +9,7 @@
 class Device;
 class Scene;
 class RenderGraph;
+class RenderGraphEditor;
 class Window;
 
 namespace GUI = ImGui;
@@ -26,28 +27,25 @@ public:
     };
 
     GUIManager(ref<Device> device) : mpDevice(device) {}
-    ~GUIManager() {}
-
-    // Main layout function
-    void renderMainLayout(ref<Scene> scene, ref<RenderGraph> renderGraph, nvrhi::TextureHandle image, Window& window, uint32_t& renderWidth, uint32_t& renderHeight);
+    ~GUIManager() {}    // Main layout function
+    void renderMainLayout(ref<Scene> scene, RenderGraphEditor* pRenderGraphEditor, nvrhi::TextureHandle image, Window& window, uint32_t& renderWidth, uint32_t& renderHeight);
 
     // Individual panel render functions
-    void renderSettingsPanel(ref<Scene> scene, ref<RenderGraph> renderGraph, nvrhi::TextureHandle image, Window& window);
+    void renderSettingsPanel(ref<Scene> scene, RenderGraphEditor* pRenderGraphEditor, nvrhi::TextureHandle image, Window& window);
 
     void renderRenderingPanel(ImTextureID textureId, uint32_t renderWidth, uint32_t renderHeight);
 
     // Getters
     const LayoutConfig& getLayoutConfig() const { return mLayoutConfig; }
 
-private:
-    void updateRenderDimensions(
+private:    void updateRenderDimensions(
         ref<Scene> scene,
-        ref<RenderGraph> renderGraph,
+        RenderGraphEditor* pRenderGraphEditor,
         uint32_t newWidth,
         uint32_t newHeight,
         uint32_t& renderWidth,
         uint32_t& renderHeight
-    );    
+    );
     
     ref<Device> mpDevice;
     LayoutConfig mLayoutConfig;

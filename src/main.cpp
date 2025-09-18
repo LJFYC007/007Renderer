@@ -6,6 +6,7 @@
 #include "Core/Window.h"
 #include "Scene/Importer/AssimpImporter.h"
 #include "RenderPasses/RenderGraphBuilder.h"
+#include "RenderPasses/RenderGraphEditor.h"
 #include "Utils/Logger.h"
 #include "Utils/GUI.h"
 #include "Scene/Camera/Camera.h"
@@ -44,12 +45,15 @@ int main()
         }
         scene->buildAccelStructs();
         uint width = 1920, height = 1080;
-        scene->camera = make_ref<Camera>(width, height, float3(0.f, 0.f, -5.f), float3(0.f, 0.f, -6.f), glm::radians(45.0f));
-
-        // Create render graph
-        auto renderGraph = RenderGraphBuilder::createDefaultGraph(pDevice);
-        renderGraph->setScene(scene);
-        renderGraph->build();
+        scene->camera = make_ref<Camera>(width, height, float3(0.f, 0.f, -5.f), float3(0.f, 0.f, -6.f), glm::radians(45.0f));        
+          // Create render graph editor and initialize with default graph
+        RenderGraphEditor renderGraphEditor;
+        auto defaultRenderGraph = RenderGraphBuilder::createDefaultGraph(pDevice);
+        defaultRenderGraph->setScene(scene);
+        
+        // Initialize editor from the default graph (this populates the editor's node/connection lists)
+        renderGraphEditor.initializeFromRenderGraph(defaultRenderGraph);
+        renderGraphEditor.setScene(scene);
 
         GUIManager guiManager(pDevice);
         bool notDone = true;
@@ -68,14 +72,15 @@ int main()
                 notDone = false;
                 break;
             }
-            pDevice->getDevice()->runGarbageCollection();
-
+            pDevice->getDevice()->runGarbageCollection();            
             if (scene->camera->dirty)
-                renderGraph->setScene(scene);
+                renderGraphEditor.setScene(scene);
             scene->camera->calculateCameraParameters();
 
-            // Execute render graph
-            RenderData finalOutput = renderGraph->execute();
+            // Get current render graph and execute
+            auto renderGraph = renderGraphEditor.getCurrentRenderGraph();
+            RenderData finalOutput;
+            finalOutput = renderGraph->execute();
 
             // Set texture for display
             nvrhi::TextureHandle imageTexture = dynamic_cast<nvrhi::ITexture*>(finalOutput["ErrorMeasure.output"].Get());
@@ -90,7 +95,7 @@ int main()
                 break;
             }
 
-            guiManager.renderMainLayout(scene, renderGraph, imageTexture, window, width, height);
+            guiManager.renderMainLayout(scene, &renderGraphEditor, imageTexture, window, width, height);
             if (GUI::IsKeyPressed(ImGuiKey_Escape))
                 notDone = false; // Exit on Escape key
 

@@ -9,17 +9,17 @@ class RenderGraphBuilder
 public:
     static ref<RenderGraph> createDefaultGraph(ref<Device> pDevice)
     {
-        auto pGraph = make_ref<RenderGraph>(pDevice);
+        // Create nodes
+        std::vector<RenderGraphNode> nodes;
+        nodes.emplace_back("PathTracing", make_ref<PathTracingPass>(pDevice));
+        nodes.emplace_back("Accumulate", make_ref<AccumulatePass>(pDevice));
+        nodes.emplace_back("ErrorMeasure", make_ref<ErrorMeasure>(pDevice));
 
-        // Add passes
-        pGraph->addPass("PathTracing", make_ref<PathTracingPass>(pDevice));
-        pGraph->addPass("Accumulate", make_ref<AccumulatePass>(pDevice));
-        pGraph->addPass("ErrorMeasure", make_ref<ErrorMeasure>(pDevice));
+        // Create connections
+        std::vector<RenderGraphConnection> connections;
+        connections.emplace_back("PathTracing", "output", "Accumulate", "output");
+        connections.emplace_back("Accumulate", "output", "ErrorMeasure", "output");
 
-        // Add connections following current logic:
-        pGraph->addConnection("PathTracing", "output", "Accumulate", "output");
-        pGraph->addConnection("Accumulate", "output", "ErrorMeasure", "output");
-
-        return pGraph;
+        return RenderGraph::create(pDevice, nodes, connections);
     }
 };
