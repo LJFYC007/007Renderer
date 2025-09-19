@@ -32,9 +32,7 @@ void rayGenMain()
     if (launchID.x >= gWidth || launchID.y >= gHeight)
         return;
 
-    float3 pixel = gCamera.data.pixel00 + launchID.x * gCamera.data.cameraU + launchID.y * gCamera.data.cameraV;
-    Ray ray = Ray(gCamera.data.posW, normalize(pixel - gCamera.data.posW));
-
+    Ray ray = gCamera.computeRayPinhole(launchID, gCamera.data.enableJitter);
     Payload payload;
     payload.color = float3(0, 0, 0);
     payload.depth = 1;

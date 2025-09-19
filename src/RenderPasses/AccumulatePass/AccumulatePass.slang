@@ -7,7 +7,7 @@ cbuffer PerFrameCB
     uint gWidth;
     uint gHeight;
     uint frameCount;
-    uint reset; // TODO: use bool, instead of uint
+    bool reset; 
 };
 
 [shader("compute")]

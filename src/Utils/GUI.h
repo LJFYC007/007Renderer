@@ -5,6 +5,7 @@
 #include <nvrhi/nvrhi.h>
 
 #include "Core/Pointer.h"
+#include "GUIWrapper.h"
 
 class Device;
 class Scene;
@@ -12,7 +13,6 @@ class RenderGraph;
 class RenderGraphEditor;
 class Window;
 
-namespace GUI = ImGui;
 namespace ed = ax::NodeEditor;
 
 class GUIManager
@@ -27,7 +27,9 @@ public:
     };
 
     GUIManager(ref<Device> device) : mpDevice(device) {}
-    ~GUIManager() {}    // Main layout function
+    ~GUIManager() {}    
+    
+    // Main layout function
     void renderMainLayout(ref<Scene> scene, RenderGraphEditor* pRenderGraphEditor, nvrhi::TextureHandle image, Window& window, uint32_t& renderWidth, uint32_t& renderHeight);
 
     // Individual panel render functions
@@ -38,7 +40,8 @@ public:
     // Getters
     const LayoutConfig& getLayoutConfig() const { return mLayoutConfig; }
 
-private:    void updateRenderDimensions(
+private:    
+    void updateRenderDimensions(
         ref<Scene> scene,
         RenderGraphEditor* pRenderGraphEditor,
         uint32_t newWidth,

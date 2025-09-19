@@ -116,7 +116,15 @@ void GUIManager::renderRenderingPanel(ImTextureID textureId, uint32_t renderWidt
 
     // Display the rendered image at actual resolution (1:1 pixel mapping)
     if (textureId)
+    {
         ImGui::Image(textureId, ImVec2((float)renderWidth, (float)renderHeight));
+        // Check if mouse is hovering over the image and left button is held
+        if (ImGui::IsItemHovered() && ImGui::IsMouseDown(0))
+        {
+            // Override ImGui's mouse capture for camera control on next frame
+            ImGui::SetNextFrameWantCaptureMouse(false);
+        }
+    }
     else
         ImGui::Text("No texture to display");
 }

@@ -15,5 +15,5 @@ void main(uint3 dispatchThreadID: SV_DispatchThreadID)
     uint2 id = dispatchThreadID.xy;
     if (id.x >= gWidth || id.y >= gHeight)
         return;
-    difference[id] = float4(abs(source[id].xyz - reference[id].xyz), 1.f);
+    difference[id] = float4(abs(reference[id].xyz - source[id].xyz), 1.f);
 }

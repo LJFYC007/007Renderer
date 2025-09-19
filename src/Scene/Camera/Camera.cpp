@@ -1,10 +1,11 @@
-#include "Camera.h"
-#include "Utils/GUI.h"
-
 #include <glm/ext.hpp>
 #include <glm/gtc/constants.hpp>
 
+#include "Camera.h"
+#include "Utils/GUI.h"
+
 Camera::Camera(const uint32_t width, const uint32_t height, const float3& posW, const float3& target, float fovY)
+    : mSampleGenerator(233) 
 {
     mData.frameWidth = width;
     mData.frameHeight = height;
@@ -14,6 +15,7 @@ Camera::Camera(const uint32_t width, const uint32_t height, const float3& posW, 
     mData.up = float3(0.0f, 1.0f, 0.0f); // Fixed up vector for first-person camera
     mData.fovY = fovY;
     mData.moveSpeed = 1.0f; // Default move speed in units per second
+    mData.enableJitter = true;
 
     // Initialize yaw and pitch from initial forward direction
     float3 initialForward = glm::normalize(target - posW);
@@ -24,17 +26,13 @@ Camera::Camera(const uint32_t width, const uint32_t height, const float3& posW, 
 
 void Camera::renderUI()
 {
-    GUI::Text("Camera Parameters");
-
     dirty |= GUI::DragFloat3("Position", &mData.posW.x, 0.1f, -100.0f, 100.0f);
     dirty |= GUI::DragFloat3("Target", &mData.target.x, 0.1f, -100.0f, 100.0f);
     dirty |= GUI::DragFloat3("Up Vector", &mData.up.x, 0.01f, -1.0f, 1.0f);
-    dirty |= GUI::SliderFloat("FOV Y (radians)", &mData.fovY, 0.17f, 2.97f, "%.3f");
+    dirty |= GUI::SliderFloat("FOV Y", &mData.fovY, 0.17f, 2.97f, "%.3f"); // radians
 
     GUI::SliderFloat("Move Speed", &mData.moveSpeed, 0.1f, 10.0f, "%.1f");
-    GUI::Text("FOV Y (degrees): %.1f", mData.fovY * 180.0f / 3.14159265f);
-    GUI::Text("Aspect Ratio: %.3f", mData.aspectRatio);
-    GUI::Text("Focal Length: %.3f", mData.focalLength);
+    GUI::Checkbox("Enable Jitter", &mData.enableJitter);
 }
 
 void Camera::handleInput()
@@ -104,6 +102,9 @@ void Camera::handleInput()
 
 void Camera::calculateCameraParameters()
 {
+    if (mData.enableJitter)
+        mData.jitter = mSampleGenerator.nextFloat2() - float2(0.5f, 0.5f);
+
     if (dirty == false)
         return;
     // For first-person camera, forward is already calculated from yaw/pitch

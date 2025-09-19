@@ -13,7 +13,9 @@ struct CameraData
     float3 forward;
     float moveSpeed;
     float3 right;
-    float _padding0; // Padding to ensure proper alignment
+    float _padding1;
     float3 up;
-    float _padding1; // Padding to ensure proper alignment
+    bool enableJitter;
+    float2 jitter;
+    float2 _padding2;
 };

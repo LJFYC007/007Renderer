@@ -34,6 +34,10 @@ RenderData AccumulatePass::execute(const RenderData& renderData)
         prepareResources();
     }
 
+    // Check for GUI refresh flags
+    if (GUI::getAndClearRefreshFlags() != RenderPassRefreshFlags::None)
+        mReset = true;
+
     mPerFrameData.gWidth = mWidth;
     mPerFrameData.gHeight = mHeight;
     mPerFrameData.reset = mReset;
@@ -43,6 +47,7 @@ RenderData AccumulatePass::execute(const RenderData& renderData)
         mReset = false;
     }
     mPerFrameData.frameCount = ++mFrameCount;
+
     RenderData output;
     output.setResource(kOutputName, mTextureOut);
     mCbPerFrame.updateData(mpDevice, &mPerFrameData, sizeof(PerFrameCB));
