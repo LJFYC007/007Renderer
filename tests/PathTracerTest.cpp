@@ -36,6 +36,6 @@ TEST_F(PathTracerTest, Basic)
     auto renderGraph = RenderGraphBuilder::createDefaultGraph(mpDevice);
     renderGraph->setScene(scene);
     RenderData finalOutput = renderGraph->execute();
-    nvrhi::TextureHandle imageTexture = nvrhi::TextureHandle(static_cast<nvrhi::ITexture*>(finalOutput["ErrorMeasure.output"].Get()));
+    nvrhi::TextureHandle imageTexture = renderGraph->getFinalOutputTexture();
     ExrUtils::saveTextureToExr(mpDevice, imageTexture, "output.exr");
 }
