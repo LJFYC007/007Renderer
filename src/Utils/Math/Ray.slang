@@ -20,8 +20,7 @@ struct Ray
     RayDesc toRayDesc() { return RayDesc(origin, tMin, dir, tMax); }
 }
 
-float3
-computeRayOrigin(float3 pos, float3 normal)
+float3 computeRayOrigin(float3 pos, float3 normal)
 {
     const float origin = 1.f / 16.f;
     const float fScale = 3.f / 65536.f;

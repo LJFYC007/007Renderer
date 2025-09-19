@@ -27,8 +27,8 @@ public:
 
     void renderUI();
 
-    void handleInput();    
-    
+    void handleInput();
+
     void calculateCameraParameters();
 
     bool dirty;

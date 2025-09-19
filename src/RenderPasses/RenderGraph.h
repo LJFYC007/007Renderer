@@ -35,21 +35,23 @@ public:
     ~RenderGraph() = default;
 
     // Core graph building from external data
-    static ref<RenderGraph> create(ref<Device> pDevice, 
-                                   const std::vector<RenderGraphNode>& nodes,
-                                   const std::vector<RenderGraphConnection>& connections);    
-                                   
+    static ref<RenderGraph> create(
+        ref<Device> pDevice,
+        const std::vector<RenderGraphNode>& nodes,
+        const std::vector<RenderGraphConnection>& connections
+    );
+
     // Execute the entire render graph
-    RenderData execute();   
-    
+    RenderData execute();
+
     // Get the final output texture for display (based on UI selection)
     nvrhi::TextureHandle getFinalOutputTexture();
-    
+
     // Render UI for output selection
     void renderOutputSelectionUI();
-    
+
     // Set scene for all passes that need it
-    void setScene(ref<Scene> pScene);    
+    void setScene(ref<Scene> pScene);
 
     // Graph queries
     const std::vector<RenderGraphNode>& getNodes() const { return mNodes; }
@@ -58,24 +60,23 @@ public:
 
 private:
     // Core graph operations
-    bool build(const std::vector<RenderGraphNode>& nodes, 
-               const std::vector<RenderGraphConnection>& connections);
+    bool build(const std::vector<RenderGraphNode>& nodes, const std::vector<RenderGraphConnection>& connections);
     bool topologicalSort();
     bool validateGraph();
     void buildDependencyGraph();
-    
+
     RenderData executePass(int nodeIndex);
     int findNode(const std::string& name) const;
 
     ref<Device> mpDevice;
-    ref<Scene> mpScene;    
+    ref<Scene> mpScene;
 
     std::vector<RenderGraphNode> mNodes;
     std::vector<RenderGraphConnection> mConnections;
     std::vector<std::unordered_set<uint>> mDependencies; // Node indices this node depends on
     std::vector<uint> mExecutionOrder;
     std::unordered_map<std::string, RenderData> mIntermediateResults;
-      
+
     // UI state for output selection
     std::string mSelectedOutputKey;
     std::vector<std::string> mAvailableOutputs;

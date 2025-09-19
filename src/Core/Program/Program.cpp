@@ -81,8 +81,8 @@ Program::Program(
 
     // Link program
     if (SLANG_FAILED(pProgram->link(mLinkedProgram.writeRef())))
-        LOG_ERROR_RETURN("[Slang] Failed to link program"); 
-    
+        LOG_ERROR_RETURN("[Slang] Failed to link program");
+
     // Get program layout with diagnostics
     mpProgramLayout = mLinkedProgram->getLayout(0, pDiagnostics.writeRef());
     if (pDiagnostics && pDiagnostics->getBufferSize() > 0)

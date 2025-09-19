@@ -37,10 +37,7 @@ uint2 TinyUniformSampleGenerator::blockCipherTEA(uint32_t v, uint32_t key)
     return uint2(v0, v1);
 }
 
-TinyUniformSampleGenerator::TinyUniformSampleGenerator(uint32_t seed)
-    : mState(seed)
-{
-}
+TinyUniformSampleGenerator::TinyUniformSampleGenerator(uint32_t seed) : mState(seed) {}
 
 TinyUniformSampleGenerator::TinyUniformSampleGenerator(uint2 pixel, uint32_t frameCount)
 {
@@ -60,8 +57,8 @@ float TinyUniformSampleGenerator::nextFloat()
 {
     // Use upper 24 bits and divide by 2^24 to get a number u in [0,1).
     // In floating-point precision this also ensures that 1.0-u != 0.0.
-    uint32_t x = next() >> 8; 
-    return x * (1.0f / 16777216.0f); 
+    uint32_t x = next() >> 8;
+    return x * (1.0f / 16777216.0f);
 }
 
 float2 TinyUniformSampleGenerator::nextFloat2()

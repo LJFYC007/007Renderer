@@ -32,11 +32,9 @@ public:
     void removePass(const std::string& name);
     void clearPasses();
 
-    // Connection management for editor  
-    void addConnection(const std::string& fromPass, const std::string& fromOutput, 
-                      const std::string& toPass, const std::string& toInput);
-    void removeConnection(const std::string& fromPass, const std::string& fromOutput, 
-                         const std::string& toPass, const std::string& toInput);
+    // Connection management for editor
+    void addConnection(const std::string& fromPass, const std::string& fromOutput, const std::string& toPass, const std::string& toInput);
+    void removeConnection(const std::string& fromPass, const std::string& fromOutput, const std::string& toPass, const std::string& toInput);
 
     // Scene management
     void setScene(ref<Scene> scene);
@@ -51,11 +49,16 @@ private:
     void drawNodes();
     void drawConnections();
     void handleNodeEditorInput();
-    
+
     // Helper functions
-    bool findConnectionDetails(ed::PinId outputPinId, ed::PinId inputPinId, 
-                             std::string& fromPass, std::string& fromOutput, 
-                             std::string& toPass, std::string& toInput);
+    bool findConnectionDetails(
+        ed::PinId outputPinId,
+        ed::PinId inputPinId,
+        std::string& fromPass,
+        std::string& fromOutput,
+        std::string& toPass,
+        std::string& toInput
+    );
     int findOutputPinId(const std::string& passName, const std::string& outputName);
     int findInputPinId(const std::string& passName, const std::string& inputName);
     bool removeConnectionByLinkId(int linkId);
@@ -72,7 +75,7 @@ private:
     ed::EditorContext* mpEditorContext;
     bool mStyleConfigured;
     std::string mSettingsFilePath;
-    
+
     // Node editor UI state
     std::unordered_map<std::string, ImVec2> mNodePositions;
     std::unordered_map<std::string, int> mNodeIds;

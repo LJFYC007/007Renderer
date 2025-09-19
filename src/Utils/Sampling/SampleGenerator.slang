@@ -47,7 +47,8 @@ export struct TinyUniformSampleGenerator : ISampleGenerator
         this.state = seed;
     }
 
-    [mutating] uint next()
+    [mutating]
+    uint next()
     {
         const uint A = 1664525u;
         const uint C = 1013904223u;

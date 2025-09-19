@@ -45,13 +45,13 @@ int main()
         }
         scene->buildAccelStructs();
         uint width = 1920, height = 1080;
-        scene->camera = make_ref<Camera>(width, height, float3(0.f, 0.f, -5.f), float3(0.f, 0.f, -6.f), glm::radians(45.0f));        
-        
+        scene->camera = make_ref<Camera>(width, height, float3(0.f, 0.f, -5.f), float3(0.f, 0.f, -6.f), glm::radians(45.0f));
+
         // Create render graph editor and initialize with default graph
         RenderGraphEditor renderGraphEditor(pDevice);
         auto defaultRenderGraph = RenderGraphBuilder::createDefaultGraph(pDevice);
         defaultRenderGraph->setScene(scene);
-        
+
         // Initialize editor from the default graph (this populates the editor's node/connection lists)
         renderGraphEditor.initializeFromRenderGraph(defaultRenderGraph);
         renderGraphEditor.setScene(scene);
@@ -73,11 +73,11 @@ int main()
                 notDone = false;
                 break;
             }
-            pDevice->getDevice()->runGarbageCollection();            
+            pDevice->getDevice()->runGarbageCollection();
             if (scene->camera->dirty)
                 renderGraphEditor.setScene(scene);
-            scene->camera->calculateCameraParameters();            
-            
+            scene->camera->calculateCameraParameters();
+
             // Get current render graph and execute
             auto renderGraph = renderGraphEditor.getCurrentRenderGraph();
             RenderData finalOutput;

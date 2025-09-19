@@ -3,9 +3,9 @@
 
 namespace
 {
-    const std::string kInputName = "input";
-    const std::string kOutputName = "output";
-}
+const std::string kInputName = "input";
+const std::string kOutputName = "output";
+} // namespace
 
 AccumulatePass::AccumulatePass(ref<Device> pDevice) : RenderPass(pDevice)
 {

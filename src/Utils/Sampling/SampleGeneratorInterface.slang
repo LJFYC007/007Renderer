@@ -1,6 +1,7 @@
 interface ISampleGenerator
 {
-    [mutating] uint next();
+    [mutating]
+    uint next();
 };
 
 float sampleNext1D<S : ISampleGenerator>(inout S sg)

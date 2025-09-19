@@ -16,7 +16,7 @@ public:
     {
         mpScene = pScene;
         mReset = true;
-    }    
+    }
 
     // RenderGraph interface
     std::string getName() const override { return "Accumulate"; }

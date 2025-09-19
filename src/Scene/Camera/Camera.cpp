@@ -4,8 +4,7 @@
 #include "Camera.h"
 #include "Utils/GUI.h"
 
-Camera::Camera(const uint32_t width, const uint32_t height, const float3& posW, const float3& target, float fovY)
-    : mSampleGenerator(233) 
+Camera::Camera(const uint32_t width, const uint32_t height, const float3& posW, const float3& target, float fovY) : mSampleGenerator(233)
 {
     mData.frameWidth = width;
     mData.frameHeight = height;

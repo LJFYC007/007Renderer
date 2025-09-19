@@ -19,14 +19,14 @@ public:
             FAIL() << "Failed to initialize device for Buffer tests";
         ImGui::CreateContext();
     }
-    
+
     void TearDown() override
     {
         ImGui::DestroyContext();
         sDevice.reset();
         spdlog::shutdown();
     }
-    
+
     static ref<Device> getDevice() { return sDevice; }
 
 private:

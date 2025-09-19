@@ -29,8 +29,8 @@ ComputePass::ComputePass(ref<Device> pDevice, const std::string& shaderPath, con
 
             LOG_DEBUG("[ComputePass] Work group size: {}x{}x{}", mWorkGroupSizeX, mWorkGroupSizeY, mWorkGroupSizeZ);
         }
-    } 
-    
+    }
+
     // Create compute pipeline
     nvrhi::ComputePipelineDesc pipelineDesc;
     std::vector<nvrhi::BindingLayoutHandle> bindingLayouts = mpBindingSetManager->getBindingLayouts();
@@ -79,30 +79,26 @@ std::string ComputePass::getLatestComputeShaderVersion()
     auto pD3D12Device = mpDevice->getD3D12Device();
     // Try shader models in descending order to find the highest supported one
     const std::pair<D3D_SHADER_MODEL, std::string> shaderModels[] = {
-        { D3D_SHADER_MODEL_6_9, "cs_6_9" },
-        { D3D_SHADER_MODEL_6_8, "cs_6_8" },
-        { D3D_SHADER_MODEL_6_7, "cs_6_7" },
-        { D3D_SHADER_MODEL_6_6, "cs_6_6" },
-        { D3D_SHADER_MODEL_6_5, "cs_6_5" },
-        { D3D_SHADER_MODEL_6_4, "cs_6_4" },
-        { D3D_SHADER_MODEL_6_3, "cs_6_3" },
-        { D3D_SHADER_MODEL_6_2, "cs_6_2" },
-        { D3D_SHADER_MODEL_6_1, "cs_6_1" },
-        { D3D_SHADER_MODEL_6_0, "cs_6_0" },
-        { D3D_SHADER_MODEL_5_1, "cs_5_1" }
+        {D3D_SHADER_MODEL_6_9, "cs_6_9"},
+        {D3D_SHADER_MODEL_6_8, "cs_6_8"},
+        {D3D_SHADER_MODEL_6_7, "cs_6_7"},
+        {D3D_SHADER_MODEL_6_6, "cs_6_6"},
+        {D3D_SHADER_MODEL_6_5, "cs_6_5"},
+        {D3D_SHADER_MODEL_6_4, "cs_6_4"},
+        {D3D_SHADER_MODEL_6_3, "cs_6_3"},
+        {D3D_SHADER_MODEL_6_2, "cs_6_2"},
+        {D3D_SHADER_MODEL_6_1, "cs_6_1"},
+        {D3D_SHADER_MODEL_6_0, "cs_6_0"},
+        {D3D_SHADER_MODEL_5_1, "cs_5_1"}
     };
 
     for (const auto& [model, version] : shaderModels)
     {
         D3D12_FEATURE_DATA_SHADER_MODEL shaderModelData = {};
         shaderModelData.HighestShaderModel = model;
-        
-        HRESULT hr = pD3D12Device->CheckFeatureSupport(
-            D3D12_FEATURE_SHADER_MODEL, 
-            &shaderModelData, 
-            sizeof(shaderModelData)
-        );
-        
+
+        HRESULT hr = pD3D12Device->CheckFeatureSupport(D3D12_FEATURE_SHADER_MODEL, &shaderModelData, sizeof(shaderModelData));
+
         if (SUCCEEDED(hr) && shaderModelData.HighestShaderModel >= model)
             return version;
     }

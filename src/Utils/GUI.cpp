@@ -10,7 +10,14 @@
 #include "Scene/Camera/Camera.h"
 #include "RenderPasses/RenderGraphEditor.h"
 
-void GUIManager::renderMainLayout(ref<Scene> scene, RenderGraphEditor* pRenderGraphEditor, nvrhi::TextureHandle image, Window& window, uint32_t& renderWidth, uint32_t& renderHeight)
+void GUIManager::renderMainLayout(
+    ref<Scene> scene,
+    RenderGraphEditor* pRenderGraphEditor,
+    nvrhi::TextureHandle image,
+    Window& window,
+    uint32_t& renderWidth,
+    uint32_t& renderHeight
+)
 {
     ImGuiIO& io = ImGui::GetIO();
 
@@ -20,14 +27,15 @@ void GUIManager::renderMainLayout(ref<Scene> scene, RenderGraphEditor* pRenderGr
     ImGui::Begin(
         "MainWindow",
         nullptr,
-        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoBringToFrontOnFocus
+        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar |
+            ImGuiWindowFlags_NoBringToFrontOnFocus
     );
 
     const float windowPadding = ImGui::GetStyle().WindowPadding.x;
     const float topPanelsHeight = io.DisplaySize.y - mLayoutConfig.editorHeight - windowPadding * 3 - 8.0f;
 
     // Top row container
-    ImGui::BeginChild("TopRow", ImVec2(-1, topPanelsHeight), false, ImGuiWindowFlags_NoScrollbar);    // Left panel - Settings
+    ImGui::BeginChild("TopRow", ImVec2(-1, topPanelsHeight), false, ImGuiWindowFlags_NoScrollbar); // Left panel - Settings
     ImGui::BeginChild("Settings", ImVec2(mLayoutConfig.splitterWidth, -1), true, ImGuiWindowFlags_NoScrollbar);
     renderSettingsPanel(scene, pRenderGraphEditor, image, window);
     ImGui::EndChild();
@@ -48,9 +56,12 @@ void GUIManager::renderMainLayout(ref<Scene> scene, RenderGraphEditor* pRenderGr
 
     // Calculate rendering dimensions based on available space
     uint32_t targetWidth = (uint32_t)rightPanelWidth;
-    uint32_t targetHeight = (uint32_t)(topPanelsHeight - ImGui::GetTextLineHeightWithSpacing() - ImGui::GetStyle().ItemSpacing.y * 2);    // Update render dimensions if changed
+    uint32_t targetHeight = (uint32_t)(topPanelsHeight - ImGui::GetTextLineHeightWithSpacing() - ImGui::GetStyle().ItemSpacing.y * 2); // Update
+                                                                                                                                       // render
+                                                                                                                                       // dimensions
+                                                                                                                                       // if changed
     updateRenderDimensions(scene, pRenderGraphEditor, targetWidth, targetHeight, renderWidth, renderHeight);
-    
+
     // Right panel - Rendering display
     ImGui::SameLine();
     ImGui::BeginChild("Rendering", ImVec2(rightPanelWidth, -1), true);
@@ -69,7 +80,7 @@ void GUIManager::renderMainLayout(ref<Scene> scene, RenderGraphEditor* pRenderGr
         // Clamp editor height
         mLayoutConfig.editorHeight = std::max(LayoutConfig::kMinEditorHeight, std::min(mLayoutConfig.editorHeight, io.DisplaySize.y - 200.0f));
     }
-    ImGui::SetItemTooltip("Drag to resize editor panel");    // Bottom panel - Node Editor (full width)
+    ImGui::SetItemTooltip("Drag to resize editor panel"); // Bottom panel - Node Editor (full width)
     ImGui::BeginChild("Editor", ImVec2(-1, mLayoutConfig.editorHeight), true);
     if (pRenderGraphEditor)
         pRenderGraphEditor->renderNodeEditor();
@@ -103,7 +114,7 @@ void GUIManager::renderSettingsPanel(ref<Scene> scene, RenderGraphEditor* pRende
             scene->camera->renderUI();
             scene->camera->handleInput();
         }
-    }    
+    }
 
     if (pRenderGraphEditor)
         pRenderGraphEditor->renderUI();

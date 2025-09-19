@@ -3,10 +3,10 @@
 
 namespace
 {
-    const std::string kSourceName = "source";
-    const std::string kReferenceName = "reference";
-    const std::string kOutputName = "output";
-}
+const std::string kSourceName = "source";
+const std::string kReferenceName = "reference";
+const std::string kOutputName = "output";
+} // namespace
 
 ErrorMeasure::ErrorMeasure(ref<Device> pDevice) : RenderPass(pDevice)
 {
@@ -31,11 +31,7 @@ ErrorMeasure::ErrorMeasure(ref<Device> pDevice) : RenderPass(pDevice)
 
 std::vector<RenderPassInput> ErrorMeasure::getInputs() const
 {
-    return 
-    {
-        RenderPassInput(kSourceName, RenderDataType::Texture2D),
-        RenderPassInput(kReferenceName, RenderDataType::Texture2D, true)
-    };
+    return {RenderPassInput(kSourceName, RenderDataType::Texture2D), RenderPassInput(kReferenceName, RenderDataType::Texture2D, true)};
 }
 
 std::vector<RenderPassOutput> ErrorMeasure::getOutputs() const

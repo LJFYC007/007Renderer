@@ -5,7 +5,11 @@
 #include "RenderGraph.h"
 #include "Utils/Logger.h"
 
-ref<RenderGraph> RenderGraph::create(ref<Device> pDevice, const std::vector<RenderGraphNode>& nodes, const std::vector<RenderGraphConnection>& connections)
+ref<RenderGraph> RenderGraph::create(
+    ref<Device> pDevice,
+    const std::vector<RenderGraphNode>& nodes,
+    const std::vector<RenderGraphConnection>& connections
+)
 {
     auto graph = ref<RenderGraph>(new RenderGraph(pDevice));
     if (!graph->build(nodes, connections))
@@ -13,12 +17,11 @@ ref<RenderGraph> RenderGraph::create(ref<Device> pDevice, const std::vector<Rend
     return graph;
 }
 
-bool RenderGraph::build(const std::vector<RenderGraphNode>& nodes, 
-                       const std::vector<RenderGraphConnection>& connections)
+bool RenderGraph::build(const std::vector<RenderGraphNode>& nodes, const std::vector<RenderGraphConnection>& connections)
 {
     mNodes = nodes;
     mConnections = connections;
-    
+
     // Initialize data structures
     mDependencies.resize(mNodes.size());
     mExecutionOrder.clear();
@@ -93,10 +96,11 @@ bool RenderGraph::validateGraph()
         {
             LOG_ERROR("Connection validation failed: Pass '{}' -> '{}' not found", conn.fromPass, conn.toPass);
             return false;
-        }        
-        
+        }
+
         const auto& outputs = mNodes[fromNodeIndex].pass->getOutputs();
-        bool outputFound = std::any_of(outputs.begin(), outputs.end(), [&conn](const RenderPassOutput& output) { return output.name == conn.fromOutput; });
+        bool outputFound =
+            std::any_of(outputs.begin(), outputs.end(), [&conn](const RenderPassOutput& output) { return output.name == conn.fromOutput; });
         if (!outputFound)
         {
             LOG_ERROR("Output '{}' not found in pass '{}'", conn.fromOutput, conn.fromPass);
@@ -110,8 +114,8 @@ bool RenderGraph::validateGraph()
             LOG_ERROR("Input '{}' not found in pass '{}'", conn.toInput, conn.toPass);
             return false;
         }
-    }    
-    
+    }
+
     // Validate all required inputs are connected
     for (const auto& node : mNodes)
         for (const auto& input : node.pass->getInputs())
@@ -133,7 +137,7 @@ bool RenderGraph::validateGraph()
             mAvailableOutputs.push_back(outputKey);
         }
 
-    // Set the last one is default output selection 
+    // Set the last one is default output selection
     if (mSelectedOutputKey.empty() && !mAvailableOutputs.empty())
     {
         mSelectedOutputIndex = static_cast<uint>(mAvailableOutputs.size() - 1);
@@ -211,8 +215,7 @@ void RenderGraph::setScene(ref<Scene> pScene)
 
 int RenderGraph::findNode(const std::string& name) const
 {
-    auto it = std::find_if(mNodes.begin(), mNodes.end(), 
-        [&name](const RenderGraphNode& node) { return node.name == name; });
+    auto it = std::find_if(mNodes.begin(), mNodes.end(), [&name](const RenderGraphNode& node) { return node.name == name; });
     return it != mNodes.end() ? static_cast<int>(it - mNodes.begin()) : -1;
 }
 
@@ -232,7 +235,7 @@ void RenderGraph::renderOutputSelectionUI()
     outputNames.reserve(mAvailableOutputs.size());
     for (const auto& output : mAvailableOutputs)
         outputNames.push_back(output.c_str());
-    
+
     if (GUI::Combo("Output", &mSelectedOutputIndex, outputNames.data(), static_cast<int>(outputNames.size())))
         mSelectedOutputKey = mAvailableOutputs[mSelectedOutputIndex];
 }

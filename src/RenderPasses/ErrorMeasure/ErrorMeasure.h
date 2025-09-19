@@ -17,8 +17,8 @@ public:
 
     RenderData execute(const RenderData& input) override;
 
-    void renderUI() override;    
-    
+    void renderUI() override;
+
     // RenderGraph interface
     std::string getName() const override { return "ErrorMeasure"; }
     std::vector<RenderPassInput> getInputs() const override;
