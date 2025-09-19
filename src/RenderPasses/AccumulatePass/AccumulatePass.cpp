@@ -1,15 +1,31 @@
 #include "AccumulatePass.h"
 #include "Utils/Math/Math.h"
 
+namespace
+{
+    const std::string kInputName = "input";
+    const std::string kOutputName = "output";
+}
+
 AccumulatePass::AccumulatePass(ref<Device> pDevice) : RenderPass(pDevice)
 {
     mCbPerFrame.initialize(pDevice, &mPerFrameData, sizeof(PerFrameCB), nvrhi::ResourceStates::ConstantBuffer, false, true, "PerFrameCB");
     mpPass = make_ref<ComputePass>(pDevice, "/src/RenderPasses/AccumulatePass/AccumulatePass.slang", "main");
 }
 
-RenderData AccumulatePass::execute(const RenderData& input)
+std::vector<RenderPassInput> AccumulatePass::getInputs() const
 {
-    nvrhi::TextureHandle pInputTexture = dynamic_cast<nvrhi::ITexture*>(input["output"].Get());
+    return {RenderPassInput(kInputName, RenderDataType::Texture2D)};
+}
+
+std::vector<RenderPassOutput> AccumulatePass::getOutputs() const
+{
+    return {RenderPassOutput(kOutputName, RenderDataType::Texture2D)};
+}
+
+RenderData AccumulatePass::execute(const RenderData& renderData)
+{
+    nvrhi::TextureHandle pInputTexture = dynamic_cast<nvrhi::ITexture*>(renderData[kInputName].Get());
     uint2 resolution = uint2(pInputTexture->getDesc().width, pInputTexture->getDesc().height);
     if (resolution.x != mWidth || resolution.y != mHeight)
     {
@@ -28,7 +44,7 @@ RenderData AccumulatePass::execute(const RenderData& input)
     }
     mPerFrameData.frameCount = ++mFrameCount;
     RenderData output;
-    output.setResource("output", mTextureOut);
+    output.setResource(kOutputName, mTextureOut);
     mCbPerFrame.updateData(mpDevice, &mPerFrameData, sizeof(PerFrameCB));
     (*mpPass)["PerFrameCB"] = mCbPerFrame.getHandle();
     (*mpPass)["input"] = pInputTexture;

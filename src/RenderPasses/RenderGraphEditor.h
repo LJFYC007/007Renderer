@@ -14,22 +14,18 @@ namespace ed = ax::NodeEditor;
 class RenderGraphEditor
 {
 public:
-    RenderGraphEditor();
+    RenderGraphEditor(ref<Device> pDevice);
     ~RenderGraphEditor();
 
     // Editor management
     void renderUI();
     void renderNodeEditor();
 
-    // Graph management - returns nullptr if current editor state is invalid
-    ref<RenderGraph> buildRenderGraph(ref<Device> pDevice);
-    
     // Initialize editor from existing render graph
     void initializeFromRenderGraph(ref<RenderGraph> graph);
-      // Access to current valid render graph
+
+    // Access to current valid render graph
     ref<RenderGraph> getCurrentRenderGraph() const { return mpCurrentValidGraph; }
-    bool hasValidGraph() const { return mpCurrentValidGraph != nullptr; }// Editor state queries
-    bool isDirty() const { return mIsDirty; }
 
     // Pass management for editor
     void addPass(const std::string& name, ref<RenderPass> pass);
@@ -47,6 +43,7 @@ public:
 
 private:
     void markDirty() { mIsDirty = true; }
+    void rebuild();
 
     // Node editor implementation
     void initializeNodeIds();
@@ -61,19 +58,20 @@ private:
                              std::string& toPass, std::string& toInput);
     int findOutputPinId(const std::string& passName, const std::string& outputName);
     int findInputPinId(const std::string& passName, const std::string& inputName);
-    ImVec2 calculateNodePosition(const std::string& nodeName, size_t nodeIndex);
     bool removeConnectionByLinkId(int linkId);
-    void autoLayoutNodes();
-      // Editor state
+
+    // Editor state
     std::vector<RenderGraphNode> mEditorNodes;
     std::vector<RenderGraphConnection> mEditorConnections;
     ref<RenderGraph> mpCurrentValidGraph;
     ref<Scene> mpScene;
+    ref<Device> mpDevice;
     bool mIsDirty;
 
     // Node editor context and styling
     ed::EditorContext* mpEditorContext;
     bool mStyleConfigured;
+    std::string mSettingsFilePath;
     
     // Node editor UI state
     std::unordered_map<std::string, ImVec2> mNodePositions;

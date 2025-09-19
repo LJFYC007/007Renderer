@@ -16,12 +16,12 @@ public:
     {
         mpScene = pScene;
         mReset = true;
-    }
+    }    
 
     // RenderGraph interface
     std::string getName() const override { return "Accumulate"; }
-    std::vector<RenderPassInput> getInputs() const override { return {RenderPassInput("output", RenderDataType::Texture2D)}; }
-    std::vector<RenderPassOutput> getOutputs() const override { return {RenderPassOutput("output", RenderDataType::Texture2D)}; }
+    std::vector<RenderPassInput> getInputs() const override;
+    std::vector<RenderPassOutput> getOutputs() const override;
 
 private:
     void prepareResources();

@@ -17,12 +17,12 @@ public:
 
     RenderData execute(const RenderData& input) override;
 
-    void renderUI() override;
-
+    void renderUI() override;    
+    
     // RenderGraph interface
     std::string getName() const override { return "ErrorMeasure"; }
-    std::vector<RenderPassInput> getInputs() const override { return {RenderPassInput("output", RenderDataType::Texture2D)}; }
-    std::vector<RenderPassOutput> getOutputs() const override { return {RenderPassOutput("output", RenderDataType::Texture2D)}; }
+    std::vector<RenderPassInput> getInputs() const override;
+    std::vector<RenderPassOutput> getOutputs() const override;
 
 private:
     void prepareResources();

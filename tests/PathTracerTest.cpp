@@ -32,7 +32,7 @@ TEST_F(PathTracerTest, Basic)
     scene->camera->calculateCameraParameters();
 
     // Create render graph
-    RenderGraphEditor renderGraphEditor;
+    RenderGraphEditor renderGraphEditor(mpDevice);
     auto renderGraph = RenderGraphBuilder::createDefaultGraph(mpDevice);
     renderGraph->setScene(scene);
     RenderData finalOutput = renderGraph->execute();

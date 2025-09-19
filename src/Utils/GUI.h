@@ -21,7 +21,7 @@ public:
     struct LayoutConfig
     {
         float splitterWidth = 450.0f;
-        float editorHeight = 300.0f;
+        float editorHeight = 500.0f;
         static constexpr float kMinSplitterWidth = 200.0f;
         static constexpr float kMinEditorHeight = 100.0f;
     };

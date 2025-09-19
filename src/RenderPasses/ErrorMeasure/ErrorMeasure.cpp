@@ -1,6 +1,13 @@
 #include "ErrorMeasure.h"
 #include "Utils/ExrUtils.h"
 
+namespace
+{
+    const std::string kSourceName = "source";
+    const std::string kReferenceName = "reference";
+    const std::string kOutputName = "output";
+}
+
 ErrorMeasure::ErrorMeasure(ref<Device> pDevice) : RenderPass(pDevice)
 {
     mCbPerFrame.initialize(pDevice, &mPerFrameData, sizeof(PerFrameCB), nvrhi::ResourceStates::ConstantBuffer, false, true, "PerFrameCB");
@@ -22,9 +29,23 @@ ErrorMeasure::ErrorMeasure(ref<Device> pDevice) : RenderPass(pDevice)
     mpDifferenceTexture = mpDevice->getDevice()->createTexture(textureDesc);
 }
 
-RenderData ErrorMeasure::execute(const RenderData& input)
+std::vector<RenderPassInput> ErrorMeasure::getInputs() const
 {
-    mpSourceTexture = dynamic_cast<nvrhi::ITexture*>(input["output"].Get());
+    return 
+    {
+        RenderPassInput(kSourceName, RenderDataType::Texture2D),
+        RenderPassInput(kReferenceName, RenderDataType::Texture2D, true)
+    };
+}
+
+std::vector<RenderPassOutput> ErrorMeasure::getOutputs() const
+{
+    return {RenderPassOutput(kOutputName, RenderDataType::Texture2D)};
+}
+
+RenderData ErrorMeasure::execute(const RenderData& renderData)
+{
+    mpSourceTexture = dynamic_cast<nvrhi::ITexture*>(renderData[kSourceName].Get());
     uint2 resolution = uint2(mpSourceTexture->getDesc().width, mpSourceTexture->getDesc().height);
     if (resolution.x != mWidth || resolution.y != mHeight)
     {
@@ -50,17 +71,16 @@ RenderData ErrorMeasure::execute(const RenderData& input)
     switch (mSelectedOutput)
     {
     case OutputId::Source:
-        output.setResource("output", mpSourceTexture);
+        output.setResource(kOutputName, mpSourceTexture);
         break;
     case OutputId::Reference:
-        output.setResource("output", mpReferenceTexture);
+        output.setResource(kOutputName, mpReferenceTexture);
         break;
     case OutputId::Difference:
     default:
-        output.setResource("output", mpDifferenceTexture);
+        output.setResource(kOutputName, mpDifferenceTexture);
         break;
     }
-
     return output;
 }
 

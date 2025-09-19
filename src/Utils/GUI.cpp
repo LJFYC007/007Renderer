@@ -80,6 +80,11 @@ void GUIManager::renderMainLayout(ref<Scene> scene, RenderGraphEditor* pRenderGr
 
 void GUIManager::renderSettingsPanel(ref<Scene> scene, RenderGraphEditor* pRenderGraphEditor, nvrhi::TextureHandle image, Window& window)
 {
+    // Add output selection UI at the top
+    ref<RenderGraph> renderGraph = pRenderGraphEditor->getCurrentRenderGraph();
+    renderGraph->renderOutputSelectionUI();
+    GUI::Separator();
+
     // Save image button
     if (ImGui::Button("Save image"))
     {
@@ -91,14 +96,16 @@ void GUIManager::renderSettingsPanel(ref<Scene> scene, RenderGraphEditor* pRende
     }
 
     ImGui::Text("%.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-    if (ImGui::CollapsingHeader("Camera Controls"))
+    if (ImGui::CollapsingHeader("Camera Controls", ImGuiTreeNodeFlags_DefaultOpen))
     {
         if (scene && scene->camera)
         {
             scene->camera->renderUI();
             scene->camera->handleInput();
         }
-    }    if (pRenderGraphEditor)
+    }    
+
+    if (pRenderGraphEditor)
         pRenderGraphEditor->renderUI();
 }
 

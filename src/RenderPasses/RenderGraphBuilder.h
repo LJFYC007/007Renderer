@@ -17,8 +17,8 @@ public:
 
         // Create connections
         std::vector<RenderGraphConnection> connections;
-        connections.emplace_back("PathTracing", "output", "Accumulate", "output");
-        connections.emplace_back("Accumulate", "output", "ErrorMeasure", "output");
+        connections.emplace_back("PathTracing", "output", "Accumulate", "input");
+        connections.emplace_back("Accumulate", "output", "ErrorMeasure", "source");
 
         return RenderGraph::create(pDevice, nodes, connections);
     }

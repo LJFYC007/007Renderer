@@ -27,7 +27,7 @@ int main()
     // Create imgui window with configuration
     Window::desc windowDesc;
     windowDesc.width = 2424;
-    windowDesc.height = 1519;
+    windowDesc.height = 1719;
     windowDesc.title = "007Renderer";
     windowDesc.enableVSync = false;
 
@@ -46,8 +46,9 @@ int main()
         scene->buildAccelStructs();
         uint width = 1920, height = 1080;
         scene->camera = make_ref<Camera>(width, height, float3(0.f, 0.f, -5.f), float3(0.f, 0.f, -6.f), glm::radians(45.0f));        
-          // Create render graph editor and initialize with default graph
-        RenderGraphEditor renderGraphEditor;
+        
+        // Create render graph editor and initialize with default graph
+        RenderGraphEditor renderGraphEditor(pDevice);
         auto defaultRenderGraph = RenderGraphBuilder::createDefaultGraph(pDevice);
         defaultRenderGraph->setScene(scene);
         
@@ -75,15 +76,15 @@ int main()
             pDevice->getDevice()->runGarbageCollection();            
             if (scene->camera->dirty)
                 renderGraphEditor.setScene(scene);
-            scene->camera->calculateCameraParameters();
-
+            scene->camera->calculateCameraParameters();            
+            
             // Get current render graph and execute
             auto renderGraph = renderGraphEditor.getCurrentRenderGraph();
             RenderData finalOutput;
             finalOutput = renderGraph->execute();
 
-            // Set texture for display
-            nvrhi::TextureHandle imageTexture = dynamic_cast<nvrhi::ITexture*>(finalOutput["ErrorMeasure.output"].Get());
+            // Set texture for display using the selected output
+            nvrhi::TextureHandle imageTexture = renderGraph->getFinalOutputTexture();
             ID3D12Resource* d3d12Texture = static_cast<ID3D12Resource*>(imageTexture->getNativeObject(nvrhi::ObjectTypes::D3D12_Resource));
             window.SetDisplayTexture(d3d12Texture);
 
