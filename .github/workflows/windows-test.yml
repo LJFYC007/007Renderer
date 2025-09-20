@@ -9,7 +9,7 @@ on:
 jobs:
   build:
     name: Build on Windows (MSVC)
-    runs-on: windows-latest
+    runs-on: self-hosted
     
     strategy:
       matrix:
