@@ -4,7 +4,7 @@ The project is written in modern C++ and built on Windows, DirectX12, NVRHI, Sla
 
 For the comments, I hope to use English comments entirely, keeping only some comments that are more difficult to understand, and leaving the obvious parts without adding comments.
 
-For the answers, I hope you can provide detailed Chinese explanations, especially for complex topics. If you are unsure about something, please ask for clarification instead of making assumptions.
+For the answers, I hope you can provide detailed English explanations, especially for complex topics. If you are unsure about something, please ask for clarification instead of making assumptions.
 
 Follow Falcor (NVIDIA rendering framework) class-internal naming conventions:
 

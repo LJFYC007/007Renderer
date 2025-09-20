@@ -82,8 +82,6 @@ RenderData ErrorMeasure::execute(const RenderData& renderData)
 
 void ErrorMeasure::renderUI()
 {
-    GUI::Text("Error Measure Pass");
-
     GUI::Text("Output Selection:");
     if (GUI::RadioButton("Source", mSelectedOutput == OutputId::Source))
         mSelectedOutput = OutputId::Source;

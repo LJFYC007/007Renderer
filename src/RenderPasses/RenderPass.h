@@ -7,6 +7,19 @@
 #include "Scene/Scene.h"
 #include "Utils/GUI.h"
 
+#ifndef RENDERPASS_FRIEND_TEST
+#if defined(__has_include)
+#if __has_include(<gtest/gtest_prod.h>)
+#include <gtest/gtest_prod.h>
+#define RENDERPASS_FRIEND_TEST(test_case_name, test_name) FRIEND_TEST(test_case_name, test_name)
+#else
+#define RENDERPASS_FRIEND_TEST(test_case_name, test_name)
+#endif
+#else
+#define RENDERPASS_FRIEND_TEST(test_case_name, test_name)
+#endif
+#endif
+
 enum class RenderDataType
 {
     Texture2D,
