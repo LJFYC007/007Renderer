@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.15)
 project(007Renderer)
 
+set(ENV{VSLANG} 1033) # Set Visual Studio language to English
 set(CMAKE_CXX_STANDARD 17)
 
 # Enable project folder organization in IDEs
