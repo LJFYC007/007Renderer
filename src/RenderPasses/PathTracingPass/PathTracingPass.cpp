@@ -1,5 +1,24 @@
 #include "PathTracingPass.h"
 
+namespace
+{
+struct PathTracingPassRegistration
+{
+    PathTracingPassRegistration()
+    {
+        RenderPassRegistry::registerPass(
+            RenderPassDescriptor{
+                "PathTracing",
+                "Physically-based path tracing integrator that produces the primary color output.",
+                [](ref<Device> pDevice) { return make_ref<PathTracingPass>(pDevice); }
+            }
+        );
+    }
+};
+
+[[maybe_unused]] static PathTracingPassRegistration gPathTracingPassRegistration;
+} // namespace
+
 PathTracingPass::PathTracingPass(ref<Device> pDevice) : RenderPass(pDevice)
 {
     mCbPerFrame.initialize(pDevice, nullptr, sizeof(PerFrameCB), nvrhi::ResourceStates::ConstantBuffer, false, true, "PerFrameCB");

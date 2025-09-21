@@ -7,6 +7,22 @@
 
 namespace
 {
+struct TextureAveragePassRegistration
+{
+    TextureAveragePassRegistration()
+    {
+        RenderPassRegistry::registerPass(
+            RenderPassDescriptor{
+                "TextureAverage",
+                "Computes an average texture over time for debugging and statistics collection.",
+                [](ref<Device> pDevice) { return make_ref<TextureAverage>(pDevice); }
+            }
+        );
+    }
+};
+
+[[maybe_unused]] static TextureAveragePassRegistration gTextureAveragePassRegistration;
+
 const std::string kInputName = "input";
 constexpr uint32_t kTileWidth = 16;
 constexpr uint32_t kTileHeight = 16;

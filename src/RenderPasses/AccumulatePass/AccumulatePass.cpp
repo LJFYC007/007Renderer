@@ -3,6 +3,22 @@
 
 namespace
 {
+struct AccumulatePassRegistration
+{
+    AccumulatePassRegistration()
+    {
+        RenderPassRegistry::registerPass(
+            RenderPassDescriptor{
+                "Accumulate",
+                "Accumulates successive frames to smooth noise and handles reset logic when parameters change.",
+                [](ref<Device> pDevice) { return make_ref<AccumulatePass>(pDevice); }
+            }
+        );
+    }
+};
+
+[[maybe_unused]] static AccumulatePassRegistration gAccumulatePassRegistration;
+
 const std::string kInputName = "input";
 const std::string kOutputName = "output";
 } // namespace

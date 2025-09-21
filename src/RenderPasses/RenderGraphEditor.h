@@ -3,6 +3,7 @@
 #include <vector>
 #include <unordered_map>
 #include <string>
+#include <array>
 #include <imgui.h>
 #include <imgui_node_editor.h>
 
@@ -43,8 +44,13 @@ private:
     void markDirty() { mIsDirty = true; }
     void rebuild();
 
+    // Node editor utilities
+    void initializePassLibrary();
+    void drawAddPassControls();
+    std::string generateUniqueNodeName(const std::string& baseName) const;
+    bool nodeNameExists(const std::string& name) const;
+
     // Node editor implementation
-    void initializeNodeIds();
     void setupNodeEditorStyle();
     void drawNodes();
     void drawConnections();
@@ -59,9 +65,27 @@ private:
         std::string& toPass,
         std::string& toInput
     );
-    int findOutputPinId(const std::string& passName, const std::string& outputName);
-    int findInputPinId(const std::string& passName, const std::string& inputName);
     bool removeConnectionByLinkId(int linkId);
+
+    inline static constexpr size_t kMaxPassNameLength = 64;
+
+    std::vector<RenderPassDescriptor> mAvailablePasses;
+    std::array<char, kMaxPassNameLength> mNewPassNameBuffer{};
+    std::string mAddPassErrorMessage;
+    int mSelectedPassIndex = -1;
+    bool mPendingAddPassPopupReset = false;
+    std::string mNodeToFocus;
+
+    struct PinRecord
+    {
+        std::string pass;
+        std::string name;
+        RenderDataType type = RenderDataType::Unknown;
+        bool isOutput = false;
+    };
+
+    std::unordered_map<int, PinRecord> mPinRecords;
+    std::unordered_map<int, std::string> mLinkKeyById;
 
     // Editor state
     std::vector<RenderGraphNode> mEditorNodes;
@@ -74,13 +98,4 @@ private:
     // Node editor context and styling
     ed::EditorContext* mpEditorContext;
     bool mStyleConfigured;
-    std::string mSettingsFilePath;
-
-    // Node editor UI state
-    std::unordered_map<std::string, ImVec2> mNodePositions;
-    std::unordered_map<std::string, int> mNodeIds;
-    std::unordered_map<std::string, std::vector<int>> mInputPinIds;
-    std::unordered_map<std::string, std::vector<int>> mOutputPinIds;
-    std::unordered_map<std::string, int> mLinkIds;
-    int mNextId;
 };

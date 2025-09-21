@@ -1,6 +1,8 @@
 #pragma once
 #include <vector>
 #include <string>
+#include <functional>
+#include <algorithm>
 
 #include "Core/Device.h"
 #include "Core/RenderData.h"
@@ -67,4 +69,35 @@ public:
 protected:
     ref<Device> mpDevice;
     ref<Scene> mpScene;
+};
+
+struct RenderPassDescriptor
+{
+    std::string displayName;
+    std::string description;
+    std::function<ref<RenderPass>(ref<Device>)> factory;
+};
+
+class RenderPassRegistry
+{
+public:
+    static void registerPass(const RenderPassDescriptor& descriptor)
+    {
+        auto& registry = getRegistry();
+        auto it = std::find_if(
+            registry.begin(), registry.end(), [&](const RenderPassDescriptor& existing) { return existing.displayName == descriptor.displayName; }
+        );
+
+        if (it == registry.end())
+            registry.push_back(descriptor);
+    }
+
+    static const std::vector<RenderPassDescriptor>& getRegisteredPasses() { return getRegistry(); }
+
+private:
+    static std::vector<RenderPassDescriptor>& getRegistry()
+    {
+        static std::vector<RenderPassDescriptor> sRegistry;
+        return sRegistry;
+    }
 };

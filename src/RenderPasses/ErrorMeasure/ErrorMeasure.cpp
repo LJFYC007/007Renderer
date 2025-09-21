@@ -3,6 +3,22 @@
 
 namespace
 {
+struct ErrorMeasurePassRegistration
+{
+    ErrorMeasurePassRegistration()
+    {
+        RenderPassRegistry::registerPass(
+            RenderPassDescriptor{
+                "ErrorMeasure",
+                "Generates an error visualization comparing a source texture against an optional reference input.",
+                [](ref<Device> pDevice) { return make_ref<ErrorMeasure>(pDevice); }
+            }
+        );
+    }
+};
+
+[[maybe_unused]] static ErrorMeasurePassRegistration gErrorMeasurePassRegistration;
+
 const std::string kSourceName = "source";
 const std::string kReferenceName = "reference";
 const std::string kOutputName = "output";
