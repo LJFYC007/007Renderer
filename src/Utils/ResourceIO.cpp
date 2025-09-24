@@ -101,9 +101,7 @@ bool uploadTexture(ref<Device> device, nvrhi::TextureHandle texture, const void*
     commandList->open();
     commandList->copyTexture(texture, slice, stagingTexture, slice);
     commandList->close();
-
-    uint64_t fenceValue = nvrhiDevice->executeCommandList(commandList);
-    nvrhiDevice->queueWaitForCommandList(nvrhi::CommandQueue::Graphics, nvrhi::CommandQueue::Graphics, fenceValue);
+    nvrhiDevice->executeCommandList(commandList);
     return true;
 }
 
@@ -126,8 +124,10 @@ bool readbackBuffer(ref<Device> device, nvrhi::BufferHandle buffer, void* pData,
     commandList->copyBuffer(stagingBuffer, 0, buffer, 0, sizeBytes);
     commandList->close();
 
-    uint64_t fenceValue = nvrhiDevice->executeCommandList(commandList);
-    nvrhiDevice->queueWaitForCommandList(nvrhi::CommandQueue::Graphics, nvrhi::CommandQueue::Graphics, fenceValue);
+    nvrhi::EventQueryHandle eventQuery = nvrhiDevice->createEventQuery();
+    nvrhiDevice->executeCommandList(commandList);
+    nvrhiDevice->setEventQuery(eventQuery, nvrhi::CommandQueue::Graphics);
+    nvrhiDevice->waitEventQuery(eventQuery);
     std::memcpy(pData, gReadbackHeap->mMappedBuffer, sizeBytes);
     return true;
 }
@@ -168,8 +168,10 @@ bool readbackTexture(ref<Device> device, nvrhi::TextureHandle texture, void* pDa
     commandList->copyTexture(stagingTexture, slice, texture, slice);
     commandList->close();
 
-    uint64_t fenceValue = nvrhiDevice->executeCommandList(commandList);
-    nvrhiDevice->queueWaitForCommandList(nvrhi::CommandQueue::Graphics, nvrhi::CommandQueue::Graphics, fenceValue);
+    nvrhi::EventQueryHandle eventQuery = nvrhiDevice->createEventQuery();
+    nvrhiDevice->executeCommandList(commandList);
+    nvrhiDevice->setEventQuery(eventQuery, nvrhi::CommandQueue::Graphics);
+    nvrhiDevice->waitEventQuery(eventQuery);
 
     size_t mappedRowPitch = 0;
     void* mappedData = nvrhiDevice->mapStagingTexture(stagingTexture, slice, nvrhi::CpuAccessMode::Read, &mappedRowPitch);
@@ -197,7 +199,10 @@ bool readbackTexture(ref<Device> device, nvrhi::TextureHandle texture, void* pDa
 ReadbackHeap::~ReadbackHeap()
 {
     if (mpBuffer)
+    {
+        mpDevice->getDevice()->waitForIdle();
         mpDevice->getDevice()->unmapBuffer(mpBuffer);
+    }
 }
 
 nvrhi::BufferHandle ReadbackHeap::allocateBuffer(size_t size)
@@ -211,7 +216,10 @@ nvrhi::BufferHandle ReadbackHeap::allocateBuffer(size_t size)
 
     auto nvrhiDevice = mpDevice->getDevice();
     if (mpBuffer)
+    {
+        nvrhiDevice->waitForIdle();
         nvrhiDevice->unmapBuffer(mpBuffer);
+    }
 
     // Allocate a readback buffer
     nvrhi::BufferDesc desc;
