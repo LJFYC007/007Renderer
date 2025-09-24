@@ -5,6 +5,7 @@
 #include "Core/Pointer.h"
 #include "Utils/Logger.h"
 #include "Utils/GUI.h"
+#include "Utils/ResourceIO.h"
 
 // Global device instance for all tests
 class BasicTestEnvironment : public ::testing::Environment
@@ -18,10 +19,12 @@ public:
         if (!sDevice->initialize())
             FAIL() << "Failed to initialize device for Buffer tests";
         ImGui::CreateContext();
+        gReadbackHeap = make_ref<ReadbackHeap>(sDevice);
     }
 
     void TearDown() override
     {
+        gReadbackHeap = nullptr;
         ImGui::DestroyContext();
         sDevice.reset();
         spdlog::shutdown();
