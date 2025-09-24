@@ -1,7 +1,6 @@
 #pragma once
 #include "RenderPasses/RenderPass.h"
 #include "ShaderPasses/ComputePass.h"
-#include "Core/Buffer.h"
 
 class ErrorMeasure : public RenderPass
 {
@@ -37,7 +36,8 @@ private:
         uint32_t gHeight;
     } mPerFrameData;
 
-    Buffer mCbPerFrame;
+    nvrhi::BufferHandle mCbPerFrame;
+    size_t mCbPerFrameSize = 0;
     nvrhi::TextureHandle mpSourceTexture;
     nvrhi::TextureHandle mpReferenceTexture;
     nvrhi::TextureHandle mpDifferenceTexture;

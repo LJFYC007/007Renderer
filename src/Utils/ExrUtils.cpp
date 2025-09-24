@@ -4,10 +4,12 @@
 
 #include <algorithm>
 #include <cstring>
+#include <vector>
 
 #include "ExrUtils.h"
 #include "Core/Device.h"
 #include "Utils/Logger.h"
+#include "Utils/ResourceIO.h"
 
 void ExrUtils::saveTextureToExr(ref<Device> pDevice, nvrhi::TextureHandle texture, const std::string& filePath)
 {
@@ -15,8 +17,25 @@ void ExrUtils::saveTextureToExr(ref<Device> pDevice, nvrhi::TextureHandle textur
         LOG_ERROR_RETURN("Invalid device or texture");
 
     const auto& desc = texture->getDesc();
-    std::vector<float> imageData;
-    copyTextureDataToCPU(pDevice, texture, imageData);
+    if (!isSupportedFormat(desc.format))
+    {
+        LOG_ERROR("Unsupported texture format for EXR export");
+        return;
+    }
+
+    const uint32_t channelCount = getChannelCount(desc.format);
+    if (channelCount == 0)
+    {
+        LOG_ERROR("Failed to determine channel count for EXR export");
+        return;
+    }
+
+    std::vector<float> imageData(static_cast<size_t>(desc.width) * desc.height * channelCount);
+    if (!ResourceIO::readbackTexture(pDevice, texture, imageData.data(), imageData.size() * sizeof(float)))
+    {
+        LOG_ERROR("Failed to read back texture data for EXR export");
+        return;
+    }
 
     // Prepare EXR image data
     EXRHeader header;
@@ -26,7 +45,6 @@ void ExrUtils::saveTextureToExr(ref<Device> pDevice, nvrhi::TextureHandle textur
     InitEXRImage(&image);
 
     // Allocate channel pointers
-    uint32_t channelCount = getChannelCount(desc.format);
     std::vector<float*> channelData(channelCount);
     std::vector<std::vector<float>> channels(channelCount);
     // Separate channels - rearrange to match EXR alphabetical order
@@ -132,90 +150,18 @@ nvrhi::TextureHandle ExrUtils::loadExrToTexture(ref<Device> pDevice, const std::
         return nullptr;
     }
 
-    copyCPUDataToTexture(pDevice, texture, std::vector<float>(imageData, imageData + width * height * 4));
+    std::vector<float> cpuData(imageData, imageData + static_cast<size_t>(width) * height * 4);
     free(imageData);
+
+    if (!ResourceIO::uploadTexture(pDevice, texture, cpuData.data(), cpuData.size() * sizeof(float)))
+    {
+        LOG_ERROR("Failed to upload EXR data to GPU texture");
+        texture = nullptr;
+        return nullptr;
+    }
+
     LOG_INFO("Successfully loaded EXR file: {}", filePath);
     return texture;
-}
-
-void ExrUtils::copyTextureDataToCPU(ref<Device> pDevice, nvrhi::TextureHandle texture, std::vector<float>& outData)
-{
-    auto desc = texture->getDesc();
-    nvrhi::StagingTextureHandle stagingTexture = pDevice->getDevice()->createStagingTexture(desc, nvrhi::CpuAccessMode::Read);
-    if (!stagingTexture)
-        LOG_ERROR_RETURN("Failed to create staging texture");
-
-    // Copy from GPU texture to staging texture
-    nvrhi::DeviceHandle nvrhiDevice = pDevice->getDevice();
-    nvrhi::CommandListHandle commandList = pDevice->getCommandList();
-    nvrhi::TextureSlice slice;
-
-    commandList->open();
-    commandList->setTextureState(texture, nvrhi::AllSubresources, nvrhi::ResourceStates::CopySource);
-    commandList->copyTexture(stagingTexture, slice, texture, slice);
-    commandList->close();
-
-    // Execute using the correct API - single command list
-    uint64_t fenceValue = nvrhiDevice->executeCommandList(commandList);
-    nvrhiDevice->queueWaitForCommandList(nvrhi::CommandQueue::Graphics, nvrhi::CommandQueue::Graphics, fenceValue);
-
-    // Map staging texture and copy data
-    size_t rowPitch;
-    void* mappedData = pDevice->getDevice()->mapStagingTexture(stagingTexture, slice, nvrhi::CpuAccessMode::Read, &rowPitch);
-    if (!mappedData)
-        LOG_ERROR_RETURN("Failed to map staging texture");
-
-    uint32_t channelCount = getChannelCount(desc.format);
-    outData.resize(desc.width * desc.height * channelCount);
-
-    // Copy row by row to handle potential padding
-    for (uint32_t row = 0; row < desc.height; ++row)
-    {
-        const float* srcRow = reinterpret_cast<const float*>(static_cast<const uint8_t*>(mappedData) + row * rowPitch);
-        float* dstRow = outData.data() + row * desc.width * channelCount;
-        memcpy(dstRow, srcRow, desc.width * channelCount * sizeof(float));
-    }
-
-    pDevice->getDevice()->unmapStagingTexture(stagingTexture);
-}
-
-void ExrUtils::copyCPUDataToTexture(ref<Device> pDevice, nvrhi::TextureHandle& texture, const std::vector<float> inData)
-{
-    auto desc = texture->getDesc();
-    nvrhi::StagingTextureHandle stagingTexture = pDevice->getDevice()->createStagingTexture(desc, nvrhi::CpuAccessMode::Write);
-    if (!stagingTexture)
-        LOG_ERROR_RETURN("Failed to create staging texture for upload");
-
-    // Map staging texture and copy data
-    nvrhi::TextureSlice slice;
-    size_t rowPitch;
-    void* mappedData = pDevice->getDevice()->mapStagingTexture(stagingTexture, slice, nvrhi::CpuAccessMode::Write, &rowPitch);
-    if (!mappedData)
-        LOG_ERROR_RETURN("Failed to map staging texture for upload");
-
-    // Copy row by row to handle potential padding
-    uint32_t channelCount = getChannelCount(desc.format);
-    for (uint32_t row = 0; row < desc.height; ++row)
-    {
-        const float* srcRow = inData.data() + row * desc.width * channelCount;
-        float* dstRow = reinterpret_cast<float*>(static_cast<uint8_t*>(mappedData) + row * rowPitch);
-        memcpy(dstRow, srcRow, desc.width * channelCount * sizeof(float));
-    }
-
-    pDevice->getDevice()->unmapStagingTexture(stagingTexture);
-
-    // Copy from staging texture to GPU texture
-    nvrhi::DeviceHandle nvrhiDevice = pDevice->getDevice();
-    nvrhi::CommandListHandle commandList = pDevice->getCommandList();
-
-    commandList->open();
-    commandList->setTextureState(texture, nvrhi::AllSubresources, nvrhi::ResourceStates::CopyDest);
-    commandList->copyTexture(texture, slice, stagingTexture, slice);
-    commandList->close();
-
-    // Execute command list and wait for completion
-    uint64_t fenceValue = nvrhiDevice->executeCommandList(commandList);
-    nvrhiDevice->queueWaitForCommandList(nvrhi::CommandQueue::Graphics, nvrhi::CommandQueue::Graphics, fenceValue);
 }
 
 uint32_t ExrUtils::getChannelCount(nvrhi::Format format)

@@ -1,4 +1,5 @@
 #include "TextureAverage.h"
+#include "Utils/ResourceIO.h"
 #include "Utils/Math/Math.h"
 #include "Utils/Logger.h"
 
@@ -30,8 +31,18 @@ constexpr uint32_t kTileHeight = 16;
 
 TextureAverage::TextureAverage(ref<Device> pDevice) : RenderPass(pDevice)
 {
-    mCbPerFrame.initialize(pDevice, &mPerFrameData, sizeof(PerFrameCB), nvrhi::ResourceStates::ConstantBuffer, false, true, "PerFrameCB");
-    mResultBuffer.initialize(pDevice, nullptr, sizeof(float4), nvrhi::ResourceStates::UnorderedAccess, true, false, "AverageResult");
+    nvrhi::BufferDesc cbDesc;
+    cbDesc.byteSize = sizeof(PerFrameCB);
+    cbDesc.isConstantBuffer = true;
+    cbDesc.initialState = nvrhi::ResourceStates::ConstantBuffer;
+    cbDesc.keepInitialState = true;
+    cbDesc.cpuAccess = nvrhi::CpuAccessMode::None;
+    cbDesc.debugName = "Utils/TextureAverage/PerFrameCB";
+    mCbPerFrame = mpDevice->getDevice()->createBuffer(cbDesc);
+    mCbPerFrameSize = mCbPerFrame ? cbDesc.byteSize : 0;
+    if (mCbPerFrame && mCbPerFrameSize > 0)
+        ResourceIO::uploadBuffer(mpDevice, mCbPerFrame, &mPerFrameData, mCbPerFrameSize);
+
     mpPass = make_ref<ComputePass>(pDevice, "/src/RenderPasses/Utils/TextureAverage/TextureAverage.slang", "main");
     mAverageResult = float4(0.0f);
 }
@@ -72,26 +83,43 @@ RenderData TextureAverage::execute(const RenderData& renderData)
     // Update constant buffer with texture dimensions
     mPerFrameData.gWidth = mWidth;
     mPerFrameData.gHeight = mHeight;
-    mCbPerFrame.updateData(mpDevice, &mPerFrameData, sizeof(PerFrameCB));
+    if (mCbPerFrame)
+        ResourceIO::uploadBuffer(mpDevice, mCbPerFrame, &mPerFrameData, sizeof(PerFrameCB));
 
     const uint32_t tilesX = (mWidth + kTileWidth - 1) / kTileWidth;
     const uint32_t tilesY = (mHeight + kTileHeight - 1) / kTileHeight;
     const size_t tileCount = static_cast<size_t>(tilesX) * static_cast<size_t>(tilesY);
     const size_t requiredBytes = tileCount * sizeof(float4);
 
-    if (mResultBuffer.getSize() != requiredBytes)
-        mResultBuffer.initialize(mpDevice, nullptr, requiredBytes, nvrhi::ResourceStates::UnorderedAccess, true, false, "AverageResult");
+    if (!mResultBuffer || mResultBufferSize != requiredBytes)
+    {
+        nvrhi::BufferDesc resultDesc;
+        resultDesc.byteSize = requiredBytes;
+        resultDesc.structStride = sizeof(float4);
+        resultDesc.canHaveUAVs = true;
+        resultDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+        resultDesc.keepInitialState = true;
+        resultDesc.cpuAccess = nvrhi::CpuAccessMode::None;
+        resultDesc.debugName = "Utils/TextureAverage/AverageResult";
+        mResultBuffer = mpDevice->getDevice()->createBuffer(resultDesc);
+        mResultBufferSize = mResultBuffer ? requiredBytes : 0;
+    }
 
     // Bind resources to compute pass
-    (*mpPass)["PerFrameCB"] = mCbPerFrame.getHandle();
+    (*mpPass)["PerFrameCB"] = mCbPerFrame;
     (*mpPass)["inputTexture"] = mpInputTexture;
-    (*mpPass)["resultBuffer"] = mResultBuffer.getHandle();
+    (*mpPass)["resultBuffer"] = mResultBuffer;
 
     // Execute compute pass with one thread per tile
     mpPass->execute(tilesX, tilesY, 1);
 
     // Read back the result from GPU
-    auto resultData = mResultBuffer.readback(mpDevice);
+    std::vector<uint8_t> resultData(requiredBytes);
+    if (!mResultBuffer || requiredBytes == 0 || !ResourceIO::readbackBuffer(mpDevice, mResultBuffer, resultData.data(), requiredBytes))
+    {
+        mAverageResult = float4(0.0f);
+        return RenderData();
+    }
 
     float4 totalSum(0.0f);
     const float* partialSums = reinterpret_cast<const float*>(resultData.data());

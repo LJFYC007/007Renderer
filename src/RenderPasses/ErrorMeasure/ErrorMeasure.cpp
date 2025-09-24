@@ -1,4 +1,5 @@
 #include "ErrorMeasure.h"
+#include "Utils/ResourceIO.h"
 #include "Utils/ExrUtils.h"
 
 namespace
@@ -26,7 +27,17 @@ const std::string kOutputName = "output";
 
 ErrorMeasure::ErrorMeasure(ref<Device> pDevice) : RenderPass(pDevice)
 {
-    mCbPerFrame.initialize(pDevice, &mPerFrameData, sizeof(PerFrameCB), nvrhi::ResourceStates::ConstantBuffer, false, true, "PerFrameCB");
+    nvrhi::BufferDesc cbDesc;
+    cbDesc.byteSize = sizeof(PerFrameCB);
+    cbDesc.isConstantBuffer = true;
+    cbDesc.initialState = nvrhi::ResourceStates::ConstantBuffer;
+    cbDesc.keepInitialState = true;
+    cbDesc.cpuAccess = nvrhi::CpuAccessMode::None;
+    cbDesc.debugName = "ErrorMeasure/PerFrameCB";
+    mCbPerFrame = mpDevice->getDevice()->createBuffer(cbDesc);
+    mCbPerFrameSize = mCbPerFrame ? cbDesc.byteSize : 0;
+    if (mCbPerFrame && mCbPerFrameSize > 0)
+        ResourceIO::uploadBuffer(mpDevice, mCbPerFrame, &mPerFrameData, mCbPerFrameSize);
     mpPass = make_ref<ComputePass>(pDevice, "/src/RenderPasses/ErrorMeasure/ErrorMeasure.slang", "main");
 
     // Load reference texture from EXR file
@@ -39,7 +50,7 @@ ErrorMeasure::ErrorMeasure(ref<Device> pDevice) : RenderPass(pDevice)
                                          .setHeight(mHeight)
                                          .setFormat(nvrhi::Format::RGBA32_FLOAT)
                                          .setInitialState(nvrhi::ResourceStates::UnorderedAccess)
-                                         .setDebugName("differenceTexture")
+                                         .setDebugName("ErrorMeasure/differenceTexture")
                                          .setIsUAV(true)
                                          .setKeepInitialState(true);
     mpDifferenceTexture = mpDevice->getDevice()->createTexture(textureDesc);
@@ -71,8 +82,9 @@ RenderData ErrorMeasure::execute(const RenderData& renderData)
     mPerFrameData.gWidth = mWidth;
     mPerFrameData.gHeight = mHeight;
 
-    mCbPerFrame.updateData(mpDevice, &mPerFrameData, sizeof(PerFrameCB));
-    (*mpPass)["PerFrameCB"] = mCbPerFrame.getHandle();
+    if (mCbPerFrame)
+        ResourceIO::uploadBuffer(mpDevice, mCbPerFrame, &mPerFrameData, sizeof(PerFrameCB));
+    (*mpPass)["PerFrameCB"] = mCbPerFrame;
     (*mpPass)["source"] = mpSourceTexture;
     (*mpPass)["reference"] = mpReferenceTexture;
     (*mpPass)["difference"] = mpDifferenceTexture;

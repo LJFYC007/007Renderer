@@ -1,7 +1,6 @@
 #pragma once
 #include "RenderPasses/RenderPass.h"
 #include "ShaderPasses/ComputePass.h"
-#include "Core/Buffer.h"
 #include "Utils/Math/Math.h"
 
 class TextureAverage : public RenderPass
@@ -28,8 +27,10 @@ private:
 
     float4 mAverageResult;
 
-    Buffer mCbPerFrame;
-    Buffer mResultBuffer;
+    nvrhi::BufferHandle mCbPerFrame;
+    nvrhi::BufferHandle mResultBuffer;
+    size_t mCbPerFrameSize = 0;
+    size_t mResultBufferSize = 0;
     ref<ComputePass> mpPass;
     nvrhi::TextureHandle mpInputTexture;
     uint32_t mWidth = 0;

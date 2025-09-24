@@ -1,7 +1,6 @@
 #pragma once
 #include "RenderPasses/RenderPass.h"
 #include "ShaderPasses/RayTracingPass.h"
-#include "Core/Buffer.h"
 
 class PathTracingPass : public RenderPass
 {
@@ -35,7 +34,10 @@ private:
         float gColor;
     } mPerFrameData;
 
-    Buffer mCbPerFrame, mCbCamera;
+    nvrhi::BufferHandle mCbPerFrame;
+    nvrhi::BufferHandle mCbCamera;
+    size_t mCbPerFrameSize = 0;
+    size_t mCbCameraSize = 0;
     nvrhi::TextureHandle mTextureOut;
     ref<RayTracingPass> mpPass;
 };

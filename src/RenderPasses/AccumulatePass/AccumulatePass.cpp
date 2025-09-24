@@ -1,4 +1,5 @@
 #include "AccumulatePass.h"
+#include "Utils/ResourceIO.h"
 #include "Utils/Math/Math.h"
 
 namespace
@@ -25,7 +26,18 @@ const std::string kOutputName = "output";
 
 AccumulatePass::AccumulatePass(ref<Device> pDevice) : RenderPass(pDevice)
 {
-    mCbPerFrame.initialize(pDevice, &mPerFrameData, sizeof(PerFrameCB), nvrhi::ResourceStates::ConstantBuffer, false, true, "PerFrameCB");
+    nvrhi::BufferDesc cbDesc;
+    cbDesc.byteSize = sizeof(PerFrameCB);
+    cbDesc.isConstantBuffer = true;
+    cbDesc.initialState = nvrhi::ResourceStates::ConstantBuffer;
+    cbDesc.keepInitialState = true;
+    cbDesc.cpuAccess = nvrhi::CpuAccessMode::None;
+    cbDesc.debugName = "AccumulatePass/PerFrameCB";
+    mCbPerFrame = mpDevice->getDevice()->createBuffer(cbDesc);
+    mCbPerFrameSize = mCbPerFrame ? cbDesc.byteSize : 0;
+    if (mCbPerFrame && mCbPerFrameSize > 0)
+        ResourceIO::uploadBuffer(mpDevice, mCbPerFrame, &mPerFrameData, mCbPerFrameSize);
+
     mpPass = make_ref<ComputePass>(pDevice, "/src/RenderPasses/AccumulatePass/AccumulatePass.slang", "main");
 }
 
@@ -66,8 +78,9 @@ RenderData AccumulatePass::execute(const RenderData& renderData)
 
     RenderData output;
     output.setResource(kOutputName, mTextureOut);
-    mCbPerFrame.updateData(mpDevice, &mPerFrameData, sizeof(PerFrameCB));
-    (*mpPass)["PerFrameCB"] = mCbPerFrame.getHandle();
+    ResourceIO::uploadBuffer(mpDevice, mCbPerFrame, &mPerFrameData, sizeof(PerFrameCB));
+
+    (*mpPass)["PerFrameCB"] = mCbPerFrame;
     (*mpPass)["input"] = pInputTexture;
     (*mpPass)["accumulateTexture"] = mAccumulateTexture;
     (*mpPass)["output"] = mTextureOut;
@@ -88,10 +101,10 @@ void AccumulatePass::prepareResources()
                                          .setHeight(mHeight)
                                          .setFormat(nvrhi::Format::RGBA32_FLOAT)
                                          .setInitialState(nvrhi::ResourceStates::UnorderedAccess)
-                                         .setDebugName("output")
+                                         .setDebugName("AccumulatePass/output")
                                          .setIsUAV(true)
                                          .setKeepInitialState(true);
     mTextureOut = mpDevice->getDevice()->createTexture(textureDesc);
-    textureDesc.setDebugName("accumulateTexture");
+    textureDesc.setDebugName("AccumulatePass/accumulateTexture");
     mAccumulateTexture = mpDevice->getDevice()->createTexture(textureDesc);
 }

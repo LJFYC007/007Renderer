@@ -87,7 +87,9 @@ bool Device::createD3D12Device()
 
         // Skip software adapters
         if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
-            continue; // Try to create device with this adapter
+            continue;
+
+        // Try to create device with this adapter
         if (SUCCEEDED(D3D12CreateDevice(mpAdapter.Get(), D3D_FEATURE_LEVEL_12_0, IID_PPV_ARGS(&mpD3d12Device))))
         {
             // Convert wide string to regular string for logging

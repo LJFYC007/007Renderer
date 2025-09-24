@@ -3,9 +3,9 @@
 #include <cstdint>
 #include <cstring>
 
-#include "Core/Buffer.h"
 #include "Core/Device.h"
 #include "ShaderPasses/ComputePass.h"
+#include "Utils/ResourceIO.h"
 #include "Environment.h"
 
 #include <nvrhi/nvrhi.h>
@@ -37,30 +37,12 @@ struct Float4
 std::vector<uint8_t> readbackBuffer(ref<Device> device, nvrhi::BufferHandle buffer, size_t byteSize)
 {
     std::vector<uint8_t> result(byteSize);
-    auto nvrhiDevice = device->getDevice();
-    auto commandList = device->getCommandList();
+    if (byteSize == 0)
+        return result;
 
-    nvrhi::BufferDesc stagingDesc;
-    stagingDesc.byteSize = byteSize;
-    stagingDesc.initialState = nvrhi::ResourceStates::CopyDest;
-    stagingDesc.cpuAccess = nvrhi::CpuAccessMode::Read;
-    stagingDesc.keepInitialState = true;
-    stagingDesc.debugName = "SlangReflectionReadback";
-    nvrhi::BufferHandle stagingBuffer = nvrhiDevice->createBuffer(stagingDesc);
+    if (!ResourceIO::readbackBuffer(device, buffer, result.data(), byteSize))
+        result.clear();
 
-    commandList->open();
-    commandList->copyBuffer(stagingBuffer, 0, buffer, 0, byteSize);
-    commandList->close();
-
-    uint64_t fenceValue = nvrhiDevice->executeCommandList(commandList);
-    nvrhiDevice->queueWaitForCommandList(nvrhi::CommandQueue::Graphics, nvrhi::CommandQueue::Graphics, fenceValue);
-
-    void* mapped = nvrhiDevice->mapBuffer(stagingBuffer, nvrhi::CpuAccessMode::Read);
-    if (mapped)
-    {
-        std::memcpy(result.data(), mapped, byteSize);
-        nvrhiDevice->unmapBuffer(stagingBuffer);
-    }
     return result;
 }
 
@@ -85,16 +67,17 @@ TEST_F(SlangTest, Basic)
 
     // Structured buffer data
     std::vector<float> structuredBufferData = {1.25f, 2.5f, 3.75f, 5.0f};
-    Buffer structuredBuffer;
-    ASSERT_TRUE(structuredBuffer.initialize(
-        mpDevice,
-        structuredBufferData.data(),
-        structuredBufferData.size() * sizeof(float),
-        nvrhi::ResourceStates::ShaderResource,
-        false,
-        false,
-        "ReflectionInputBuffer"
-    ));
+    const size_t structuredBufferBytes = structuredBufferData.size() * sizeof(float);
+    nvrhi::BufferDesc structuredBufferDesc;
+    structuredBufferDesc.byteSize = structuredBufferBytes;
+    structuredBufferDesc.structStride = sizeof(float);
+    structuredBufferDesc.initialState = nvrhi::ResourceStates::ShaderResource;
+    structuredBufferDesc.keepInitialState = true;
+    structuredBufferDesc.cpuAccess = nvrhi::CpuAccessMode::None;
+    structuredBufferDesc.debugName = "ReflectionInputBuffer";
+    nvrhi::BufferHandle structuredBuffer = mpDevice->getDevice()->createBuffer(structuredBufferDesc);
+    ASSERT_TRUE(structuredBuffer);
+    ASSERT_TRUE(ResourceIO::uploadBuffer(mpDevice, structuredBuffer, structuredBufferData.data(), structuredBufferBytes));
 
     // Constant buffer data (true flag)
     ConstantBufferData constantsTrue{};
@@ -105,10 +88,16 @@ TEST_F(SlangTest, Basic)
     constantsTrue.vectorValue[1] = 0.25f;
     constantsTrue.vectorValue[2] = 0.75f;
 
-    Buffer constantBuffer;
-    ASSERT_TRUE(constantBuffer.initialize(
-        mpDevice, &constantsTrue, sizeof(constantsTrue), nvrhi::ResourceStates::ConstantBuffer, false, true, "ReflectionConstants"
-    ));
+    nvrhi::BufferDesc constantBufferDesc;
+    constantBufferDesc.byteSize = sizeof(constantsTrue);
+    constantBufferDesc.isConstantBuffer = true;
+    constantBufferDesc.initialState = nvrhi::ResourceStates::ConstantBuffer;
+    constantBufferDesc.keepInitialState = true;
+    constantBufferDesc.cpuAccess = nvrhi::CpuAccessMode::None;
+    constantBufferDesc.debugName = "ReflectionConstants";
+    nvrhi::BufferHandle constantBuffer = mpDevice->getDevice()->createBuffer(constantBufferDesc);
+    ASSERT_TRUE(constantBuffer);
+    ASSERT_TRUE(ResourceIO::uploadBuffer(mpDevice, constantBuffer, &constantsTrue, sizeof(constantsTrue)));
 
     // Texture data (each thread reads a different texel)
     std::vector<Float4> textureData = {
@@ -156,9 +145,9 @@ TEST_F(SlangTest, Basic)
 
     // Dispatch compute shader using reflection-driven bindings
     ref<Pass> pass = make_ref<ComputePass>(mpDevice, "/tests/SlangTest.slang", "computeMain");
-    (*pass)["gInputBuffer"] = structuredBuffer.getHandle();
+    (*pass)["gInputBuffer"] = structuredBuffer;
     (*pass)["gInputTexture"] = texture;
-    (*pass)["gConstants"] = constantBuffer.getHandle();
+    (*pass)["gConstants"] = constantBuffer;
     (*pass)["gOutputBuffer"] = outputBuffer;
 
     pass->execute(elementCount, 1, 1);
@@ -181,7 +170,7 @@ TEST_F(SlangTest, Basic)
     ConstantBufferData constantsFalse = constantsTrue;
     constantsFalse.scalarValue = 1.25f;
     constantsFalse.setFlag(false);
-    constantBuffer.updateData(mpDevice, &constantsFalse, sizeof(constantsFalse));
+    ASSERT_TRUE(ResourceIO::uploadBuffer(mpDevice, constantBuffer, &constantsFalse, sizeof(constantsFalse)));
 
     pass->execute(elementCount, 1, 1);
 

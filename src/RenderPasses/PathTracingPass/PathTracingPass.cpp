@@ -1,4 +1,5 @@
 #include "PathTracingPass.h"
+#include "Utils/ResourceIO.h"
 
 namespace
 {
@@ -21,8 +22,20 @@ struct PathTracingPassRegistration
 
 PathTracingPass::PathTracingPass(ref<Device> pDevice) : RenderPass(pDevice)
 {
-    mCbPerFrame.initialize(pDevice, nullptr, sizeof(PerFrameCB), nvrhi::ResourceStates::ConstantBuffer, false, true, "PerFrameCB");
-    mCbCamera.initialize(pDevice, nullptr, sizeof(CameraData), nvrhi::ResourceStates::ConstantBuffer, false, true, "Camera");
+    nvrhi::BufferDesc cbDesc;
+    cbDesc.byteSize = sizeof(PerFrameCB);
+    cbDesc.isConstantBuffer = true;
+    cbDesc.initialState = nvrhi::ResourceStates::ConstantBuffer;
+    cbDesc.keepInitialState = true;
+    cbDesc.cpuAccess = nvrhi::CpuAccessMode::None;
+    cbDesc.debugName = "PathTracingPass/PerFrameCB";
+    mCbPerFrame = mpDevice->getDevice()->createBuffer(cbDesc);
+    mCbPerFrameSize = mCbPerFrame ? cbDesc.byteSize : 0;
+
+    cbDesc.byteSize = sizeof(CameraData);
+    cbDesc.debugName = "PathTracingPass/Camera";
+    mCbCamera = mpDevice->getDevice()->createBuffer(cbDesc);
+    mCbCameraSize = mCbCamera ? cbDesc.byteSize : 0;
 
     std::unordered_map<std::string, nvrhi::ShaderType> entryPoints = {
         {"rayGenMain", nvrhi::ShaderType::RayGeneration}, {"missMain", nvrhi::ShaderType::Miss}, {"closestHitMain", nvrhi::ShaderType::ClosestHit}
@@ -48,11 +61,11 @@ RenderData PathTracingPass::execute(const RenderData& input)
 
     RenderData output;
     output.setResource("output", mTextureOut);
-    mCbPerFrame.updateData(mpDevice, &mPerFrameData, sizeof(PerFrameCB));
-    mCbCamera.updateData(mpDevice, &mpScene->camera->getCameraData(), sizeof(CameraData));
+    ResourceIO::uploadBuffer(mpDevice, mCbPerFrame, &mPerFrameData, sizeof(PerFrameCB));
+    ResourceIO::uploadBuffer(mpDevice, mCbCamera, &mpScene->camera->getCameraData(), sizeof(CameraData));
 
-    (*mpPass)["PerFrameCB"] = mCbPerFrame.getHandle();
-    (*mpPass)["gCamera"] = mCbCamera.getHandle();
+    (*mpPass)["PerFrameCB"] = mCbPerFrame;
+    (*mpPass)["gCamera"] = mCbCamera;
     (*mpPass)["gScene.vertices"] = mpScene->getVertexBuffer();
     (*mpPass)["gScene.indices"] = mpScene->getIndexBuffer();
     (*mpPass)["gScene.meshes"] = mpScene->getMeshBuffer();
@@ -76,7 +89,7 @@ void PathTracingPass::prepareResources()
                                          .setHeight(mHeight)
                                          .setFormat(nvrhi::Format::RGBA32_FLOAT)
                                          .setInitialState(nvrhi::ResourceStates::UnorderedAccess)
-                                         .setDebugName("output")
+                                         .setDebugName("PathTracingPass/output")
                                          .setIsUAV(true)
                                          .setKeepInitialState(true);
     mTextureOut = mpDevice->getDevice()->createTexture(textureDesc);

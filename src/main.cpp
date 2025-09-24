@@ -9,6 +9,7 @@
 #include "RenderPasses/RenderGraphEditor.h"
 #include "Utils/Logger.h"
 #include "Utils/GUI.h"
+#include "Utils/ResourceIO.h"
 #include "Scene/Camera/Camera.h"
 
 int main()
@@ -35,6 +36,9 @@ int main()
     window.PrepareResources();
 
     {
+        // Create readback heap
+        gReadbackHeap = make_ref<ReadbackHeap>(pDevice);
+
         // Setup scene
         AssimpImporter importer(pDevice);
         ref<Scene> scene = importer.loadScene(std::string(PROJECT_DIR) + "/media/cornell_box.gltf");
@@ -103,6 +107,9 @@ int main()
             // Finish rendering
             window.RenderEnd();
         }
+
+        // Release readback heap before device shutdown
+        gReadbackHeap = nullptr;
     }
 
     window.CleanupResources();
