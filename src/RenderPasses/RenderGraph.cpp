@@ -227,9 +227,10 @@ nvrhi::TextureHandle RenderGraph::getFinalOutputTexture()
     auto it = mIntermediateResults.find(passName);
     nvrhi::TextureHandle sourceTexture = static_cast<nvrhi::ITexture*>(it->second[outputName].Get());
     const auto& sourceDesc = sourceTexture->getDesc();
-
-    // Check if we need to recreate the output texture
-    if (!mOutputTexture || mOutputWidth != sourceDesc.width || mOutputHeight != sourceDesc.height)
+    if (!mOutputTexture)
+        createOutputTexture(sourceDesc.width, sourceDesc.height, sourceDesc.format);
+    const auto& destDesc = mOutputTexture->getDesc();
+    if (sourceDesc.width != destDesc.width || sourceDesc.height != destDesc.height || sourceDesc.format != destDesc.format)
         createOutputTexture(sourceDesc.width, sourceDesc.height, sourceDesc.format);
 
     // Copy the source texture to our managed output texture
@@ -258,10 +259,7 @@ void RenderGraph::createOutputTexture(uint32_t width, uint32_t height, nvrhi::Fo
     desc.initialState = nvrhi::ResourceStates::ShaderResource;
     desc.keepInitialState = true;
     desc.debugName = "RenderGraph/OutputTexture";
-
     mOutputTexture = mpDevice->getDevice()->createTexture(desc);
-    mOutputWidth = width;
-    mOutputHeight = height;
 }
 
 void RenderGraph::renderOutputSelectionUI()

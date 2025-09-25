@@ -17,12 +17,12 @@
       "generator": "Ninja",
       "configurationType": "RelWithDebInfo",
       "inheritEnvironments": [ "msvc_x64_x64" ],
-      "buildRoot": "${projectDir}\\build\\Release",
-      "installRoot": "${projectDir}\\build\\Release\\install",
+      "buildRoot": "${projectDir}\\build\\RelWithDebInfo",
+      "installRoot": "${projectDir}\\build\\RelWithDebInfo\\install",
       "cmakeCommandArgs": "",
       "buildCommandArgs": "",
       "ctestCommandArgs": "",
-      "launchTarget": "${buildRoot}\\bin\\Release\\007Renderer.exe"
+      "launchTarget": "${buildRoot}\\bin\\RelWithDebInfo\\007Renderer.exe"
     }
   ]
 }

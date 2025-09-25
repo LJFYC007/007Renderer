@@ -24,7 +24,8 @@ public:
 
     void TearDown() override
     {
-        gReadbackHeap = nullptr;
+        sDevice->getDevice()->waitForIdle();
+        gReadbackHeap.reset();
         ImGui::DestroyContext();
         sDevice.reset();
         spdlog::shutdown();

@@ -80,9 +80,5 @@ private:
     std::string mSelectedOutputKey;
     std::vector<std::string> mAvailableOutputs;
     int mSelectedOutputIndex;
-
-    // Internal output texture for maintaining ShaderResource state
     nvrhi::TextureHandle mOutputTexture;
-    uint32_t mOutputWidth = 0;
-    uint32_t mOutputHeight = 0;
 };

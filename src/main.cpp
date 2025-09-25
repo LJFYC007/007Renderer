@@ -109,7 +109,7 @@ int main()
         }
 
         // Release readback heap before device shutdown
-        gReadbackHeap = nullptr;
+        gReadbackHeap.reset();
     }
 
     window.CleanupResources();
