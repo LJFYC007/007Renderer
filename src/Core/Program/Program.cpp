@@ -591,10 +591,12 @@ bool Program::processParameter(slang::VariableLayoutReflection* pVarLayout, int 
         break;
     }
 
+    // TODO: every constant buffer we treat as volatile for now
     case slang::TypeReflection::Kind::ConstantBuffer:
     {
-        layoutItem = nvrhi::BindingLayoutItem::ConstantBuffer(bindingSlot);
+        layoutItem = nvrhi::BindingLayoutItem::VolatileConstantBuffer(bindingSlot);
         bindingItem = nvrhi::BindingSetItem::ConstantBuffer(bindingSlot, nullptr);
+        bindingItem.type = nvrhi::ResourceType::VolatileConstantBuffer;
         LOG_DEBUG("[ShaderBinding] Found constant buffer: {} at slot {}", paramNameStr, bindingSlot);
         break;
     }

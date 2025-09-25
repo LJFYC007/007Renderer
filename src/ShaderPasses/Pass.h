@@ -3,12 +3,21 @@
 #include "Core/Program/BindingSetManager.h"
 #include "Core/Pointer.h"
 
+struct ConstantBuffer
+{
+    nvrhi::BufferHandle buffer;
+    void* pData;
+    size_t sizeBytes;
+};
+
 class Pass
 {
 public:
     Pass(ref<Device> pDevice) : mpDevice(pDevice) {};
 
     virtual void execute(uint32_t width, uint32_t height, uint32_t depth) = 0;
+
+    void addConstantBuffer(nvrhi::BufferHandle buffer, void* pData, size_t sizeBytes) { mConstantBuffers.push_back({buffer, pData, sizeBytes}); }
 
     // We can use pass["name"] = resourceHandle;
     class BindingSlot
@@ -33,4 +42,5 @@ public:
 protected:
     ref<Device> mpDevice;
     ref<BindingSetManager> mpBindingSetManager; // Manages binding sets and layouts
+    std::vector<ConstantBuffer> mConstantBuffers;
 };

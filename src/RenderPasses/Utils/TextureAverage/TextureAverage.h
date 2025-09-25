@@ -29,7 +29,6 @@ private:
 
     nvrhi::BufferHandle mCbPerFrame;
     nvrhi::BufferHandle mResultBuffer;
-    size_t mCbPerFrameSize = 0;
     size_t mResultBufferSize = 0;
     ref<ComputePass> mpPass;
     nvrhi::TextureHandle mpInputTexture;

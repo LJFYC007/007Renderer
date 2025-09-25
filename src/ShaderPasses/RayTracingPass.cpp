@@ -68,6 +68,9 @@ void RayTracingPass::execute(uint32_t width, uint32_t height, uint32_t depth)
     auto pCommandList = mpDevice->getCommandList();
     auto pNvrhiDevice = mpDevice->getDevice();
     pCommandList->open();
+    for (const auto& cbTex : mConstantBuffers)
+        if (cbTex.buffer && cbTex.pData && cbTex.sizeBytes > 0)
+            pCommandList->writeBuffer(cbTex.buffer, cbTex.pData, cbTex.sizeBytes);
     pCommandList->setRayTracingState(rtState);
     nvrhi::rt::DispatchRaysArguments args;
     args.setDimensions(width, height, depth);

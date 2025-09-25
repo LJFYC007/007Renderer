@@ -39,7 +39,6 @@ private:
     } mPerFrameData;
 
     nvrhi::BufferHandle mCbPerFrame;
-    size_t mCbPerFrameSize = 0;
     nvrhi::TextureHandle mTextureOut;
     nvrhi::TextureHandle mAccumulateTexture;
     ref<ComputePass> mpPass;

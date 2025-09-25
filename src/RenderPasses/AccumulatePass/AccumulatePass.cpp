@@ -32,13 +32,12 @@ AccumulatePass::AccumulatePass(ref<Device> pDevice) : RenderPass(pDevice)
     cbDesc.initialState = nvrhi::ResourceStates::ConstantBuffer;
     cbDesc.keepInitialState = true;
     cbDesc.cpuAccess = nvrhi::CpuAccessMode::None;
+    cbDesc.isVolatile = true;
     cbDesc.debugName = "AccumulatePass/PerFrameCB";
     mCbPerFrame = mpDevice->getDevice()->createBuffer(cbDesc);
-    mCbPerFrameSize = mCbPerFrame ? cbDesc.byteSize : 0;
-    if (mCbPerFrame && mCbPerFrameSize > 0)
-        ResourceIO::uploadBuffer(mpDevice, mCbPerFrame, &mPerFrameData, mCbPerFrameSize);
 
     mpPass = make_ref<ComputePass>(pDevice, "/src/RenderPasses/AccumulatePass/AccumulatePass.slang", "main");
+    mpPass->addConstantBuffer(mCbPerFrame, &mPerFrameData, sizeof(PerFrameCB));
 }
 
 std::vector<RenderPassInput> AccumulatePass::getInputs() const
@@ -78,8 +77,6 @@ RenderData AccumulatePass::execute(const RenderData& renderData)
 
     RenderData output;
     output.setResource(kOutputName, mTextureOut);
-    ResourceIO::uploadBuffer(mpDevice, mCbPerFrame, &mPerFrameData, sizeof(PerFrameCB));
-
     (*mpPass)["PerFrameCB"] = mCbPerFrame;
     (*mpPass)["input"] = pInputTexture;
     (*mpPass)["accumulateTexture"] = mAccumulateTexture;

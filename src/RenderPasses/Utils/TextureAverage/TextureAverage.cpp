@@ -37,13 +37,12 @@ TextureAverage::TextureAverage(ref<Device> pDevice) : RenderPass(pDevice)
     cbDesc.initialState = nvrhi::ResourceStates::ConstantBuffer;
     cbDesc.keepInitialState = true;
     cbDesc.cpuAccess = nvrhi::CpuAccessMode::None;
+    cbDesc.isVolatile = true;
     cbDesc.debugName = "Utils/TextureAverage/PerFrameCB";
     mCbPerFrame = mpDevice->getDevice()->createBuffer(cbDesc);
-    mCbPerFrameSize = mCbPerFrame ? cbDesc.byteSize : 0;
-    if (mCbPerFrame && mCbPerFrameSize > 0)
-        ResourceIO::uploadBuffer(mpDevice, mCbPerFrame, &mPerFrameData, mCbPerFrameSize);
 
     mpPass = make_ref<ComputePass>(pDevice, "/src/RenderPasses/Utils/TextureAverage/TextureAverage.slang", "main");
+    mpPass->addConstantBuffer(mCbPerFrame, &mPerFrameData, sizeof(PerFrameCB));
     mAverageResult = float4(0.0f);
 }
 
@@ -83,8 +82,6 @@ RenderData TextureAverage::execute(const RenderData& renderData)
     // Update constant buffer with texture dimensions
     mPerFrameData.gWidth = mWidth;
     mPerFrameData.gHeight = mHeight;
-    if (mCbPerFrame)
-        ResourceIO::uploadBuffer(mpDevice, mCbPerFrame, &mPerFrameData, sizeof(PerFrameCB));
 
     const uint32_t tilesX = (mWidth + kTileWidth - 1) / kTileWidth;
     const uint32_t tilesY = (mHeight + kTileHeight - 1) / kTileHeight;

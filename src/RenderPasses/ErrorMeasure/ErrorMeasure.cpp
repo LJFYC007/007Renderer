@@ -33,12 +33,11 @@ ErrorMeasure::ErrorMeasure(ref<Device> pDevice) : RenderPass(pDevice)
     cbDesc.initialState = nvrhi::ResourceStates::ConstantBuffer;
     cbDesc.keepInitialState = true;
     cbDesc.cpuAccess = nvrhi::CpuAccessMode::None;
+    cbDesc.isVolatile = true;
     cbDesc.debugName = "ErrorMeasure/PerFrameCB";
     mCbPerFrame = mpDevice->getDevice()->createBuffer(cbDesc);
-    mCbPerFrameSize = mCbPerFrame ? cbDesc.byteSize : 0;
-    if (mCbPerFrame && mCbPerFrameSize > 0)
-        ResourceIO::uploadBuffer(mpDevice, mCbPerFrame, &mPerFrameData, mCbPerFrameSize);
     mpPass = make_ref<ComputePass>(pDevice, "/src/RenderPasses/ErrorMeasure/ErrorMeasure.slang", "main");
+    mpPass->addConstantBuffer(mCbPerFrame, &mPerFrameData, sizeof(PerFrameCB));
 
     // Load reference texture from EXR file
     mpReferenceTexture = ExrUtils::loadExrToTexture(pDevice, std::string(PROJECT_DIR) + "/media/reference.exr");
@@ -82,8 +81,6 @@ RenderData ErrorMeasure::execute(const RenderData& renderData)
     mPerFrameData.gWidth = mWidth;
     mPerFrameData.gHeight = mHeight;
 
-    if (mCbPerFrame)
-        ResourceIO::uploadBuffer(mpDevice, mCbPerFrame, &mPerFrameData, sizeof(PerFrameCB));
     (*mpPass)["PerFrameCB"] = mCbPerFrame;
     (*mpPass)["source"] = mpSourceTexture;
     (*mpPass)["reference"] = mpReferenceTexture;

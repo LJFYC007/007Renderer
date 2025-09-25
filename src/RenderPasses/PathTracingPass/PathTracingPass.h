@@ -11,6 +11,12 @@ public:
 
     void renderUI() override;
 
+    void setScene(ref<Scene> pScene) override
+    {
+        mpScene = pScene;
+        mpPass->addConstantBuffer(mCbCamera, &mpScene->camera->getCameraData(), sizeof(CameraData));
+    }
+
     // RenderGraph interface
     std::string getName() const override { return "PathTracing"; }
     std::vector<RenderPassInput> getInputs() const override { return {}; } // No inputs, generates from scene
@@ -36,8 +42,6 @@ private:
 
     nvrhi::BufferHandle mCbPerFrame;
     nvrhi::BufferHandle mCbCamera;
-    size_t mCbPerFrameSize = 0;
-    size_t mCbCameraSize = 0;
     nvrhi::TextureHandle mTextureOut;
     ref<RayTracingPass> mpPass;
 };

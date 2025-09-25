@@ -93,12 +93,14 @@ int main()
             window.SetDisplayTexture(d3d12Texture);
 
             // Custom ImGui content before window render
-            bool renderResult = window.RenderBegin();
-            if (!renderResult)
+            Window::FrameStatus frameStatus = window.RenderBegin();
+            if (frameStatus == Window::FrameStatus::Exit)
             {
                 notDone = false;
                 break;
             }
+            else if (frameStatus == Window::FrameStatus::Skip)
+                continue;
 
             guiManager.renderMainLayout(scene, &renderGraphEditor, imageTexture, window, width, height);
             if (GUI::IsKeyPressed(ImGuiKey_Escape))

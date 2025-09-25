@@ -134,9 +134,9 @@ void Window::PrepareResources()
     mDisplayImGuiHandle = (ImTextureID)(intptr_t)mDisplaySrvGpuHandle.ptr;
 }
 
-bool Window::RenderBegin()
+Window::FrameStatus Window::RenderBegin()
 {
-    bool done = false;
+    bool exitRequested = false;
     // Poll and handle messages (inputs, window resize, etc.)
     MSG msg;
     while (::PeekMessage(&msg, nullptr, 0U, 0U, PM_REMOVE))
@@ -144,14 +144,15 @@ bool Window::RenderBegin()
         ::TranslateMessage(&msg);
         ::DispatchMessage(&msg);
         if (msg.message == WM_QUIT)
-            done = true;
+            exitRequested = true;
     }
-    if (done)
-        return false; // Handle window screen locked
+    if (exitRequested)
+        return FrameStatus::Exit; // Handle window close request
+
     if ((g_SwapChainOccluded && g_pSwapChain->Present(0, DXGI_PRESENT_TEST) == DXGI_STATUS_OCCLUDED) || ::IsIconic(mHwnd))
     {
         ::Sleep(10);
-        return true;
+        return FrameStatus::Skip;
     }
     g_SwapChainOccluded = false;
 
@@ -159,7 +160,7 @@ bool Window::RenderBegin()
     ImGui_ImplDX12_NewFrame();
     ImGui_ImplWin32_NewFrame();
     ImGui::NewFrame();
-    return true;
+    return FrameStatus::Ready;
 }
 
 void Window::RenderEnd()

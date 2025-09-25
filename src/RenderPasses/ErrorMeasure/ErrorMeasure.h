@@ -24,8 +24,6 @@ public:
     std::vector<RenderPassOutput> getOutputs() const override;
 
 private:
-    void prepareResources();
-
     uint32_t mWidth = 0;
     uint32_t mHeight = 0;
     OutputId mSelectedOutput = OutputId::Difference;
@@ -37,7 +35,6 @@ private:
     } mPerFrameData;
 
     nvrhi::BufferHandle mCbPerFrame;
-    size_t mCbPerFrameSize = 0;
     nvrhi::TextureHandle mpSourceTexture;
     nvrhi::TextureHandle mpReferenceTexture;
     nvrhi::TextureHandle mpDifferenceTexture;

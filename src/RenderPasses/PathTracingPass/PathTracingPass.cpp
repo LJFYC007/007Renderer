@@ -28,19 +28,19 @@ PathTracingPass::PathTracingPass(ref<Device> pDevice) : RenderPass(pDevice)
     cbDesc.initialState = nvrhi::ResourceStates::ConstantBuffer;
     cbDesc.keepInitialState = true;
     cbDesc.cpuAccess = nvrhi::CpuAccessMode::None;
+    cbDesc.isVolatile = true;
     cbDesc.debugName = "PathTracingPass/PerFrameCB";
     mCbPerFrame = mpDevice->getDevice()->createBuffer(cbDesc);
-    mCbPerFrameSize = mCbPerFrame ? cbDesc.byteSize : 0;
 
     cbDesc.byteSize = sizeof(CameraData);
     cbDesc.debugName = "PathTracingPass/Camera";
     mCbCamera = mpDevice->getDevice()->createBuffer(cbDesc);
-    mCbCameraSize = mCbCamera ? cbDesc.byteSize : 0;
 
     std::unordered_map<std::string, nvrhi::ShaderType> entryPoints = {
         {"rayGenMain", nvrhi::ShaderType::RayGeneration}, {"missMain", nvrhi::ShaderType::Miss}, {"closestHitMain", nvrhi::ShaderType::ClosestHit}
     };
     mpPass = make_ref<RayTracingPass>(pDevice, "/src/RenderPasses/PathTracingPass/PathTracing.slang", entryPoints);
+    mpPass->addConstantBuffer(mCbPerFrame, &mPerFrameData, sizeof(PerFrameCB));
 }
 
 RenderData PathTracingPass::execute(const RenderData& input)
@@ -61,9 +61,6 @@ RenderData PathTracingPass::execute(const RenderData& input)
 
     RenderData output;
     output.setResource("output", mTextureOut);
-    ResourceIO::uploadBuffer(mpDevice, mCbPerFrame, &mPerFrameData, sizeof(PerFrameCB));
-    ResourceIO::uploadBuffer(mpDevice, mCbCamera, &mpScene->camera->getCameraData(), sizeof(CameraData));
-
     (*mpPass)["PerFrameCB"] = mCbPerFrame;
     (*mpPass)["gCamera"] = mCbCamera;
     (*mpPass)["gScene.vertices"] = mpScene->getVertexBuffer();

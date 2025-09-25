@@ -53,11 +53,13 @@ void ComputePass::dispatch(uint32_t width, uint32_t height, uint32_t depth)
 
     nvrhi::ComputeState state;
     state.pipeline = mPipeline;
+    for (const auto& cbTex : mConstantBuffers)
+        if (cbTex.buffer && cbTex.pData && cbTex.sizeBytes > 0)
+            pCommandList->writeBuffer(cbTex.buffer, cbTex.pData, cbTex.sizeBytes);
     std::vector<nvrhi::BindingSetHandle> bindingSets = mpBindingSetManager->getBindingSets();
     for (const auto& pBindingSet : bindingSets)
         if (pBindingSet)
             state.addBindingSet(pBindingSet);
-
     pCommandList->setComputeState(state);
     pCommandList->dispatch(width, height, depth);
     pCommandList->close();

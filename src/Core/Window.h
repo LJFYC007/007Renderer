@@ -46,7 +46,15 @@ public:
     ~Window() {};
     void PrepareResources();
     void CleanupResources();
-    bool RenderBegin();
+
+    enum class FrameStatus
+    {
+        Ready,
+        Skip,
+        Exit
+    };
+
+    FrameStatus RenderBegin();
     void RenderEnd();
     void SetDisplayTexture(ID3D12Resource* texture);
     ImTextureID GetDisplayTextureImGuiHandle() const;
