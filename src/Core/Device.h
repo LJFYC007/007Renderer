@@ -15,6 +15,7 @@ using Microsoft::WRL::ComPtr;
 
 #ifdef _DEBUG
 #define DX12_ENABLE_DEBUG_LAYER
+#include <d3d12sdklayers.h>
 #endif
 
 // Message callback class for NVRHI

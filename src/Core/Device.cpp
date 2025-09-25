@@ -22,7 +22,18 @@ bool Device::initialize()
     // Enable debug layer in debug builds
 #ifdef _DEBUG
     if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&mpDx12Debug))))
+    {
         mpDx12Debug->EnableDebugLayer();
+
+        // Enable GPU-based validation (GBV) for enhanced debugging
+        ID3D12Debug3* pDx12Debug3 = nullptr;
+        if (SUCCEEDED(mpDx12Debug->QueryInterface(IID_PPV_ARGS(&pDx12Debug3))))
+        {
+            pDx12Debug3->SetEnableGPUBasedValidation(TRUE);
+            pDx12Debug3->SetGPUBasedValidationFlags(D3D12_GPU_BASED_VALIDATION_FLAGS_NONE);
+            pDx12Debug3->Release();
+        }
+    }
 #endif
 
     // Create DXGI factory

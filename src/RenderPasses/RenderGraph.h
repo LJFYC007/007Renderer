@@ -67,6 +67,7 @@ private:
 
     RenderData executePass(int nodeIndex);
     int findNode(const std::string& name) const;
+    void createOutputTexture(uint32_t width, uint32_t height, nvrhi::Format format);
 
     ref<Device> mpDevice;
     ref<Scene> mpScene;
@@ -75,10 +76,13 @@ private:
     std::vector<RenderGraphConnection> mConnections;
     std::vector<std::unordered_set<uint>> mDependencies; // Node indices this node depends on
     std::vector<uint> mExecutionOrder;
-    std::unordered_map<std::string, RenderData> mIntermediateResults;
-
-    // UI state for output selection
+    std::unordered_map<std::string, RenderData> mIntermediateResults; // UI state for output selection
     std::string mSelectedOutputKey;
     std::vector<std::string> mAvailableOutputs;
     int mSelectedOutputIndex;
+
+    // Internal output texture for maintaining ShaderResource state
+    nvrhi::TextureHandle mOutputTexture;
+    uint32_t mOutputWidth = 0;
+    uint32_t mOutputHeight = 0;
 };

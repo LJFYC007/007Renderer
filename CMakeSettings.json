@@ -4,23 +4,25 @@
       "name": "x64-Debug",
       "generator": "Ninja",
       "configurationType": "Debug",
-      "inheritEnvironments": ["msvc_x64_x64"],
+      "inheritEnvironments": [ "msvc_x64_x64" ],
       "buildRoot": "${projectDir}\\build\\Debug",
       "installRoot": "${projectDir}\\build\\Debug\\install",
       "cmakeCommandArgs": "",
       "buildCommandArgs": "",
-      "ctestCommandArgs": ""
+      "ctestCommandArgs": "",
+      "launchTarget": "${buildRoot}\\bin\\Debug\\007Renderer.exe"
     },
     {
       "name": "x64-Release",
       "generator": "Ninja",
-      "configurationType": "Release",
-      "inheritEnvironments": ["msvc_x64_x64"],
+      "configurationType": "RelWithDebInfo",
+      "inheritEnvironments": [ "msvc_x64_x64" ],
       "buildRoot": "${projectDir}\\build\\Release",
       "installRoot": "${projectDir}\\build\\Release\\install",
       "cmakeCommandArgs": "",
       "buildCommandArgs": "",
-      "ctestCommandArgs": ""
+      "ctestCommandArgs": "",
+      "launchTarget": "${buildRoot}\\bin\\Release\\007Renderer.exe"
     }
   ]
 }

@@ -59,7 +59,7 @@ public:
 
     nvrhi::BufferHandle allocateBuffer(size_t size);
 
-    void* mMappedBuffer;
+    void* mMappedBuffer = nullptr;
 
 private:
     ref<Device> mpDevice;

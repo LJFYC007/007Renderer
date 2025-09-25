@@ -9,7 +9,7 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 # Set output directories for different build types
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/bin/Debug)
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}/bin/Release)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO ${CMAKE_BINARY_DIR}/bin/Release)
 
 # ----------------------------------------------------------------------------
 # Slang shader support
@@ -190,9 +190,9 @@ target_link_libraries(007Renderer PRIVATE
 # ----------------------------------------------------------------------------
 target_compile_definitions(007Core PUBLIC
     $<$<CONFIG:Debug>:SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_DEBUG>
-    $<$<CONFIG:Release>:SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_INFO>
+    $<$<CONFIG:RelWithDebInfo>:SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_INFO>
     $<$<CONFIG:Debug>:_DEBUG>
-    $<$<CONFIG:Release>:NDEBUG>
+    $<$<CONFIG:RelWithDebInfo>:NDEBUG>
     TINYEXR_USE_MINIZ=1
 )
 
@@ -219,7 +219,7 @@ if(BUILD_TESTING)
     # Set output directory for test executable
     set_target_properties(007Tests PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_BINARY_DIR}/bin/Debug
-        RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_BINARY_DIR}/bin/Release
+        RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO ${CMAKE_BINARY_DIR}/bin/Release
     )
     include(GoogleTest)
     # Use PRE_TEST discovery mode to avoid running executable during configure
@@ -228,7 +228,8 @@ if(BUILD_TESTING)
     else()
         gtest_discover_tests(007Tests)
     endif()
-      # Add custom test target that works with both single and multi-config generators
+
+    # Add custom test target that works with both single and multi-config generators
     add_custom_target(run_tests
         COMMAND ${CMAKE_CTEST_COMMAND} --verbose --output-on-failure
         DEPENDS 007Tests

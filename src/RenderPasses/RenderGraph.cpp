@@ -225,8 +225,43 @@ nvrhi::TextureHandle RenderGraph::getFinalOutputTexture()
     std::string passName = mSelectedOutputKey.substr(0, dotPos);
     std::string outputName = mSelectedOutputKey.substr(dotPos + 1);
     auto it = mIntermediateResults.find(passName);
-    auto resource = it->second[outputName];
-    return static_cast<nvrhi::ITexture*>(resource.Get());
+    nvrhi::TextureHandle sourceTexture = static_cast<nvrhi::ITexture*>(it->second[outputName].Get());
+    const auto& sourceDesc = sourceTexture->getDesc();
+
+    // Check if we need to recreate the output texture
+    if (!mOutputTexture || mOutputWidth != sourceDesc.width || mOutputHeight != sourceDesc.height)
+        createOutputTexture(sourceDesc.width, sourceDesc.height, sourceDesc.format);
+
+    // Copy the source texture to our managed output texture
+    auto commandList = mpDevice->getCommandList();
+    commandList->open();
+    nvrhi::TextureSlice slice;
+    commandList->copyTexture(mOutputTexture, slice, sourceTexture, slice);
+    commandList->close();
+    mpDevice->getDevice()->executeCommandList(commandList);
+
+    return mOutputTexture;
+}
+
+void RenderGraph::createOutputTexture(uint32_t width, uint32_t height, nvrhi::Format format)
+{
+    nvrhi::TextureDesc desc;
+    desc.width = width;
+    desc.height = height;
+    desc.format = format;
+    desc.dimension = nvrhi::TextureDimension::Texture2D;
+    desc.mipLevels = 1;
+    desc.arraySize = 1;
+    desc.sampleCount = 1;
+    desc.isRenderTarget = false;
+    desc.isUAV = false;
+    desc.initialState = nvrhi::ResourceStates::ShaderResource;
+    desc.keepInitialState = true;
+    desc.debugName = "RenderGraph/OutputTexture";
+
+    mOutputTexture = mpDevice->getDevice()->createTexture(desc);
+    mOutputWidth = width;
+    mOutputHeight = height;
 }
 
 void RenderGraph::renderOutputSelectionUI()

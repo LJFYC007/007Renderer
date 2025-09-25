@@ -1,0 +1,7 @@
+{
+  "slang.predefinedMacros": [
+  ],
+  "slang.additionalSearchPaths": [
+    "src"
+  ]
+}

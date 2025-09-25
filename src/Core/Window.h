@@ -20,6 +20,7 @@ using Microsoft::WRL::ComPtr;
 
 #ifdef DX12_ENABLE_DEBUG_LAYER
 #include <dxgidebug.h>
+#include <d3d12sdklayers.h>
 #pragma comment(lib, "dxguid.lib")
 #endif
 
