@@ -12,11 +12,12 @@ ref<Scene> AssimpImporter::loadScene(const std::string& fileName)
     unsigned int postProcessFlags = aiProcess_Triangulate |              // Convert polygons to triangles
                                     aiProcess_FlipUVs |                  // Flip UV coordinates (OpenGL -> D3D convention)
                                     aiProcess_GenSmoothNormals |         // Generate smooth normals if missing
+                                    aiProcess_GenUVCoords |              // Generate UV coordinates if missing
                                     aiProcess_CalcTangentSpace |         // Calculate tangent and bitangent vectors
                                     aiProcess_JoinIdenticalVertices |    // Remove duplicate vertices
                                     aiProcess_ImproveCacheLocality |     // Optimize vertex cache locality
-                                    aiProcess_RemoveRedundantMaterials | // Remove unused materials aiProcess_OptimizeMeshes |           // Reduce
-                                                                         // mesh count
+                                    aiProcess_RemoveRedundantMaterials | // Remove unused materials
+                                    aiProcess_OptimizeMeshes |           // Reduce mesh count
                                     aiProcess_PreTransformVertices |     // Apply node transformations to vertex data
                                     aiProcess_ValidateDataStructure;     // Validate the imported scene
     const aiScene* aiScene = mImporter.ReadFile(fileName, postProcessFlags);

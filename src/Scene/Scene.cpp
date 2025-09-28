@@ -8,6 +8,12 @@ void Scene::buildAccelStructs()
     size_t vertexBufferSize = vertices.size() * sizeof(Vertex);
     size_t indexBufferSize = indices.size() * sizeof(uint32_t);
 
+    if (vertices.empty() || indices.empty())
+    {
+        LOG_WARN("Scene has no geometry to build acceleration structures");
+        return;
+    }
+
     // Create vertex buffer for acceleration structure build input
     nvrhi::BufferDesc vertexBufferDesc = nvrhi::BufferDesc()
                                              .setByteSize(vertexBufferSize)
@@ -73,8 +79,21 @@ void Scene::buildAccelStructs()
                                                .setStructStride(sizeof(Material));
     mMaterialBuffer = nvrhiDevice->createBuffer(materialBufferDesc);
     if (!mMaterialBuffer)
-        LOG_ERROR_RETURN("Failed to create material buffer for scene"); // BLAS descriptor
+        LOG_ERROR_RETURN("Failed to create material buffer for scene");
+
+    auto triangles = nvrhi::rt::GeometryTriangles()
+                         .setVertexBuffer(mVertexBuffer)
+                         .setVertexFormat(nvrhi::Format::RGB32_FLOAT)
+                         .setVertexCount(static_cast<uint32_t>(vertices.size()))
+                         .setVertexStride(sizeof(Vertex))
+                         .setIndexBuffer(mIndexBuffer)
+                         .setIndexFormat(nvrhi::Format::R32_UINT)
+                         .setIndexCount(static_cast<uint32_t>(indices.size()));
+
+    auto geometryDesc = nvrhi::rt::GeometryDesc().setTriangles(triangles).setFlags(nvrhi::rt::GeometryFlags::Opaque);
+
     auto blasDesc = nvrhi::rt::AccelStructDesc().setDebugName("BLAS").setIsTopLevel(false);
+    blasDesc.addBottomLevelGeometry(geometryDesc);
     mBlas = nvrhiDevice->createAccelStruct(blasDesc);
     if (!mBlas)
         LOG_ERROR_RETURN("Failed to create BLAS");
@@ -90,17 +109,8 @@ void Scene::buildAccelStructs()
     commandList->writeBuffer(mIndexBuffer, indices.data(), indices.size() * sizeof(uint32_t));
     commandList->writeBuffer(mMeshBuffer, meshes.data(), meshes.size() * sizeof(Mesh));
     commandList->writeBuffer(mTriangleToMeshBuffer, triangleToMesh.data(), triangleToMesh.size() * sizeof(uint32_t));
-    commandList->writeBuffer(mMaterialBuffer, materials.data(), materials.size() * sizeof(Material)); // Build the BLAS
-    auto triangles = nvrhi::rt::GeometryTriangles()
-                         .setVertexBuffer(mVertexBuffer)
-                         .setVertexFormat(nvrhi::Format::RGB32_FLOAT)
-                         .setVertexCount(static_cast<uint32_t>(vertices.size()))
-                         .setVertexStride(sizeof(Vertex))
-                         .setIndexBuffer(mIndexBuffer)
-                         .setIndexFormat(nvrhi::Format::R32_UINT)
-                         .setIndexCount(static_cast<uint32_t>(indices.size()));
+    commandList->writeBuffer(mMaterialBuffer, materials.data(), materials.size() * sizeof(Material));
 
-    auto geometryDesc = nvrhi::rt::GeometryDesc().setTriangles(triangles).setFlags(nvrhi::rt::GeometryFlags::Opaque);
     commandList->buildBottomLevelAccelStruct(mBlas, &geometryDesc, 1);
 
     auto instanceDesc = nvrhi::rt::InstanceDesc()
