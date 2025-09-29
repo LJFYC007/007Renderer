@@ -36,10 +36,5 @@ public:
 private:
     CameraData mData;
     bool mFirstMouseInput = true;
-
-    // First person camera rotation angles
-    float mYaw = 0.0f;   // Horizontal rotation (around Y axis)
-    float mPitch = 0.0f; // Vertical rotation (around X axis)
-
     TinyUniformSampleGenerator mSampleGenerator;
 };

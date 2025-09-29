@@ -1,5 +1,8 @@
 #pragma once
+#define GLM_ENABLE_EXPERIMENTAL
 #include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
+#include <glm/gtx/quaternion.hpp>
 
 using float2 = glm::vec2;
 using float3 = glm::vec3;

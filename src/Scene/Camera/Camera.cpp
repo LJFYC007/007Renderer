@@ -11,15 +11,10 @@ Camera::Camera(const uint32_t width, const uint32_t height, const float3& posW, 
     mData.posW = posW;
     mData.forward = glm::normalize(target - posW);
     mData.target = target;
-    mData.up = float3(0.0f, 1.0f, 0.0f); // Fixed up vector for first-person camera
+    mData.up = float3(0.0f, 1.0f, 0.0f);
     mData.fovY = fovY;
     mData.moveSpeed = 1.0f; // Default move speed in units per second
     mData.enableJitter = true;
-
-    // Initialize yaw and pitch from initial forward direction
-    float3 initialForward = glm::normalize(target - posW);
-    mYaw = atan2(initialForward.z, initialForward.x);
-    mPitch = asin(initialForward.y);
     dirty = true;
 }
 
@@ -37,6 +32,7 @@ void Camera::renderUI()
 void Camera::handleInput()
 {
     float3 movement(0.f);
+    float3 viewDir = normalize(mData.target - mData.posW);
     if (GUI::IsKeyDown(ImGuiKey_W))
         movement += mData.forward, dirty = true;
     if (GUI::IsKeyDown(ImGuiKey_S))
@@ -54,6 +50,7 @@ void Camera::handleInput()
     float deltaTime = GUI::GetIO().DeltaTime;
     movement *= mData.moveSpeed * deltaTime;
     mData.posW += movement;
+    mData.target = mData.posW + viewDir;
 
     // Only handle mouse input if ImGui is not using it
     if (GUI::IsMouseDown(0) && !GUI::GetIO().WantCaptureMouse) // Left mouse button
@@ -75,23 +72,18 @@ void Camera::handleInput()
 
         if (glm::length(delta) > 0.001f)
         {
-            // Update yaw (horizontal rotation) and pitch (vertical rotation)
-            mYaw += delta.x * sensitivity;
-            mPitch -= delta.y * sensitivity; // Invert Y for natural feel
+            float3 camUp = float3(0.f, 1.f, 0.f);
+            float3 sideway = cross(viewDir, normalize(camUp));
+            float2 rotation = -delta * sensitivity;
 
-            // Clamp pitch to prevent camera flipping
-            const float maxPitch = glm::radians(89.0f);
-            mPitch = glm::clamp(mPitch, -maxPitch, maxPitch);
+            glm::quat qy = glm::angleAxis(rotation.y, sideway);
+            viewDir = qy * viewDir;
+            camUp = qy * camUp;
+            glm::quat qx = glm::angleAxis(rotation.x, camUp);
+            viewDir = qx * viewDir;
 
-            // Calculate new forward direction from yaw and pitch
-            float3 newForward;
-            newForward.x = cos(mYaw) * cos(mPitch);
-            newForward.y = sin(mPitch);
-            newForward.z = sin(mYaw) * cos(mPitch);
-            mData.forward = glm::normalize(newForward);
-
-            // Update target to reflect new direction
-            mData.target = mData.posW + mData.forward;
+            mData.target = mData.posW + viewDir;
+            mData.up = camUp;
             dirty = true;
         }
     }
@@ -106,15 +98,16 @@ void Camera::calculateCameraParameters()
 
     if (dirty == false)
         return;
-    // For first-person camera, forward is already calculated from yaw/pitch
-    // Keep world up vector fixed to maintain stability
-    mData.right = glm::normalize(glm::cross(mData.forward, mData.up));
 
     // Calculate viewport dimensions based on FOV
     mData.aspectRatio = static_cast<float>(mData.frameWidth) / static_cast<float>(mData.frameHeight);
     float viewportHeight = 2.0f;
     float viewportWidth = viewportHeight * mData.aspectRatio;
     mData.focalLength = 1.0f / glm::tan(mData.fovY * 0.5f);
+
+    mData.forward = glm::normalize(mData.target - mData.posW);
+    mData.right = glm::normalize(glm::cross(mData.forward, mData.up));
+    mData.up = glm::normalize(glm::cross(mData.right, mData.forward));
 
     // Calculate camera U and V vectors (pixel step vectors)
     mData.cameraU = mData.right * (viewportWidth / mData.frameWidth);
