@@ -4,14 +4,14 @@
 #include "Camera.h"
 #include "Utils/GUI.h"
 
-Camera::Camera(const uint32_t width, const uint32_t height, const float3& posW, const float3& target, float fovY) : mSampleGenerator(233)
+Camera::Camera(const float3& posW, const float3& target, float fovY, uint32_t width, uint32_t height) : mSampleGenerator(233)
 {
     mData.frameWidth = width;
     mData.frameHeight = height;
     mData.posW = posW;
     mData.forward = glm::normalize(target - posW);
     mData.target = target;
-    mData.up = float3(0.0f, 1.0f, 0.0f);
+    mData.up = mDefaultUp;
     mData.fovY = fovY;
     mData.moveSpeed = 1.0f; // Default move speed in units per second
     mData.enableJitter = true;
@@ -72,7 +72,7 @@ void Camera::handleInput()
 
         if (glm::length(delta) > 0.001f)
         {
-            float3 camUp = float3(0.f, 1.f, 0.f);
+            float3 camUp = mDefaultUp;
             float3 sideway = cross(viewDir, normalize(camUp));
             float2 rotation = -delta * sensitivity;
 

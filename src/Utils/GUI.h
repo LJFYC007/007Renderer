@@ -30,14 +30,7 @@ public:
     ~GUIManager() {}
 
     // Main layout function
-    void renderMainLayout(
-        ref<Scene> scene,
-        RenderGraphEditor* pRenderGraphEditor,
-        nvrhi::TextureHandle image,
-        Window& window,
-        uint32_t& renderWidth,
-        uint32_t& renderHeight
-    );
+    void renderMainLayout(ref<Scene> scene, RenderGraphEditor* pRenderGraphEditor, nvrhi::TextureHandle image, Window& window);
 
     // Individual panel render functions
     void renderSettingsPanel(ref<Scene> scene, RenderGraphEditor* pRenderGraphEditor, nvrhi::TextureHandle image, Window& window);
@@ -48,14 +41,7 @@ public:
     const LayoutConfig& getLayoutConfig() const { return mLayoutConfig; }
 
 private:
-    void updateRenderDimensions(
-        ref<Scene> scene,
-        RenderGraphEditor* pRenderGraphEditor,
-        uint32_t newWidth,
-        uint32_t newHeight,
-        uint32_t& renderWidth,
-        uint32_t& renderHeight
-    );
+    void updateRenderDimensions(ref<Scene> scene, RenderGraphEditor* pRenderGraphEditor, uint32_t renderWidth, uint32_t renderHeight);
 
     ref<Device> mpDevice;
     LayoutConfig mLayoutConfig;

@@ -4,7 +4,7 @@
 
 #include "Core/Device.h"
 #include "Core/Window.h"
-#include "Scene/Importer/AssimpImporter.h"
+#include "Scene/Importer/UsdImporter.h"
 #include "RenderPasses/RenderGraphBuilder.h"
 #include "RenderPasses/RenderGraphEditor.h"
 #include "Utils/Logger.h"
@@ -40,16 +40,14 @@ int main()
         gReadbackHeap = make_ref<ReadbackHeap>(pDevice);
 
         // Setup scene
-        AssimpImporter importer(pDevice);
-        ref<Scene> scene = importer.loadScene(std::string(PROJECT_DIR) + "/media/cornell_box.gltf");
+        UsdImporter importer(pDevice);
+        ref<Scene> scene = importer.loadScene(std::string(PROJECT_DIR) + "/media/cornell_box/cornell_box.usdc");
         if (!scene)
         {
             LOG_ERROR("Failed to load scene from file.");
             return 1;
         }
         scene->buildAccelStructs();
-        uint width = 1920, height = 1080;
-        scene->camera = make_ref<Camera>(width, height, float3(0.f, 0.f, -5.f), float3(0.f, 0.f, -6.f), glm::radians(45.0f));
 
         // Create render graph editor and initialize with default graph
         RenderGraphEditor renderGraphEditor(pDevice);
@@ -78,9 +76,13 @@ int main()
                 break;
             }
             pDevice->getDevice()->runGarbageCollection();
+
+            // Update camera parameters if dirty
             if (scene->camera->dirty)
+            {
+                scene->camera->calculateCameraParameters();
                 renderGraphEditor.setScene(scene);
-            scene->camera->calculateCameraParameters();
+            }
 
             // Get current render graph and execute
             auto renderGraph = renderGraphEditor.getCurrentRenderGraph();
@@ -102,7 +104,7 @@ int main()
             else if (frameStatus == Window::FrameStatus::Skip)
                 continue;
 
-            guiManager.renderMainLayout(scene, &renderGraphEditor, imageTexture, window, width, height);
+            guiManager.renderMainLayout(scene, &renderGraphEditor, imageTexture, window);
             if (GUI::IsKeyPressed(ImGuiKey_Escape))
                 notDone = false; // Exit on Escape key
 

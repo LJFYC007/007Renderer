@@ -16,3 +16,6 @@
 [submodule "external/assimp"]
 	path = external/assimp
 	url = https://github.com/assimp/assimp.git
+[submodule "external/tinyusdz"]
+	path = external/tinyusdz
+	url = git@github.com:lighttransport/tinyusdz.git

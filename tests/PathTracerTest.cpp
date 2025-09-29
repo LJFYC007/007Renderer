@@ -23,8 +23,6 @@ protected:
 
 TEST_F(PathTracerTest, Basic)
 {
-    const uint width = 1920;
-    const uint height = 1080;
     const uint spp = 4096;
     const float threshold = 0.003f; // Convergence threshold
 
@@ -33,7 +31,7 @@ TEST_F(PathTracerTest, Basic)
     if (!scene)
         FAIL() << "Failed to load scene from file.";
     scene->buildAccelStructs();
-    scene->camera = make_ref<Camera>(width, height, float3(0.f, 0.f, -5.f), float3(0.f, 0.f, -6.f), glm::radians(45.0f));
+    scene->camera = make_ref<Camera>(float3(0.f, 0.f, -5.f), float3(0.f, 0.f, -6.f), glm::radians(45.0f));
 
     // Create render graph
     RenderGraphEditor renderGraphEditor(mpDevice);

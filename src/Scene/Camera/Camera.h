@@ -8,10 +8,13 @@
 class Camera
 {
 public:
-    Camera(const uint32_t width, const uint32_t height, const float3& posW, const float3& target, float fovY);
+    Camera(const float3& posW, const float3& target, float fovY, uint32_t width = 1920, uint32_t height = 1080);
 
     const CameraData& getCameraData() const { return mData; }
     CameraData& getCameraData() { return mData; }
+
+    uint32_t getWidth() const { return mData.frameWidth; }
+    uint32_t getHeight() const { return mData.frameHeight; }
 
     void setWidth(const uint32_t width)
     {
@@ -35,6 +38,7 @@ public:
 
 private:
     CameraData mData;
+    const float3 mDefaultUp = float3(0.f, 0.f, 1.f);
     bool mFirstMouseInput = true;
     TinyUniformSampleGenerator mSampleGenerator;
 };

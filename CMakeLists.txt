@@ -61,6 +61,11 @@ add_subdirectory(external/spdlog)
 set_target_properties(spdlog PROPERTIES FOLDER "External")
 
 # ----------------------------------------------------------------------------
+# TinyUSDZ support
+# ----------------------------------------------------------------------------
+add_subdirectory(external/tinyusdz)
+
+# ----------------------------------------------------------------------------
 # Assimp support
 # ----------------------------------------------------------------------------
 set(ASSIMP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
@@ -161,6 +166,7 @@ target_include_directories(007Core PUBLIC
     ${SLANG_INCLUDE_DIRS}
     ${IMGUI_INCLUDE_DIRS}
     external/imgui-node-editor
+    external/tinyusdz/src
 )
 
 target_link_libraries(007Core PUBLIC
@@ -174,6 +180,7 @@ target_link_libraries(007Core PUBLIC
     assimp
     miniz
     tinyexr
+    tinyusdz::tinyusdz_static
 )
 
 # ----------------------------------------------------------------------------

@@ -10,14 +10,7 @@
 #include "Scene/Camera/Camera.h"
 #include "RenderPasses/RenderGraphEditor.h"
 
-void GUIManager::renderMainLayout(
-    ref<Scene> scene,
-    RenderGraphEditor* pRenderGraphEditor,
-    nvrhi::TextureHandle image,
-    Window& window,
-    uint32_t& renderWidth,
-    uint32_t& renderHeight
-)
+void GUIManager::renderMainLayout(ref<Scene> scene, RenderGraphEditor* pRenderGraphEditor, nvrhi::TextureHandle image, Window& window)
 {
     ImGuiIO& io = ImGui::GetIO();
 
@@ -56,17 +49,14 @@ void GUIManager::renderMainLayout(
 
     // Calculate rendering dimensions based on available space
     uint32_t targetWidth = (uint32_t)rightPanelWidth;
-    uint32_t targetHeight = (uint32_t)(topPanelsHeight - ImGui::GetTextLineHeightWithSpacing() - ImGui::GetStyle().ItemSpacing.y * 2); // Update
-                                                                                                                                       // render
-                                                                                                                                       // dimensions
-                                                                                                                                       // if changed
-    updateRenderDimensions(scene, pRenderGraphEditor, targetWidth, targetHeight, renderWidth, renderHeight);
+    uint32_t targetHeight = (uint32_t)(topPanelsHeight - ImGui::GetTextLineHeightWithSpacing() - ImGui::GetStyle().ItemSpacing.y * 2);
+    updateRenderDimensions(scene, pRenderGraphEditor, targetWidth, targetHeight);
 
     // Right panel - Rendering display
     ImGui::SameLine();
     ImGui::BeginChild("Rendering", ImVec2(rightPanelWidth, -1), true);
     ImTextureID textureId = window.GetDisplayTextureImGuiHandle();
-    renderRenderingPanel(textureId, renderWidth, renderHeight);
+    renderRenderingPanel(textureId, scene->camera->getWidth(), scene->camera->getHeight());
     ImGui::EndChild();
 
     ImGui::EndChild(); // End TopRow
@@ -140,20 +130,10 @@ void GUIManager::renderRenderingPanel(ImTextureID textureId, uint32_t renderWidt
         ImGui::Text("No texture to display");
 }
 
-void GUIManager::updateRenderDimensions(
-    ref<Scene> scene,
-    RenderGraphEditor* pRenderGraphEditor,
-    uint32_t newWidth,
-    uint32_t newHeight,
-    uint32_t& renderWidth,
-    uint32_t& renderHeight
-)
+void GUIManager::updateRenderDimensions(ref<Scene> scene, RenderGraphEditor* pRenderGraphEditor, uint32_t renderWidth, uint32_t renderHeight)
 {
-    if (mIsFirstFrame || (newWidth != mPrevRenderWidth) || (newHeight != mPrevRenderHeight))
+    if (mIsFirstFrame || (renderWidth != mPrevRenderWidth) || (renderHeight != mPrevRenderHeight))
     {
-        renderWidth = newWidth;
-        renderHeight = newHeight;
-
         if (scene && scene->camera)
         {
             scene->camera->setWidth(renderWidth);
@@ -175,7 +155,7 @@ void GUIManager::updateRenderDimensions(
                 mPrevRenderHeight
             );
 
-        mPrevRenderWidth = newWidth;
-        mPrevRenderHeight = newHeight;
+        mPrevRenderWidth = renderWidth;
+        mPrevRenderHeight = renderHeight;
     }
 }
