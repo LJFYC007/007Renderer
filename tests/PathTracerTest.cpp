@@ -2,7 +2,7 @@
 #include <algorithm>
 #include <iostream>
 
-#include "Scene/Importer/AssimpImporter.h"
+#include "Scene/Importer/Importer.h"
 #include "RenderPasses/RenderGraphEditor.h"
 #include "RenderPasses/RenderGraphBuilder.h"
 #include "Utils/ExrUtils.h"
@@ -26,8 +26,7 @@ TEST_F(PathTracerTest, Basic)
     const uint spp = 4096;
     const float threshold = 0.003f; // Convergence threshold
 
-    AssimpImporter importer(mpDevice);
-    ref<Scene> scene = importer.loadScene(std::string(PROJECT_DIR) + "/media/cornell_box.gltf");
+    ref<Scene> scene = loadSceneWithImporter(std::string(PROJECT_DIR) + "/media/cornell_box.gltf", mpDevice);
     if (!scene)
         FAIL() << "Failed to load scene from file.";
     scene->buildAccelStructs();

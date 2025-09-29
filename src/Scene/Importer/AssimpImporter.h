@@ -1,23 +1,19 @@
 #pragma once
-#include <string>
 #include <assimp/Importer.hpp>
 
-#include "Scene/Scene.h"
-#include "Core/Pointer.h"
-#include "Core/Device.h"
+#include "Importer.h"
 
 /*
 TODO: use our logger instead of Assimp's
 */
 
-class AssimpImporter
+class AssimpImporter : public Importer
 {
 public:
-    AssimpImporter(ref<Device> pDevice) : mpDevice(pDevice) {}
+    AssimpImporter(ref<Device> pDevice) : Importer(pDevice) {}
 
-    ref<Scene> loadScene(const std::string& fileName);
+    ref<Scene> loadScene(const std::string& fileName) override;
 
 private:
     Assimp::Importer mImporter;
-    ref<Device> mpDevice;
 };

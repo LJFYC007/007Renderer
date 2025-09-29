@@ -4,8 +4,7 @@
 
 #include "Core/Device.h"
 #include "Core/Window.h"
-#include "Scene/Importer/UsdImporter.h"
-#include "Scene/Importer/AssimpImporter.h"
+#include "Scene/Importer/Importer.h"
 #include "RenderPasses/RenderGraphBuilder.h"
 #include "RenderPasses/RenderGraphEditor.h"
 #include "Utils/Logger.h"
@@ -41,8 +40,7 @@ int main()
         gReadbackHeap = make_ref<ReadbackHeap>(pDevice);
 
         // Setup scene
-        UsdImporter importer(pDevice);
-        ref<Scene> scene = importer.loadScene(std::string(PROJECT_DIR) + "/media/cornell_box/cornell_box.usdc");
+        ref<Scene> scene = loadSceneWithImporter(std::string(PROJECT_DIR) + "/media/cornell_box/cornell_box.usdc", pDevice);
         if (!scene)
         {
             LOG_ERROR("Failed to load scene from file.");
