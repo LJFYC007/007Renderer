@@ -5,6 +5,7 @@
 #include "Core/Device.h"
 #include "Core/Window.h"
 #include "Scene/Importer/UsdImporter.h"
+#include "Scene/Importer/AssimpImporter.h"
 #include "RenderPasses/RenderGraphBuilder.h"
 #include "RenderPasses/RenderGraphEditor.h"
 #include "Utils/Logger.h"
@@ -79,10 +80,8 @@ int main()
 
             // Update camera parameters if dirty
             if (scene->camera->dirty)
-            {
-                scene->camera->calculateCameraParameters();
                 renderGraphEditor.setScene(scene);
-            }
+            scene->camera->calculateCameraParameters(); // Remember this contains jitter
 
             // Get current render graph and execute
             auto renderGraph = renderGraphEditor.getCurrentRenderGraph();

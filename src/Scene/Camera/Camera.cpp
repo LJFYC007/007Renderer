@@ -11,10 +11,13 @@ Camera::Camera(const float3& posW, const float3& target, float fovY, uint32_t wi
     mData.posW = posW;
     mData.forward = glm::normalize(target - posW);
     mData.target = target;
-    mData.up = mDefaultUp;
     mData.fovY = fovY;
     mData.moveSpeed = 1.0f; // Default move speed in units per second
     mData.enableJitter = true;
+
+    if (abs(dot(mData.forward, mDefaultUp)) > 0.999f)
+        mDefaultUp = float3(0.f, 1.f, 0.f);
+    mData.up = mDefaultUp;
     dirty = true;
 }
 

@@ -38,7 +38,7 @@ public:
 
 private:
     CameraData mData;
-    const float3 mDefaultUp = float3(0.f, 0.f, 1.f);
+    float3 mDefaultUp = float3(0.f, 0.f, 1.f);
     bool mFirstMouseInput = true;
     TinyUniformSampleGenerator mSampleGenerator;
 };
