@@ -1,15 +1,28 @@
-#include <pprinter.hh>
-#include <value-pprint.hh>
+#include <tinyusdz.hh>
 #include <tydra/attribute-eval.hh>
 #include <tydra/render-data.hh>
 #include <tydra/shader-network.hh>
+#include <tydra/scene-access.hh>
+#include <tydra/attribute-eval.hh>
+#include <pprinter.hh>
+#include <usdShade.hh>
+#include <value-pprint.hh>
 
 #include <array>
 #include <cmath>
 #include <optional>
+#include <map>
 
 #include "UsdImporter.h"
 #include "Utils/Logger.h"
+
+// key = Full absolute prim path(e.g. `/bora/dora`)
+using XformMap = std::map<std::string, const tinyusdz::Xform*>;
+using MeshMap = std::map<std::string, const tinyusdz::GeomMesh*>;
+using MaterialMap = std::map<std::string, const tinyusdz::Material*>;
+using PreviewSurfaceMap = std::map<std::string, std::pair<const tinyusdz::Shader*, const tinyusdz::UsdPreviewSurface*>>;
+using UVTextureMap = std::map<std::string, std::pair<const tinyusdz::Shader*, const tinyusdz::UsdUVTexture*>>;
+using PrimvarReader_float2Map = std::map<std::string, std::pair<const tinyusdz::Shader*, const tinyusdz::UsdPrimvarReader_float2*>>;
 
 ref<Scene> UsdImporter::loadScene(const std::string& fileName)
 {
@@ -24,15 +37,11 @@ ref<Scene> UsdImporter::loadScene(const std::string& fileName)
         LOG_ERROR("Failed to load USD file: {}. Error: {}", fileName, err);
         return nullptr;
     }
-
-    LOG_INFO("Successfully loaded USD file: {}", fileName);
+    LOG_DEBUG("Successfully loaded USD file: {}", fileName);
 
     // Create a new scene to hold the converted data
     ref<Scene> scene = make_ref<Scene>(mpDevice);
     scene->name = fileName;
-    scene->materials.push_back(Material());
-    mMaterialPathToIndex.clear();
-    mMaterialPathToIndex[""] = 0;
 
     // Build XformNode hierarchy to handle transforms properly
     tinyusdz::tydra::XformNode rootXformNode;
@@ -45,8 +54,45 @@ ref<Scene> UsdImporter::loadScene(const std::string& fileName)
         return nullptr;
     }
 
-    // Load materials from the USD stage
-    loadMaterials(scene);
+    // Mapping hold the pointer to concrete Prim object,
+    // So stage content should not be changed(no Prim addition/deletion).
+    // XformMap xformmap;
+    // MeshMap meshmap;
+    // PreviewSurfaceMap surfacemap;
+    // UVTextureMap texmap;
+    // PrimvarReader_float2Map preadermap;
+    // tinyusdz::tydra::ListPrims(mStage, xformmap);
+    // tinyusdz::tydra::ListPrims(mStage, meshmap);
+
+    MaterialMap matmap;
+    tinyusdz::tydra::ListPrims(mStage, matmap);
+
+    // Build RenderScene to access materials
+    tinyusdz::tydra::RenderScene renderScene;
+    tinyusdz::tydra::RenderSceneConverter converter;
+    tinyusdz::tydra::RenderSceneConverterEnv env(mStage);
+
+    // Convert USD Stage to RenderScene to access processed materials
+    if (!converter.ConvertToRenderScene(env, &renderScene))
+    {
+        std::string warn = converter.GetWarning();
+        std::string err = converter.GetError();
+        if (!warn.empty())
+            LOG_WARN("USD material conversion warning: {}", warn);
+        if (!err.empty())
+            LOG_ERROR("USD material conversion error: {}", err);
+        return nullptr;
+    }
+
+    // Convert RenderMaterials to renderer materials
+    for (const auto& renderMaterial : renderScene.materials)
+    {
+        Material material = extractMaterial(renderMaterial);
+        scene->materials.push_back(material);
+        uint32_t materialIndex = static_cast<uint32_t>(scene->materials.size() - 1);
+        mMaterialPathToIndex[renderMaterial.abs_path] = materialIndex;
+    }
+
     // Traverse the XformNode hierarchy for meshes
     for (const auto& child : rootXformNode.children)
         traverseXformNode(child, scene);
@@ -68,9 +114,24 @@ void UsdImporter::traverseXformNode(const tinyusdz::tydra::XformNode& node, ref<
     {
         const tinyusdz::value::matrix4d& worldMatrix = node.get_world_matrix();
         if (const tinyusdz::GeomMesh* geomMesh = node.prim->as<tinyusdz::GeomMesh>())
-            extractMeshGeometry(*geomMesh, worldMatrix, node.absolute_path, scene);
+        {
+            extractMeshGeometry(geomMesh, worldMatrix, scene);
+
+            tinyusdz::Path matPath;
+            const tinyusdz::Material* material{nullptr};
+            std::string err;
+            bool ret = tinyusdz::tydra::GetBoundMaterial(
+                mStage, tinyusdz::Path(tinyusdz::to_string(node.absolute_path), ""), /* purpose */ "", &matPath, &material, &err
+            );
+
+            // Create mesh entry
+            Mesh mesh;
+            std::string meshName = geomMesh->get_name();
+            mesh.materialIndex = mMaterialPathToIndex[tinyusdz::to_string(matPath)];
+            scene->meshes.push_back(mesh);
+        }
         else if (const tinyusdz::GeomCamera* geomCamera = node.prim->as<tinyusdz::GeomCamera>())
-            extractCamera(*geomCamera, worldMatrix, scene);
+            extractCamera(geomCamera, worldMatrix, scene);
     }
 
     // Recursively traverse children
@@ -78,7 +139,7 @@ void UsdImporter::traverseXformNode(const tinyusdz::tydra::XformNode& node, ref<
         traverseXformNode(child, scene);
 }
 
-void UsdImporter::extractCamera(const tinyusdz::GeomCamera& geomCamera, const tinyusdz::value::matrix4d& worldMatrix, ref<Scene> scene)
+void UsdImporter::extractCamera(const tinyusdz::GeomCamera* geomCamera, const tinyusdz::value::matrix4d& worldMatrix, ref<Scene> scene)
 {
     // Evaluate camera position in world space using tinyusdz helpers
     tinyusdz::value::point3f origin{0.0f, 0.0f, 0.0f};
@@ -105,17 +166,12 @@ void UsdImporter::extractCamera(const tinyusdz::GeomCamera& geomCamera, const ti
     );
 }
 
-void UsdImporter::extractMeshGeometry(
-    const tinyusdz::GeomMesh& geomMesh,
-    const tinyusdz::value::matrix4d& worldMatrix,
-    const tinyusdz::Path& meshPath,
-    ref<Scene> scene
-)
+void UsdImporter::extractMeshGeometry(const tinyusdz::GeomMesh* geomMesh, const tinyusdz::value::matrix4d& worldMatrix, ref<Scene> scene)
 {
-    std::vector<tinyusdz::value::point3f> points = geomMesh.get_points();
-    std::vector<int32_t> faceVertexIndices = geomMesh.get_faceVertexIndices();
-    std::vector<int32_t> faceVertexCounts = geomMesh.get_faceVertexCounts();
-    std::vector<tinyusdz::value::normal3f> normals = geomMesh.get_normals();
+    std::vector<tinyusdz::value::point3f> points = geomMesh->get_points();
+    std::vector<int32_t> faceVertexIndices = geomMesh->get_faceVertexIndices();
+    std::vector<int32_t> faceVertexCounts = geomMesh->get_faceVertexCounts();
+    std::vector<tinyusdz::value::normal3f> normals = geomMesh->get_normals();
     bool hasNormals = !normals.empty();
 
     // Get UV coordinates from primvars (try common UV primvar names)
@@ -124,11 +180,11 @@ void UsdImporter::extractMeshGeometry(
     std::vector<std::string> uvNames = {"st", "uv", "st0", "uv0"};
 
     for (const std::string& uvName : uvNames)
-        if (geomMesh.has_primvar(uvName))
+        if (geomMesh->has_primvar(uvName))
         {
             tinyusdz::GeomPrimvar uvPrimvar;
             std::string uvErr;
-            if (geomMesh.get_primvar(uvName, &uvPrimvar, &uvErr) && uvPrimvar.get_value(&uvCoords))
+            if (geomMesh->get_primvar(uvName, &uvPrimvar, &uvErr) && uvPrimvar.get_value(&uvCoords))
             {
                 hasUVs = true;
                 break;
@@ -220,95 +276,12 @@ void UsdImporter::extractMeshGeometry(
         faceIndexOffset += vertexCount;
     }
 
-    // Create mesh entry
-    Mesh mesh;
-    mesh.materialIndex = processMaterialBinding(meshPath);
-
     // Update triangle to mesh mapping
     for (uint32_t i = 0; i < triangleCount; ++i)
         scene->triangleToMesh.push_back(static_cast<uint32_t>(scene->meshes.size()));
-    scene->meshes.push_back(mesh);
 }
 
-void UsdImporter::loadMaterials(ref<Scene> scene)
-{
-    // Build RenderScene to access materials
-    tinyusdz::tydra::RenderScene renderScene;
-    tinyusdz::tydra::RenderSceneConverter converter;
-    tinyusdz::tydra::RenderSceneConverterEnv env(mStage);
-
-    // Convert USD Stage to RenderScene to access processed materials
-    if (!converter.ConvertToRenderScene(env, &renderScene))
-    {
-        std::string warn = converter.GetWarning();
-        std::string err = converter.GetError();
-        if (!warn.empty())
-            LOG_WARN("USD material conversion warning: {}", warn);
-        if (!err.empty())
-            LOG_ERROR("USD material conversion error: {}", err);
-        return;
-    }
-
-    // Convert RenderMaterials to renderer materials
-    for (const auto& renderMaterial : renderScene.materials)
-    {
-        Material material = convertUsdRenderMaterial(renderMaterial);
-
-        LOG_DEBUG(
-            "Loaded USD material '{}': baseColor({}, {}, {}), metallic={}, roughness={}, emissive=({}, {}, {})",
-            renderMaterial.name,
-            material.baseColorFactor.r,
-            material.baseColorFactor.g,
-            material.baseColorFactor.b,
-            material.metallicFactor,
-            material.roughnessFactor,
-            material.emissiveFactor.r,
-            material.emissiveFactor.g,
-            material.emissiveFactor.b
-        );
-
-        scene->materials.push_back(material);
-        uint32_t materialIndex = static_cast<uint32_t>(scene->materials.size() - 1);
-
-        if (!renderMaterial.abs_path.empty())
-            mMaterialPathToIndex[renderMaterial.abs_path] = materialIndex;
-
-        if (!renderMaterial.name.empty() && mMaterialPathToIndex.find(renderMaterial.name) == mMaterialPathToIndex.end())
-            mMaterialPathToIndex[renderMaterial.name] = materialIndex;
-    }
-
-    std::string warn = converter.GetWarning();
-    if (!warn.empty())
-        LOG_WARN("USD material loading warnings: {}", warn);
-}
-
-uint32_t UsdImporter::processMaterialBinding(const tinyusdz::Path& meshPath)
-{
-    tinyusdz::Path materialPath;
-    const tinyusdz::Material* usdMaterial = nullptr;
-    std::string err;
-
-    if (tinyusdz::tydra::GetBoundMaterial(mStage, meshPath, "", &materialPath, &usdMaterial, &err))
-    {
-        const std::string materialFullPath = materialPath.full_path_name();
-        const std::string materialPrimPath = materialPath.prim_part();
-
-        auto it = mMaterialPathToIndex.find(materialFullPath);
-        if (it == mMaterialPathToIndex.end() && !materialPrimPath.empty())
-            it = mMaterialPathToIndex.find(materialPrimPath);
-
-        if (it != mMaterialPathToIndex.end())
-            return it->second;
-
-        LOG_WARN("USD material '{}' bound to mesh '{}' was not converted; using default material", materialFullPath, meshPath.full_path_name());
-    }
-    else if (!err.empty())
-        LOG_WARN("Failed to resolve material binding for mesh '{}': {}", meshPath.full_path_name(), err);
-
-    return 0;
-}
-
-Material UsdImporter::convertUsdRenderMaterial(const tinyusdz::tydra::RenderMaterial& usdMaterial)
+Material UsdImporter::extractMaterial(const tinyusdz::tydra::RenderMaterial& usdMaterial)
 {
     Material material;
     const auto& surfaceShader = usdMaterial.surfaceShader;
