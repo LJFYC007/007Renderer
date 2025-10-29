@@ -64,6 +64,7 @@ set_target_properties(spdlog PROPERTIES FOLDER "External")
 # TinyUSDZ support
 # ----------------------------------------------------------------------------
 add_subdirectory(external/tinyusdz)
+set_target_properties(tinyusdz_static PROPERTIES FOLDER "External")
 
 # ----------------------------------------------------------------------------
 # Assimp support

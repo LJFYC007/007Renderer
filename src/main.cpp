@@ -40,13 +40,16 @@ int main()
         gReadbackHeap = make_ref<ReadbackHeap>(pDevice);
 
         // Setup scene
-        ref<Scene> scene = loadSceneWithImporter(std::string(PROJECT_DIR) + "/media/cornell_box/cornell_box.usdc", pDevice);
+        // ref<Scene> scene = loadSceneWithImporter("F:/Scenes/Bistro_v5_2/BistroInterior_Wine.usdc", pDevice);
+        ref<Scene> scene = loadSceneWithImporter(std::string(PROJECT_DIR) + "/media/cornell_box.usdc", pDevice);
         if (!scene)
         {
             LOG_ERROR("Failed to load scene from file.");
             return 1;
         }
         scene->buildAccelStructs();
+        if (!scene->camera)
+            scene->camera = make_ref<Camera>(float3(0.f, 0.f, -5.f), float3(0.f, 0.f, -6.f), glm::radians(45.0f));
 
         // Create render graph editor and initialize with default graph
         RenderGraphEditor renderGraphEditor(pDevice);

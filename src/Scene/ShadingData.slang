@@ -2,6 +2,7 @@ struct ShadingData
 {
     float3 position;
     float3 normal;
+    float2 uv;
     float3 V; // view direction which is from shading point to origin
     float3 T; // Tangent
     float3 B; // Bitangent

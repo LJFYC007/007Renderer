@@ -118,10 +118,20 @@ struct GLTFDiffuseBRDF
 
 struct GLTFMaterial
 {
+    // Note: float3 in GPU buffers is padded to 16 bytes (same as float4)
     float3 baseColor;
+    float _padding0; // Padding to align float3 to 16 bytes
+
     float3 emissive;
+    float _padding1; // Padding to align float3 to 16 bytes
+
     float metallic = 1.f;
     float roughness = 0.f;
+
+    uint baseColorTextureId;
+    uint metallicRoughnessTextureId;
+    uint emissiveTextureId;
+    uint normalTextureId;
 
     // Constructor to initialize the material with a color
     __init(float3 _baseColor, float3 _emissive, float _metallic, float _roughness)
@@ -130,31 +140,67 @@ struct GLTFMaterial
         emissive = _emissive;
         metallic = _metallic;
         roughness = _roughness;
+        baseColorTextureId = kInvalidTextureId;
+        metallicRoughnessTextureId = kInvalidTextureId;
+        emissiveTextureId = kInvalidTextureId;
+        normalTextureId = kInvalidTextureId;
+    }
+
+    // Sample textures and get final material properties
+    // Use SampleLevel instead of Sample for raytracing shaders (no automatic mip level calculation)
+    float3 getBaseColor<let sampleTextures : bool>(float2 uv, Texture2D textures[2], SamplerState sampler)
+    {
+        if (sampleTextures && baseColorTextureId != kInvalidTextureId)
+            return textures[baseColorTextureId].SampleLevel(sampler, uv, 0).rgb * baseColor;
+        return baseColor;
+    }
+
+    float2 getMetallicRoughness<let sampleTextures : bool>(float2 uv, Texture2D textures[2], SamplerState sampler)
+    {
+        if (sampleTextures && metallicRoughnessTextureId != kInvalidTextureId)
+        {
+            float4 mr = textures[metallicRoughnessTextureId].SampleLevel(sampler, uv, 0);
+            return float2(mr.b * metallic, mr.g * roughness); // Blue=metallic, Green=roughness
+        }
+        return float2(metallic, roughness);
+    }
+
+    float3 getEmissive<let sampleTextures : bool>(float2 uv, Texture2D textures[2], SamplerState sampler)
+    {
+        if (sampleTextures && emissiveTextureId != kInvalidTextureId)
+            return textures[emissiveTextureId].SampleLevel(sampler, uv, 0).rgb * emissive;
+        return emissive;
     }
 
     // Implement the scatter method for Lambertian reflection
-    bool scatter<S : ISampleGenerator>(const ShadingData sd, inout S sg, out BSDFSample sample)
+    bool scatter<S : ISampleGenerator>(const ShadingData sd, inout S sg, out BSDFSample sample, Texture2D textures[2], SamplerState sampler)
     {
         float3 wiLocal = sd.toLocal(sd.V);
         float3 woLocal;
-        float alpha = max(kMinGGXAlpha, roughness * roughness);
+
+        // Sample textures to get material properties
+        float3 sampledBaseColor = getBaseColor<true>(sd.uv, textures, sampler);
+        float2 mr = getMetallicRoughness<true>(sd.uv, textures, sampler);
+        float sampledMetallic = mr.x;
+        float sampledRoughness = mr.y;
+        float alpha = max(kMinGGXAlpha, sampledRoughness * sampledRoughness);
 
         float uSelect = sampleNext1D(sg);
-        if (uSelect < metallic)
+        if (uSelect < sampledMetallic)
         {
-            GLTFSpecularBRDF specularBRDF = GLTFSpecularBRDF(baseColor, metallic, alpha);
+            GLTFSpecularBRDF specularBRDF = GLTFSpecularBRDF(sampledBaseColor, sampledMetallic, alpha);
             if (!specularBRDF.sample(wiLocal, woLocal, sample.pdf, sample.weight, sg))
                 return false;
-            sample.pdf *= metallic;
-            sample.weight /= metallic;
+            sample.pdf *= sampledMetallic;
+            sample.weight /= sampledMetallic;
         }
         else
         {
-            GLTFDiffuseBRDF diffuseBRDF = GLTFDiffuseBRDF(baseColor, metallic, alpha);
+            GLTFDiffuseBRDF diffuseBRDF = GLTFDiffuseBRDF(sampledBaseColor, sampledMetallic, alpha);
             if (!diffuseBRDF.sample(wiLocal, woLocal, sample.pdf, sample.weight, sg))
                 return false;
-            sample.pdf *= (1.f - metallic);
-            sample.weight /= (1.f - metallic);
+            sample.pdf *= (1.f - sampledMetallic);
+            sample.weight /= (1.f - sampledMetallic);
         }
 
         sample.wo = sd.toWorld(woLocal);

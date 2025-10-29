@@ -36,6 +36,13 @@ PathTracingPass::PathTracingPass(ref<Device> pDevice) : RenderPass(pDevice)
     cbDesc.debugName = "PathTracingPass/Camera";
     mCbCamera = mpDevice->getDevice()->createBuffer(cbDesc);
 
+    // Create texture sampler
+    nvrhi::SamplerDesc samplerDesc;
+    samplerDesc.setAllFilters(true);
+    samplerDesc.setMaxAnisotropy(16.f);
+    samplerDesc.setAllAddressModes(nvrhi::SamplerAddressMode::Repeat);
+    mTextureSampler = mpDevice->getDevice()->createSampler(samplerDesc);
+
     std::unordered_map<std::string, nvrhi::ShaderType> entryPoints = {
         {"rayGenMain", nvrhi::ShaderType::RayGeneration}, {"missMain", nvrhi::ShaderType::Miss}, {"closestHitMain", nvrhi::ShaderType::ClosestHit}
     };
@@ -69,6 +76,18 @@ RenderData PathTracingPass::execute(const RenderData& input)
     (*mpPass)["gScene.triangleToMesh"] = mpScene->getTriangleToMeshBuffer();
     (*mpPass)["gScene.materials"] = mpScene->getMaterialBuffer();
     (*mpPass)["gScene.rtAccel"] = mpScene->getTLAS();
+
+    // Bind textures
+    for (size_t i = 0; i < mpScene->getTextureCount(); ++i)
+    {
+        std::string textureName = "gScene.textures[" + std::to_string(i) + "]";
+        nvrhi::TextureHandle texture = mpScene->getTexture(static_cast<uint32_t>(i));
+        (*mpPass)[textureName] = texture;
+    }
+
+    // Bind sampler
+    (*mpPass)["gScene.textureSampler"] = mTextureSampler;
+
     (*mpPass)["result"] = mTextureOut;
     mpPass->execute(mWidth, mHeight, 1);
     return output;

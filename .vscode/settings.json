@@ -106,10 +106,12 @@
         "scoped_allocator": "cpp",
         "strstream": "cpp",
         "valarray": "cpp",
-        "*.rh": "cpp"
+        "*.rh": "cpp",
+        "*.inc": "cpp"
     },
     "cmake.generator": "Ninja",
     "cmake.buildDirectory": "${workspaceFolder}/build/${buildType}",
     "cmake.configureOnOpen": true,
-    "cmake.configureOnEdit": true
+    "cmake.configureOnEdit": true,
+    "cmake.outputLogEncoding": "gbk"
 }

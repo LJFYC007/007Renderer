@@ -2,6 +2,8 @@ import Utils.Math.Ray;
 import Utils.Sampling.SampleGeneratorInterface;
 import Scene.ShadingData;
 
+static const uint kInvalidTextureId = 0xFFFFFFFF;
+
 struct BSDFSample
 {
     float3 wo;     // Sampled direction in world space (normalized).

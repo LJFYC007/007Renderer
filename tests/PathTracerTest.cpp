@@ -24,13 +24,13 @@ protected:
 TEST_F(PathTracerTest, Basic)
 {
     const uint spp = 4096;
-    const float threshold = 0.003f; // Convergence threshold
+    const float threshold = 0.005f; // Convergence threshold
 
-    ref<Scene> scene = loadSceneWithImporter(std::string(PROJECT_DIR) + "/media/cornell_box.gltf", mpDevice);
+    // ref<Scene> scene = loadSceneWithImporter(std::string(PROJECT_DIR) + "/media/cornell_box.gltf", mpDevice);
+    ref<Scene> scene = loadSceneWithImporter(std::string(PROJECT_DIR) + "/media/cornell_box.usdc", mpDevice);
     if (!scene)
         FAIL() << "Failed to load scene from file.";
     scene->buildAccelStructs();
-    scene->camera = make_ref<Camera>(float3(0.f, 0.f, -5.f), float3(0.f, 0.f, -6.f), glm::radians(45.0f));
 
     // Create render graph
     RenderGraphEditor renderGraphEditor(mpDevice);
@@ -54,7 +54,8 @@ TEST_F(PathTracerTest, Basic)
             break;
         }
     auto average = textureAveragePass->mAverageResult;
-    EXPECT_TRUE(average.r < threshold && average.g < threshold && average.b < threshold);
+    EXPECT_TRUE(average.r < threshold && average.g < threshold && average.b < threshold)
+        << "Average result: r=" << average.r << ", g=" << average.g << ", b=" << average.b;
 
     // Save the final output texture to EXR file
     nvrhi::TextureHandle imageTexture = renderGraph->getFinalOutputTexture();

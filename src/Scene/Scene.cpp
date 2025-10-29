@@ -1,5 +1,62 @@
 #include "Scene.h"
 #include "Utils/Logger.h"
+#include "Utils/ResourceIO.h"
+
+uint32_t Scene::loadTexture(const float* data, uint32_t width, uint32_t height, uint32_t channels, const std::string& debugName)
+{
+    nvrhi::Format format;
+    uint32_t gpuChannels = channels;
+
+    if (channels == 1)
+        format = nvrhi::Format::R32_FLOAT;
+    else if (channels == 2)
+        format = nvrhi::Format::RG32_FLOAT;
+    else if (channels == 3 || channels == 4)
+    {
+        format = nvrhi::Format::RGBA32_FLOAT;
+        gpuChannels = 4;
+    }
+
+    auto textureDesc = nvrhi::TextureDesc()
+                           .setDimension(nvrhi::TextureDimension::Texture2D)
+                           .setWidth(width)
+                           .setHeight(height)
+                           .setMipLevels(1)
+                           .setFormat(format)
+                           .setInitialState(nvrhi::ResourceStates::ShaderResource)
+                           .setKeepInitialState(true)
+                           .setDebugName(debugName);
+
+    auto nvrhiDevice = mpDevice->getDevice();
+    nvrhi::TextureHandle texture = nvrhiDevice->createTexture(textureDesc);
+
+    std::vector<float> uploadData;
+    if (channels == 3)
+    {
+        uploadData.resize(width * height * 4);
+        for (uint32_t i = 0; i < width * height; ++i)
+        {
+            uploadData[i * 4] = data[i * 3];
+            uploadData[i * 4 + 1] = data[i * 3 + 1];
+            uploadData[i * 4 + 2] = data[i * 3 + 2];
+            uploadData[i * 4 + 3] = 1.0f;
+        }
+    }
+    else
+        uploadData.assign(data, data + width * height * channels);
+
+    size_t dataSize = width * height * gpuChannels * sizeof(float);
+    if (!ResourceIO::uploadTexture(mpDevice, texture, uploadData.data(), dataSize))
+    {
+        LOG_ERROR("Failed to upload texture '{}'", debugName);
+        return kInvalidTextureId;
+    }
+
+    mTextures.push_back(texture);
+    LOG_INFO("Loaded texture '{}' ({}x{}, {} channels)", debugName, width, height, channels);
+
+    return static_cast<uint32_t>(mTextures.size() - 1);
+}
 
 void Scene::buildAccelStructs()
 {

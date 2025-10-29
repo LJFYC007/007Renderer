@@ -43,5 +43,6 @@ private:
     nvrhi::BufferHandle mCbPerFrame;
     nvrhi::BufferHandle mCbCamera;
     nvrhi::TextureHandle mTextureOut;
+    nvrhi::SamplerHandle mTextureSampler;
     ref<RayTracingPass> mpPass;
 };

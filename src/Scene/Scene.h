@@ -54,6 +54,23 @@ public:
         return defaultMaterial;
     }
 
+    uint32_t loadTexture(const float* data, uint32_t width, uint32_t height, uint32_t channels, const std::string& debugName = "");
+
+    // Get texture by ID
+    nvrhi::TextureHandle getTexture(uint32_t textureId) const
+    {
+        if (textureId < mTextures.size())
+            return mTextures[textureId];
+        return nullptr;
+    }
+
+    // Get all textures
+    const std::vector<nvrhi::TextureHandle>& getTextures() const { return mTextures; }
+    size_t getTextureCount() const { return mTextures.size(); }
+
+    // Get default texture (for unfilled texture slots)
+    nvrhi::TextureHandle getDefaultTexture() const { return mDefaultTexture; }
+
 private:
     ref<Device> mpDevice;
     nvrhi::BufferHandle mVertexBuffer;
@@ -63,4 +80,6 @@ private:
     nvrhi::BufferHandle mTriangleToMeshBuffer;
     nvrhi::rt::AccelStructHandle mBlas;
     nvrhi::rt::AccelStructHandle mTlas;
+    std::vector<nvrhi::TextureHandle> mTextures;
+    nvrhi::TextureHandle mDefaultTexture; // Default 1x1 white texture for unused slots
 };

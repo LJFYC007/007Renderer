@@ -124,6 +124,7 @@ void closestHitMain(inout Payload payload, BuiltInTriangleIntersectionAttributes
     ShadingData sd;
     sd.normal = hitNormal;
     sd.position = computeRayOrigin(hitPoint, hitNormal);
+    sd.uv = w * uv0 + u * uv1 + v * uv2;
     sd.V = normalize(WorldRayOrigin() - hitPoint);
     sd.T = tangent;
     sd.B = bitangent;
@@ -133,15 +134,16 @@ void closestHitMain(inout Payload payload, BuiltInTriangleIntersectionAttributes
     GLTFMaterial material = gScene.materials[materialIndex];
     // Material material = LambertianMaterial(float3(1.0f, 0.5f, 0.5f));
 
-    // Emissive contribution
-    if (any(material.emissive > 0.f))
+    // Emissive contribution (with texture sampling)
+    float3 emissive = material.getEmissive<true>(sd.uv, gScene.textures, gScene.textureSampler);
+    if (any(emissive > 0.f))
     {
-        payload.color = material.emissive;
+        payload.color = emissive;
         return;
     }
 
     BSDFSample sample;
-    if (!material.scatter(sd, payload.sampleGen, sample))
+    if (!material.scatter(sd, payload.sampleGen, sample, gScene.textures, gScene.textureSampler))
         return;
     Ray bounceRay = Ray(sd.position, sample.wo);
 

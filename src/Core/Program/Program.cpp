@@ -628,6 +628,73 @@ bool Program::processParameter(slang::VariableLayoutReflection* pVarLayout, int 
         return true;
     }
 
+    case slang::TypeReflection::Kind::Array:
+    {
+        // Handle array types (e.g., Texture2D textures[16])
+        auto pElementType = pTypeLayout->getElementTypeLayout();
+        if (!pElementType)
+        {
+            LOG_WARN("[ShaderBinding] Array {} has no element type layout", paramNameStr);
+            return true;
+        }
+
+        auto elementCount = pTypeLayout->getElementCount();
+        LOG_DEBUG(
+            "[ShaderBinding] Processing array: {} with {} elements at slot {} in space {}",
+            paramNameStr,
+            elementCount,
+            bindingSlot,
+            bindingSpaceOffset
+        );
+
+        // Check if array element is a resource type
+        if (pElementType->getKind() == slang::TypeReflection::Kind::Resource)
+        {
+            auto resourceShape = pElementType->getResourceShape();
+            auto resourceAccess = pElementType->getResourceAccess();
+
+            if (resourceShape == SLANG_TEXTURE_2D &&
+                (resourceAccess == SLANG_RESOURCE_ACCESS_READ || resourceAccess == SLANG_RESOURCE_ACCESS_READ_WRITE))
+            {
+                // Create individual bindings for each array element
+                for (uint32_t i = 0; i < elementCount; ++i)
+                {
+                    std::string elementName = paramNameStr + "[" + std::to_string(i) + "]";
+                    uint32_t elementSlot = bindingSlot + i;
+
+                    nvrhi::BindingLayoutItem elementLayoutItem = resourceAccess == SLANG_RESOURCE_ACCESS_READ
+                                                                     ? nvrhi::BindingLayoutItem::Texture_SRV(elementSlot)
+                                                                     : nvrhi::BindingLayoutItem::Texture_UAV(elementSlot);
+                    nvrhi::BindingSetItem elementBindingItem = resourceAccess == SLANG_RESOURCE_ACCESS_READ
+                                                                   ? nvrhi::BindingSetItem::Texture_SRV(elementSlot, nullptr)
+                                                                   : nvrhi::BindingSetItem::Texture_UAV(elementSlot, nullptr);
+
+                    ReflectionInfo reflectionInfo;
+                    reflectionInfo.name = prefix + elementName;
+                    reflectionInfo.bindingLayoutItem = elementLayoutItem;
+                    reflectionInfo.bindingSetItem = elementBindingItem;
+                    reflectionInfo.bindingSpace = bindingSpaceOffset;
+                    mReflectionInfo.push_back(reflectionInfo);
+
+                    LOG_DEBUG("[ShaderBinding] Array element: {} at slot {} in space {}", reflectionInfo.name, elementSlot, bindingSpaceOffset);
+                }
+                return true;
+            }
+        }
+
+        LOG_WARN("[ShaderBinding] Unsupported array type for: {}", paramNameStr);
+        return true;
+    }
+
+    case slang::TypeReflection::Kind::SamplerState:
+    {
+        // Handle sampler state
+        layoutItem = nvrhi::BindingLayoutItem::Sampler(bindingSlot);
+        bindingItem = nvrhi::BindingSetItem::Sampler(bindingSlot, nullptr);
+        LOG_DEBUG("[ShaderBinding] Found sampler state: {} at slot {} in space {}", paramNameStr, bindingSlot, bindingSpaceOffset);
+        break;
+    }
+
     default:
         return true;
     }

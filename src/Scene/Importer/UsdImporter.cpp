@@ -5,6 +5,7 @@
 #include <tydra/scene-access.hh>
 #include <tydra/attribute-eval.hh>
 #include <pprinter.hh>
+#include <io-util.hh>
 #include <usdShade.hh>
 #include <value-pprint.hh>
 
@@ -68,12 +69,21 @@ ref<Scene> UsdImporter::loadScene(const std::string& fileName)
     tinyusdz::tydra::ListPrims(mStage, matmap);
 
     // Build RenderScene to access materials
-    tinyusdz::tydra::RenderScene renderScene;
     tinyusdz::tydra::RenderSceneConverter converter;
     tinyusdz::tydra::RenderSceneConverterEnv env(mStage);
+    std::string usdBaseDir = tinyusdz::io::GetBaseDir(fileName);
+
+    LOG_INFO("USD base directory for asset search: '{}'", usdBaseDir);
+    LOG_INFO("USD file path: '{}'", fileName);
+
+    // Set search paths for texture loading
+    env.set_search_paths({usdBaseDir});
+    env.scene_config.load_texture_assets = true;
+
+    LOG_INFO("RenderSceneConverter config: load_texture_assets = {}", env.scene_config.load_texture_assets ? "true" : "false");
 
     // Convert USD Stage to RenderScene to access processed materials
-    if (!converter.ConvertToRenderScene(env, &renderScene))
+    if (!converter.ConvertToRenderScene(env, &mRenderScene))
     {
         std::string warn = converter.GetWarning();
         std::string err = converter.GetError();
@@ -84,10 +94,43 @@ ref<Scene> UsdImporter::loadScene(const std::string& fileName)
         return nullptr;
     }
 
-    // Convert RenderMaterials to renderer materials
-    for (const auto& renderMaterial : renderScene.materials)
+    // Log conversion results
+    if (!converter.GetWarning().empty())
+        LOG_WARN("USD RenderScene conversion warning: {}", converter.GetWarning());
+
+    LOG_INFO(
+        "RenderScene conversion completed: {} textures, {} images, {} buffers",
+        mRenderScene.textures.size(),
+        mRenderScene.images.size(),
+        mRenderScene.buffers.size()
+    );
+
+    // Print the entire prim hierarchy for debugging
+    auto prim_visit_fun = [](const tinyusdz::Path& abs_path, const tinyusdz::Prim& prim, const int32_t level, void* userdata, std::string* err
+                          ) -> bool
     {
-        Material material = extractMaterial(renderMaterial);
+        (void)err;
+        std::cout << tinyusdz::pprint::Indent(level) << "[" << level << "] (" << prim.data().type_name() << ") " << prim.local_path().prim_part()
+                  << " : AbsPath " << tinyusdz::to_string(abs_path) << "\n";
+
+        // Use as() or is() for Prim specific processing.
+        if (const tinyusdz::Material* pm = prim.as<tinyusdz::Material>())
+        {
+            (void)pm;
+            std::cout << tinyusdz::pprint::Indent(level) << "  Got Material!\n";
+            // return false + `err` empty if you want to terminate traversal earlier.
+            // return false;
+        }
+
+        return true;
+    };
+    void* userdata = nullptr;
+    // tinyusdz::tydra::VisitPrims(mStage, prim_visit_fun, userdata);
+
+    // Convert RenderMaterials to renderer materials
+    for (const auto& renderMaterial : mRenderScene.materials)
+    {
+        Material material = extractMaterial(renderMaterial, scene);
         scene->materials.push_back(material);
         uint32_t materialIndex = static_cast<uint32_t>(scene->materials.size() - 1);
         mMaterialPathToIndex[renderMaterial.abs_path] = materialIndex;
@@ -168,18 +211,17 @@ void UsdImporter::extractCamera(const tinyusdz::GeomCamera* geomCamera, const ti
 
 void UsdImporter::extractMeshGeometry(const tinyusdz::GeomMesh* geomMesh, const tinyusdz::value::matrix4d& worldMatrix, ref<Scene> scene)
 {
-    std::vector<tinyusdz::value::point3f> points = geomMesh->get_points();
-    std::vector<int32_t> faceVertexIndices = geomMesh->get_faceVertexIndices();
-    std::vector<int32_t> faceVertexCounts = geomMesh->get_faceVertexCounts();
-    std::vector<tinyusdz::value::normal3f> normals = geomMesh->get_normals();
+    auto points = geomMesh->get_points();
+    auto faceVertexIndices = geomMesh->get_faceVertexIndices();
+    auto faceVertexCounts = geomMesh->get_faceVertexCounts();
+    auto normals = geomMesh->get_normals();
     bool hasNormals = !normals.empty();
 
-    // Get UV coordinates from primvars (try common UV primvar names)
+    // Get UV coordinates from primvars
     std::vector<tinyusdz::value::texcoord2f> uvCoords;
     bool hasUVs = false;
-    std::vector<std::string> uvNames = {"st", "uv", "st0", "uv0"};
-
-    for (const std::string& uvName : uvNames)
+    for (const auto& uvName : {"st", "uv", "st0", "uv0"})
+    {
         if (geomMesh->has_primvar(uvName))
         {
             tinyusdz::GeomPrimvar uvPrimvar;
@@ -187,118 +229,188 @@ void UsdImporter::extractMeshGeometry(const tinyusdz::GeomMesh* geomMesh, const 
             if (geomMesh->get_primvar(uvName, &uvPrimvar, &uvErr) && uvPrimvar.get_value(&uvCoords))
             {
                 hasUVs = true;
+                if (uvPrimvar.get_interpolation() != tinyusdz::Interpolation::FaceVarying)
+                    LOG_WARN("UV coordinates are not faceVarying, skipping");
                 break;
             }
         }
-    if (!hasUVs)
-        LOG_WARN("No UV coordinates found in mesh primvars, defaulting to zero UVs");
-
-    // Store the current vertex and index offsets
-    uint32_t vertexOffset = static_cast<uint32_t>(scene->vertices.size());
-    uint32_t indexOffset = static_cast<uint32_t>(scene->indices.size());
-
-    // Convert points to vertices and apply transform
-    for (size_t i = 0; i < points.size(); ++i)
-    {
-        Vertex vertex;
-
-        // Apply world transform to position
-        tinyusdz::value::point3f transformedPos = tinyusdz::transform(worldMatrix, points[i]);
-        vertex.position[0] = transformedPos[0];
-        vertex.position[1] = transformedPos[1];
-        vertex.position[2] = transformedPos[2];
-
-        // Set texture coordinates (UV)
-        if (hasUVs && i < uvCoords.size())
-        {
-            vertex.texCoord[0] = uvCoords[i][0];
-            vertex.texCoord[1] = uvCoords[i][1];
-        }
-        else
-        {
-            vertex.texCoord[0] = 0.0f;
-            vertex.texCoord[1] = 0.0f;
-        }
-
-        // Set normals if available and apply transform
-        if (hasNormals && i < normals.size())
-        {
-            // Transform normal using the 3x3 part of the matrix (direction transform)
-            tinyusdz::value::normal3f transformedNormal = tinyusdz::transform_dir(worldMatrix, normals[i]);
-            vertex.normal[0] = transformedNormal[0];
-            vertex.normal[1] = transformedNormal[1];
-            vertex.normal[2] = transformedNormal[2];
-        }
-        else
-        {
-            // Default normal pointing up
-            vertex.normal[0] = 0.0f;
-            vertex.normal[1] = 1.0f;
-            vertex.normal[2] = 0.0f;
-        }
-
-        scene->vertices.push_back(vertex);
     }
+    if (!hasUVs)
+        LOG_WARN("No UV coordinates found, defaulting to zero UVs");
 
-    // Convert face data to triangles (rest of the triangulation logic remains the same)
-    size_t faceIndexOffset = 0;
+    // Helper to create vertex from indices
+    auto createVertex = [&](int32_t pointIdx, int32_t uvIdx) -> Vertex
+    {
+        Vertex v;
+        auto pos = tinyusdz::transform(worldMatrix, points[pointIdx]);
+        v.position[0] = pos[0];
+        v.position[1] = pos[1];
+        v.position[2] = pos[2];
+
+        if (uvIdx < static_cast<int32_t>(uvCoords.size()))
+        {
+            v.texCoord[0] = uvCoords[uvIdx][0];
+            v.texCoord[1] = uvCoords[uvIdx][1];
+        }
+        else
+        {
+            v.texCoord[0] = 0.0f;
+            v.texCoord[1] = 0.0f;
+        }
+
+        if (hasNormals && pointIdx < static_cast<int32_t>(normals.size()))
+        {
+            auto n = tinyusdz::transform_dir(worldMatrix, normals[pointIdx]);
+            v.normal[0] = n[0];
+            v.normal[1] = n[1];
+            v.normal[2] = n[2];
+        }
+        else
+        {
+            v.normal[0] = 0.0f;
+            v.normal[1] = 1.0f;
+            v.normal[2] = 0.0f;
+        }
+
+        return v;
+    };
+
+    // Helper to add vertex and return its index
+    auto addVertex = [&](int32_t faceOffset, int32_t localIdx) -> uint32_t
+    {
+        int32_t pointIdx = faceVertexIndices[faceOffset + localIdx];
+        int32_t uvIdx = static_cast<int32_t>(faceOffset + localIdx);
+        scene->vertices.push_back(createVertex(pointIdx, uvIdx));
+        uint32_t idx = static_cast<uint32_t>(scene->vertices.size()) - 1;
+        scene->indices.push_back(idx);
+        return idx;
+    };
+
+    size_t faceOffset = 0;
     uint32_t triangleCount = 0;
 
-    // Process each face based on face vertex counts
-    for (size_t faceIdx = 0; faceIdx < faceVertexCounts.size(); ++faceIdx)
+    for (int32_t faceVertCount : faceVertexCounts)
     {
-        int32_t vertexCount = faceVertexCounts[faceIdx];
-
-        if (vertexCount == 3)
+        if (faceVertCount == 3)
         {
-            // Triangle - add directly
-            scene->indices.push_back(vertexOffset + static_cast<uint32_t>(faceVertexIndices[faceIndexOffset]));
-            scene->indices.push_back(vertexOffset + static_cast<uint32_t>(faceVertexIndices[faceIndexOffset + 1]));
-            scene->indices.push_back(vertexOffset + static_cast<uint32_t>(faceVertexIndices[faceIndexOffset + 2]));
+            // Triangle
+            for (int32_t i = 0; i < 3; ++i)
+                addVertex(faceOffset, i);
             triangleCount++;
         }
-        else if (vertexCount == 4)
+        else if (faceVertCount == 4)
         {
-            // Quad - split into two triangles
-            // Triangle 1: 0, 1, 2
-            scene->indices.push_back(vertexOffset + static_cast<uint32_t>(faceVertexIndices[faceIndexOffset]));
-            scene->indices.push_back(vertexOffset + static_cast<uint32_t>(faceVertexIndices[faceIndexOffset + 1]));
-            scene->indices.push_back(vertexOffset + static_cast<uint32_t>(faceVertexIndices[faceIndexOffset + 2]));
+            // Quad -> split into two triangles (0,1,2) and (0,2,3)
+            addVertex(faceOffset, 0);
+            addVertex(faceOffset, 1);
+            addVertex(faceOffset, 2);
 
-            // Triangle 2: 0, 2, 3
-            scene->indices.push_back(vertexOffset + static_cast<uint32_t>(faceVertexIndices[faceIndexOffset]));
-            scene->indices.push_back(vertexOffset + static_cast<uint32_t>(faceVertexIndices[faceIndexOffset + 2]));
-            scene->indices.push_back(vertexOffset + static_cast<uint32_t>(faceVertexIndices[faceIndexOffset + 3]));
+            addVertex(faceOffset, 0);
+            addVertex(faceOffset, 2);
+            addVertex(faceOffset, 3);
             triangleCount += 2;
         }
         else
-            LOG_WARN("Polygon with more than 4 vertices found, skipping triangulation");
-        faceIndexOffset += vertexCount;
+            LOG_WARN("Polygon with {} vertices found, skipping", faceVertCount);
+
+        faceOffset += faceVertCount;
     }
 
-    // Update triangle to mesh mapping
     for (uint32_t i = 0; i < triangleCount; ++i)
         scene->triangleToMesh.push_back(static_cast<uint32_t>(scene->meshes.size()));
 }
 
-Material UsdImporter::extractMaterial(const tinyusdz::tydra::RenderMaterial& usdMaterial)
+Material UsdImporter::extractMaterial(const tinyusdz::tydra::RenderMaterial& usdMaterial, ref<Scene> scene)
 {
     Material material;
     const auto& surfaceShader = usdMaterial.surfaceShader;
 
+    // Base Color (diffuse)
     if (!surfaceShader.diffuseColor.is_texture())
     {
         const auto& diffuse = surfaceShader.diffuseColor.value;
         material.baseColorFactor = glm::vec3(diffuse[0], diffuse[1], diffuse[2]);
     }
+    else
+    {
+        int32_t texId = surfaceShader.diffuseColor.texture_id;
+        material.baseColorTextureId = loadTextureFromRenderScene(texId, scene);
+        LOG_INFO("{}: Base color texture loaded (engine ID: {})", usdMaterial.abs_path, material.baseColorTextureId);
+    }
+
+    // Metallic
     if (!surfaceShader.metallic.is_texture())
         material.metallicFactor = surfaceShader.metallic.value;
+    else
+    {
+        int32_t texId = surfaceShader.metallic.texture_id;
+        material.metallicRoughnessTextureId = loadTextureFromRenderScene(texId, scene);
+        LOG_INFO("{}: Metallic texture loaded (engine ID: {})", usdMaterial.abs_path, material.metallicRoughnessTextureId);
+    }
+
+    // Roughness
     if (!surfaceShader.roughness.is_texture())
         material.roughnessFactor = surfaceShader.roughness.value;
+    else if (material.metallicRoughnessTextureId == kInvalidTextureId)
+    {
+        int32_t texId = surfaceShader.roughness.texture_id;
+        material.metallicRoughnessTextureId = loadTextureFromRenderScene(texId, scene);
+        LOG_INFO("{}: Roughness texture loaded (engine ID: {})", usdMaterial.abs_path, material.metallicRoughnessTextureId);
+    }
+
+    // Emissive
     if (!surfaceShader.emissiveColor.is_texture())
     {
         const auto& emissive = surfaceShader.emissiveColor.value;
         material.emissiveFactor = glm::vec3(emissive[0], emissive[1], emissive[2]);
     }
+    else
+    {
+        int32_t texId = surfaceShader.emissiveColor.texture_id;
+        material.emissiveTextureId = loadTextureFromRenderScene(texId, scene);
+        LOG_INFO("{}: Emissive texture loaded (engine ID: {})", usdMaterial.abs_path, material.emissiveTextureId);
+    }
+
     return material;
+}
+
+uint32_t UsdImporter::loadTextureFromRenderScene(int32_t textureId, ref<Scene> scene)
+{
+    // Check if already loaded
+    auto it = mUsdTextureIdToEngineId.find(textureId);
+    if (it != mUsdTextureIdToEngineId.end())
+        return it->second;
+
+    const auto& uvTexture = mRenderScene.textures[textureId];
+    const auto& texImage = mRenderScene.images[uvTexture.texture_image_id];
+    const auto& buffer = mRenderScene.buffers[texImage.buffer_id];
+
+    if (buffer.data.empty())
+    {
+        LOG_ERROR("Texture buffer is empty! Texture asset may not have been loaded by tinyusdz.");
+        return kInvalidTextureId;
+    }
+
+    // Verify buffer size matches expected size based on component type
+    uint32_t bytesPerComponent = 4; // float32
+    size_t expectedSize = static_cast<size_t>(texImage.width) * texImage.height * texImage.channels * bytesPerComponent;
+    if (buffer.data.size() != expectedSize)
+    {
+        LOG_WARN(
+            "Buffer size ({}) doesn't match expected ({} = {}x{}x{}x{})",
+            buffer.data.size(),
+            expectedSize,
+            texImage.width,
+            texImage.height,
+            texImage.channels,
+            bytesPerComponent
+        );
+    }
+
+    const float* floatData = reinterpret_cast<const float*>(buffer.data.data());
+    uint32_t engineTextureId = scene->loadTexture(floatData, texImage.width, texImage.height, texImage.channels, texImage.asset_identifier);
+
+    // Cache the mapping
+    mUsdTextureIdToEngineId[textureId] = engineTextureId;
+    return engineTextureId;
 }
