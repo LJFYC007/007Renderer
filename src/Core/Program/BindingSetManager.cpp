@@ -34,6 +34,7 @@ BindingSetManager::BindingSetManager(ref<Device> pDevice, std::vector<Reflection
             }
 
             mpDevice->getDevice()->resizeDescriptorTable(descriptorTable, info.descriptorTableSize, false);
+            LOG_DEBUG("[BindingSetManager] Creating new descriptor table for space {} with size {}", space, info.descriptorTableSize);
 
             // Store descriptor table info
             DescriptorTableInfo tableInfo;
@@ -160,5 +161,4 @@ void BindingSetManager::setDescriptorTable(
         if (!mpDevice->getDevice()->writeDescriptorTable(tableInfo.descriptorTable, item))
             LOG_ERROR("[BindingSetManager] Failed to write default texture to slot {} in descriptor table '{}'", i, name);
     }
-    LOG_DEBUG("[BindingSetManager] Bound {} textures to descriptor table '{}' (capacity: {})", textures.size(), name, tableInfo.size);
 }

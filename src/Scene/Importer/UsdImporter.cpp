@@ -79,8 +79,7 @@ ref<Scene> UsdImporter::loadScene(const std::string& fileName)
     // Set search paths for texture loading
     env.set_search_paths({usdBaseDir});
     env.scene_config.load_texture_assets = true;
-
-    LOG_INFO("RenderSceneConverter config: load_texture_assets = {}", env.scene_config.load_texture_assets ? "true" : "false");
+    env.material_config.linearize_color_space = true;
 
     // Convert USD Stage to RenderScene to access processed materials
     if (!converter.ConvertToRenderScene(env, &mRenderScene))

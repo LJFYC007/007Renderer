@@ -26,8 +26,6 @@ ComputePass::ComputePass(ref<Device> pDevice, const std::string& shaderPath, con
             mWorkGroupSizeX = static_cast<uint32_t>(workGroupSize[0]);
             mWorkGroupSizeY = static_cast<uint32_t>(workGroupSize[1]);
             mWorkGroupSizeZ = static_cast<uint32_t>(workGroupSize[2]);
-
-            LOG_DEBUG("[ComputePass] Work group size: {}x{}x{}", mWorkGroupSizeX, mWorkGroupSizeY, mWorkGroupSizeZ);
         }
     }
 

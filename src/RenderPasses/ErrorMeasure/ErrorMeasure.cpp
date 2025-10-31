@@ -53,6 +53,17 @@ ErrorMeasure::ErrorMeasure(ref<Device> pDevice) : RenderPass(pDevice)
                                          .setIsUAV(true)
                                          .setKeepInitialState(true);
     mpDifferenceTexture = mpDevice->getDevice()->createTexture(textureDesc);
+
+    // Create unified output texture that will always be returned
+    nvrhi::TextureDesc outputTextureDesc = nvrhi::TextureDesc()
+                                               .setWidth(mWidth)
+                                               .setHeight(mHeight)
+                                               .setFormat(nvrhi::Format::RGBA32_FLOAT)
+                                               .setInitialState(nvrhi::ResourceStates::UnorderedAccess)
+                                               .setDebugName("ErrorMeasure/outputTexture")
+                                               .setIsUAV(true)
+                                               .setKeepInitialState(true);
+    mpOutputTexture = mpDevice->getDevice()->createTexture(outputTextureDesc);
 }
 
 std::vector<RenderPassInput> ErrorMeasure::getInputs() const
@@ -80,28 +91,17 @@ RenderData ErrorMeasure::execute(const RenderData& renderData)
 
     mPerFrameData.gWidth = mWidth;
     mPerFrameData.gHeight = mHeight;
+    mPerFrameData.gSelectedOutput = static_cast<uint32_t>(mSelectedOutput);
 
     (*mpPass)["PerFrameCB"] = mCbPerFrame;
     (*mpPass)["source"] = mpSourceTexture;
     (*mpPass)["reference"] = mpReferenceTexture;
-    (*mpPass)["difference"] = mpDifferenceTexture;
+    (*mpPass)["output"] = mpOutputTexture;
     mpPass->execute(mWidth, mHeight, 1);
 
-    // Set output based on user selection
+    // Always return the unified output texture
     RenderData output;
-    switch (mSelectedOutput)
-    {
-    case OutputId::Source:
-        output.setResource(kOutputName, mpSourceTexture);
-        break;
-    case OutputId::Reference:
-        output.setResource(kOutputName, mpReferenceTexture);
-        break;
-    case OutputId::Difference:
-    default:
-        output.setResource(kOutputName, mpDifferenceTexture);
-        break;
-    }
+    output.setResource(kOutputName, mpOutputTexture);
     return output;
 }
 

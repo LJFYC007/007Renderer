@@ -32,11 +32,13 @@ private:
     {
         uint32_t gWidth;
         uint32_t gHeight;
+        uint32_t gSelectedOutput;
     } mPerFrameData;
 
     nvrhi::BufferHandle mCbPerFrame;
     nvrhi::TextureHandle mpSourceTexture;
     nvrhi::TextureHandle mpReferenceTexture;
     nvrhi::TextureHandle mpDifferenceTexture;
+    nvrhi::TextureHandle mpOutputTexture;
     ref<ComputePass> mpPass;
 };
