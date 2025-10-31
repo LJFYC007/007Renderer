@@ -2,8 +2,7 @@
 #include <string>
 
 #include "Utils/Math/Math.h"
-
-static uint kInvalidTextureId = 0xFFFFFFFF;
+#include "Scene/Material/TextureManager.h"
 
 struct Material
 {
@@ -18,7 +17,8 @@ struct Material
     float roughnessFactor = 1.f;
 
     uint baseColorTextureId = kInvalidTextureId;
-    uint metallicRoughnessTextureId = kInvalidTextureId; // Combined metallic(B) + roughness(G) texture
+    uint metallicTextureId = kInvalidTextureId;
+    uint roughnessTextureId = kInvalidTextureId;
     uint emissiveTextureId = kInvalidTextureId;
     uint normalTextureId = kInvalidTextureId;
 

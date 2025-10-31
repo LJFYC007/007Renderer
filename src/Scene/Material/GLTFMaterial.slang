@@ -1,4 +1,5 @@
 #include "Scene/Material/Material.slang"
+#include "Scene/Material/TextureSampler.slang"
 #include "Utils/Math/MathConstants.slangh"
 import Utils.Sampling.Sample;
 import Utils.Sampling.SampleGeneratorInterface;
@@ -116,7 +117,7 @@ struct GLTFDiffuseBRDF
     }
 };
 
-struct GLTFMaterial
+struct GLTFMaterial : IMaterial
 {
     // Note: float3 in GPU buffers is padded to 16 bytes (same as float4)
     float3 baseColor;
@@ -129,7 +130,8 @@ struct GLTFMaterial
     float roughness = 0.f;
 
     uint baseColorTextureId;
-    uint metallicRoughnessTextureId;
+    uint metallicTextureId;
+    uint roughnessTextureId;
     uint emissiveTextureId;
     uint normalTextureId;
 
@@ -141,69 +143,55 @@ struct GLTFMaterial
         metallic = _metallic;
         roughness = _roughness;
         baseColorTextureId = kInvalidTextureId;
-        metallicRoughnessTextureId = kInvalidTextureId;
+        metallicTextureId = kInvalidTextureId;
+        roughnessTextureId = kInvalidTextureId;
         emissiveTextureId = kInvalidTextureId;
         normalTextureId = kInvalidTextureId;
     }
 
-    // Sample textures and get final material properties
-    // Use SampleLevel instead of Sample for raytracing shaders (no automatic mip level calculation)
-    float3 getBaseColor<let sampleTextures : bool>(float2 uv, Texture2D textures[2], SamplerState sampler)
-    {
-        if (sampleTextures && baseColorTextureId != kInvalidTextureId)
-            return textures[baseColorTextureId].SampleLevel(sampler, uv, 0).rgb * baseColor;
-        return baseColor;
-    }
+    float3 getEmissive(float2 uv) { return sampleEmissive(emissiveTextureId, uv, emissive); }
 
-    float2 getMetallicRoughness<let sampleTextures : bool>(float2 uv, Texture2D textures[2], SamplerState sampler)
+    BSDFSample scatter<S : ISampleGenerator>(const ShadingData sd, inout S sg)
     {
-        if (sampleTextures && metallicRoughnessTextureId != kInvalidTextureId)
-        {
-            float4 mr = textures[metallicRoughnessTextureId].SampleLevel(sampler, uv, 0);
-            return float2(mr.b * metallic, mr.g * roughness); // Blue=metallic, Green=roughness
-        }
-        return float2(metallic, roughness);
-    }
+        BSDFSample sample;
+        sample.pdf = 0.0f;
+        sample.weight = float3(0.0f);
+        sample.wo = float3(0.0f);
 
-    float3 getEmissive<let sampleTextures : bool>(float2 uv, Texture2D textures[2], SamplerState sampler)
-    {
-        if (sampleTextures && emissiveTextureId != kInvalidTextureId)
-            return textures[emissiveTextureId].SampleLevel(sampler, uv, 0).rgb * emissive;
-        return emissive;
-    }
-
-    // Implement the scatter method for Lambertian reflection
-    bool scatter<S : ISampleGenerator>(const ShadingData sd, inout S sg, out BSDFSample sample, Texture2D textures[2], SamplerState sampler)
-    {
         float3 wiLocal = sd.toLocal(sd.V);
         float3 woLocal;
 
         // Sample textures to get material properties
-        float3 sampledBaseColor = getBaseColor<true>(sd.uv, textures, sampler);
-        float2 mr = getMetallicRoughness<true>(sd.uv, textures, sampler);
-        float sampledMetallic = mr.x;
-        float sampledRoughness = mr.y;
+        float3 sampledBaseColor = sampleBaseColor(baseColorTextureId, sd.uv, baseColor);
+        float sampledMetallic = sampleMetallic(metallicTextureId, sd.uv, metallic);
+        float sampledRoughness = sampleRoughness(roughnessTextureId, sd.uv, roughness);
         float alpha = max(kMinGGXAlpha, sampledRoughness * sampledRoughness);
 
         float uSelect = sampleNext1D(sg);
+        float pdf;
+        float3 weight;
+
         if (uSelect < sampledMetallic)
         {
             GLTFSpecularBRDF specularBRDF = GLTFSpecularBRDF(sampledBaseColor, sampledMetallic, alpha);
-            if (!specularBRDF.sample(wiLocal, woLocal, sample.pdf, sample.weight, sg))
-                return false;
-            sample.pdf *= sampledMetallic;
-            sample.weight /= sampledMetallic;
+            if (specularBRDF.sample(wiLocal, woLocal, pdf, weight, sg))
+            {
+                sample.pdf = pdf * sampledMetallic;
+                sample.weight = weight / sampledMetallic;
+                sample.wo = sd.toWorld(woLocal);
+            }
         }
         else
         {
             GLTFDiffuseBRDF diffuseBRDF = GLTFDiffuseBRDF(sampledBaseColor, sampledMetallic, alpha);
-            if (!diffuseBRDF.sample(wiLocal, woLocal, sample.pdf, sample.weight, sg))
-                return false;
-            sample.pdf *= (1.f - sampledMetallic);
-            sample.weight /= (1.f - sampledMetallic);
+            if (diffuseBRDF.sample(wiLocal, woLocal, pdf, weight, sg))
+            {
+                sample.pdf = pdf * (1.f - sampledMetallic);
+                sample.weight = weight / (1.f - sampledMetallic);
+                sample.wo = sd.toWorld(woLocal);
+            }
         }
 
-        sample.wo = sd.toWorld(woLocal);
-        return true;
+        return sample;
     }
 };

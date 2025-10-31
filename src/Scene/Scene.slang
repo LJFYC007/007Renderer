@@ -20,8 +20,6 @@ struct Scene
     StructuredBuffer<GLTFMaterial> materials;
     StructuredBuffer<MeshInfo> meshes;
     StructuredBuffer<uint> triangleToMesh; // Maps triangle index to mesh index
-    Texture2D textures[2];                 // Array of textures (adjust size as needed)
-    SamplerState textureSampler;
 };
 
 ParameterBlock<Scene> gScene;

@@ -335,7 +335,6 @@ Material UsdImporter::extractMaterial(const tinyusdz::tydra::RenderMaterial& usd
     {
         int32_t texId = surfaceShader.diffuseColor.texture_id;
         material.baseColorTextureId = loadTextureFromRenderScene(texId, scene);
-        LOG_INFO("{}: Base color texture loaded (engine ID: {})", usdMaterial.abs_path, material.baseColorTextureId);
     }
 
     // Metallic
@@ -344,18 +343,16 @@ Material UsdImporter::extractMaterial(const tinyusdz::tydra::RenderMaterial& usd
     else
     {
         int32_t texId = surfaceShader.metallic.texture_id;
-        material.metallicRoughnessTextureId = loadTextureFromRenderScene(texId, scene);
-        LOG_INFO("{}: Metallic texture loaded (engine ID: {})", usdMaterial.abs_path, material.metallicRoughnessTextureId);
+        material.metallicTextureId = loadTextureFromRenderScene(texId, scene);
     }
 
     // Roughness
     if (!surfaceShader.roughness.is_texture())
         material.roughnessFactor = surfaceShader.roughness.value;
-    else if (material.metallicRoughnessTextureId == kInvalidTextureId)
+    else
     {
         int32_t texId = surfaceShader.roughness.texture_id;
-        material.metallicRoughnessTextureId = loadTextureFromRenderScene(texId, scene);
-        LOG_INFO("{}: Roughness texture loaded (engine ID: {})", usdMaterial.abs_path, material.metallicRoughnessTextureId);
+        material.roughnessTextureId = loadTextureFromRenderScene(texId, scene);
     }
 
     // Emissive
@@ -368,7 +365,6 @@ Material UsdImporter::extractMaterial(const tinyusdz::tydra::RenderMaterial& usd
     {
         int32_t texId = surfaceShader.emissiveColor.texture_id;
         material.emissiveTextureId = loadTextureFromRenderScene(texId, scene);
-        LOG_INFO("{}: Emissive texture loaded (engine ID: {})", usdMaterial.abs_path, material.emissiveTextureId);
     }
 
     return material;

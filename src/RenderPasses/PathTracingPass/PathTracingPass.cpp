@@ -77,16 +77,12 @@ RenderData PathTracingPass::execute(const RenderData& input)
     (*mpPass)["gScene.materials"] = mpScene->getMaterialBuffer();
     (*mpPass)["gScene.rtAccel"] = mpScene->getTLAS();
 
-    // Bind textures
-    for (size_t i = 0; i < mpScene->getTextureCount(); ++i)
-    {
-        std::string textureName = "gScene.textures[" + std::to_string(i) + "]";
-        nvrhi::TextureHandle texture = mpScene->getTexture(static_cast<uint32_t>(i));
-        (*mpPass)[textureName] = texture;
-    }
+    // Bind all textures to descriptor table for bindless access
+    // Pass default texture to fill unused slots
+    mpPass->setDescriptorTable("gMaterialTextures.textures", mpScene->getTextures(), mpScene->getDefaultTexture());
 
-    // Bind sampler
-    (*mpPass)["gScene.textureSampler"] = mTextureSampler;
+    // Bind sampler separately (in different register space)
+    (*mpPass)["gMaterialSampler.sampler"] = mTextureSampler;
 
     (*mpPass)["result"] = mTextureOut;
     mpPass->execute(mWidth, mHeight, 1);

@@ -19,6 +19,13 @@ public:
 
     void addConstantBuffer(nvrhi::BufferHandle buffer, void* pData, size_t sizeBytes) { mConstantBuffers.push_back({buffer, pData, sizeBytes}); }
 
+    // Descriptor table support for bindless resources
+    void setDescriptorTable(const std::string& name, const std::vector<nvrhi::TextureHandle>& textures, nvrhi::TextureHandle defaultTexture)
+    {
+        if (mpBindingSetManager)
+            mpBindingSetManager->setDescriptorTable(name, textures, defaultTexture);
+    }
+
     // We can use pass["name"] = resourceHandle;
     class BindingSlot
     {

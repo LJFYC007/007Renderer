@@ -132,18 +132,20 @@ void closestHitMain(inout Payload payload, BuiltInTriangleIntersectionAttributes
     uint meshIndex = gScene.triangleToMesh[primitiveIndex];
     uint materialIndex = gScene.meshes[meshIndex].materialIndex;
     GLTFMaterial material = gScene.materials[materialIndex];
-    // Material material = LambertianMaterial(float3(1.0f, 0.5f, 0.5f));
+    // Or use any material implementing IMaterial:
+    // LambertianMaterial material = LambertianMaterial(float3(1.0f, 0.5f, 0.5f));
 
-    // Emissive contribution (with texture sampling)
-    float3 emissive = material.getEmissive<true>(sd.uv, gScene.textures, gScene.textureSampler);
+    // Emissive contribution
+    float3 emissive = material.getEmissive(sd.uv);
     if (any(emissive > 0.f))
     {
         payload.color = emissive;
         return;
     }
 
-    BSDFSample sample;
-    if (!material.scatter(sd, payload.sampleGen, sample, gScene.textures, gScene.textureSampler))
+    // Sample BSDF using unified interface
+    BSDFSample sample = material.scatter(sd, payload.sampleGen);
+    if (sample.pdf <= 0.0f)
         return;
     Ray bounceRay = Ray(sd.position, sample.wo);
 
