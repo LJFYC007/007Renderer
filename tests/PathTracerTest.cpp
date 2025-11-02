@@ -23,6 +23,31 @@ protected:
 
 TEST_F(PathTracerTest, Basic)
 {
+    const uint spp = 4;           // Low SPP for CI
+    const float threshold = 1.0f; // Large threshold
+
+    ref<Scene> scene = loadSceneWithImporter(std::string(PROJECT_DIR) + "/media/cornell_box.usdc", mpDevice);
+    if (!scene)
+        FAIL() << "Failed to load scene from file.";
+    scene->buildAccelStructs();
+
+    RenderGraphEditor renderGraphEditor(mpDevice);
+    auto renderGraph = RenderGraphBuilder::createDefaultGraph(mpDevice);
+    renderGraph->setScene(scene);
+
+    for (uint i = 0; i < spp; ++i)
+    {
+        scene->camera->calculateCameraParameters();
+        renderGraph->execute();
+    }
+
+    // Only verify that rendering completed without errors
+    nvrhi::TextureHandle imageTexture = renderGraph->getFinalOutputTexture();
+    EXPECT_NE(imageTexture, nullptr);
+}
+
+TEST_F(PathTracerTest, Full)
+{
     const uint spp = 4096;
     const float threshold = 0.005f; // Convergence threshold
 

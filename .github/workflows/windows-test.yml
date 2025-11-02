@@ -9,7 +9,7 @@ on:
 jobs:
   build:
     name: Build on Windows (MSVC)
-    runs-on: self-hosted
+    runs-on: windows-latest
     
     strategy:
       matrix:
@@ -79,10 +79,11 @@ jobs:
         }
         Write-Host "✅ Successfully built ${{ matrix.build_type }} version"
 
-    - name: Run tests and generate report
+    - name: Run CI tests and generate report
       run: |
         $reportDir = "build/test-reports"
         if (!(Test-Path -Path $reportDir)) {
-          New-Item -ItemType Directory -Path $reportDir | Out-Null
+          New-Item -ItemType Directory -Path $reportDir -Force | Out-Null
         }
-        .\build\${{ matrix.build_type }}\bin\${{ matrix.build_type }}\007Tests.exe --gtest_output=xml:build/test-reports/results.xml
+        $testExe = "build\${{ matrix.build_type }}\bin\${{ matrix.build_type }}\007Tests.exe"
+        & $testExe --gtest_filter="-*Full" --gtest_output=xml:build/test-reports/results.xml

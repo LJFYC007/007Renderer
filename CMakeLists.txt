@@ -230,14 +230,15 @@ if(BUILD_TESTING)
         RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO ${CMAKE_BINARY_DIR}/bin/RelWithDebInfo
     )
     include(GoogleTest)
-    # Use PRE_TEST discovery mode to avoid running executable during configure
+
+    # Discover tests - PRE_TEST mode discovers tests at build time (avoids running executable during configure)
     if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.18")
         gtest_discover_tests(007Tests DISCOVERY_MODE PRE_TEST)
     else()
         gtest_discover_tests(007Tests)
     endif()
 
-    # Add custom test target that works with both single and multi-config generators
+    # Test targets
     add_custom_target(run_tests
         COMMAND ${CMAKE_CTEST_COMMAND} --verbose --output-on-failure
         DEPENDS 007Tests
@@ -245,8 +246,16 @@ if(BUILD_TESTING)
         COMMENT "Running all tests"
     )
 
+    # Test target for CI
+    add_custom_target(run_tests_ci
+        COMMAND $<TARGET_FILE:007Tests> --gtest_filter="-*Full" --gtest_output=xml:${CMAKE_BINARY_DIR}/test-reports/results.xml
+        DEPENDS 007Tests
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+        COMMENT "Running CI tests (excludes Full tests)"
+    )
+
     # Hide auxiliary test target
-    set_target_properties(run_tests PROPERTIES FOLDER "Utilities")
+    set_target_properties(run_tests run_tests_ci PROPERTIES FOLDER "Utilities")
 endif()
 
 # ----------------------------------------------------------------------------

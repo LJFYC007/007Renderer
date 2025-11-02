@@ -19,6 +19,7 @@ public:
 
 private:
     RENDERPASS_FRIEND_TEST(PathTracerTest, Basic);
+    RENDERPASS_FRIEND_TEST(PathTracerTest, Full);
     struct PerFrameCB
     {
         uint32_t gWidth;
