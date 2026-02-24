@@ -1,5 +1,5 @@
 # Define download URLs
-$slangUrl = "https://github.com/shader-slang/slang/releases/download/v2025.16.1/slang-2025.16.1-windows-x86_64.zip"
+$slangUrl = "https://github.com/shader-slang/slang/releases/download/v2026.3.1/slang-2026.3.1-windows-x86_64.zip"
 $dxcUrl = "https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.8.2505.1/dxc_2025_07_14.zip"
 
 # Define target directories

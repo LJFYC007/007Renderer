@@ -113,5 +113,8 @@
     "cmake.buildDirectory": "${workspaceFolder}/build/${buildType}",
     "cmake.configureOnOpen": true,
     "cmake.configureOnEdit": true,
-    "cmake.outputLogEncoding": "gbk"
+    "cmake.outputLogEncoding": "gbk",
+    "cmake.environment": {
+        "VSLANG": "1033"
+    }
 }

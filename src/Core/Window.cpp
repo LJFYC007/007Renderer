@@ -76,12 +76,8 @@ Window::Window(ComPtr<ID3D12Device> device, ComPtr<ID3D12CommandQueue> commandQu
     ImGui::CreateContext();
     mpIo = &ImGui::GetIO();
     (void)mpIo;
-    mpIo->ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
-    mpIo->ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
-    mpIo->ConfigFlags |= ImGuiConfigFlags_DockingEnable;     // Enable Docking
-    // mpIo->ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;       // Enable Multi-Viewport / Platform Windows
-    // mpIo->ConfigViewportsNoAutoMerge = true;
-    // mpIo->ConfigViewportsNoTaskBarIcon = true;
+    mpIo->ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    mpIo->ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
 
     std::string cousineFontPath = std::string(PROJECT_EXTERNAL_DIR) + "/imgui/misc/fonts/Cousine-Regular.ttf";
     ImFont* cousineFont = mpIo->Fonts->AddFontFromFileTTF(cousineFontPath.c_str(), 14.0f);
@@ -94,20 +90,11 @@ void Window::PrepareResources()
 
     // Setup scaling
     ImGuiStyle& style = ImGui::GetStyle();
-    style.ScaleAllSizes(mMainScale);      // Bake a fixed style scale. (until we have a solution for dynamic style scaling, changing this
-                                          // requires resetting Style + calling this again)
-    style.FontScaleDpi = mMainScale;      // Set initial font scale. (using mpIo->ConfigDpiScaleFonts=true makes this unnecessary. We leave both
-                                          // here for documentation purpose)
-    mpIo->ConfigDpiScaleFonts = true;     // [Experimental] Automatically overwrite style.FontScaleDpi in Begin() when Monitor DPI changes. This
-                                          // will scale fonts but _NOT_ scale sizes/padding for now.
-    mpIo->ConfigDpiScaleViewports = true; // [Experimental] Scale Dear ImGui and Platform Windows when Monitor DPI changes.
+    style.ScaleAllSizes(mMainScale); // Bake a fixed style scale. (until we have a solution for dynamic style scaling, changing this
+                                     // requires resetting Style + calling this again)
+    style.FontScaleDpi = mMainScale;
 
-    // When viewports are enabled we tweak WindowRounding/WindowBg so platform windows can look identical to regular ones.
-    if (mpIo->ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
-    {
-        style.WindowRounding = 0.0f;
-        style.Colors[ImGuiCol_WindowBg].w = 1.0f;
-    } // Setup Platform/Renderer backends
+    // Setup Platform/Renderer backends
     ImGui_ImplWin32_Init(mHwnd);
 
     ImGui_ImplDX12_InitInfo init_info = {};
@@ -192,13 +179,6 @@ void Window::RenderEnd()
     g_pd3dCommandList->ResourceBarrier(1, &barrier);
     g_pd3dCommandList->Close();
     g_pd3dCommandQueue->ExecuteCommandLists(1, (ID3D12CommandList* const*)&g_pd3dCommandList);
-
-    // Update and Render additional Platform Windows
-    if (mpIo->ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
-    {
-        ImGui::UpdatePlatformWindows();
-        ImGui::RenderPlatformWindowsDefault();
-    }
 
     // Present
     UINT syncInterval = mEnableVSync ? 1 : 0;

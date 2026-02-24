@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.15)
 project(007Renderer)
 
-set(ENV{VSLANG} 1033) # Set Visual Studio language to English
 set(CMAKE_CXX_STANDARD 17)
 
 # Enable project folder organization in IDEs
@@ -132,6 +131,26 @@ set_target_properties(gmock_main PROPERTIES FOLDER "External")
 set(NVRHI_WITH_VULKAN OFF CACHE BOOL "")
 set(NVRHI_WITH_DX12 ON CACHE BOOL "")
 set(NVRHI_WITH_DX11 OFF CACHE BOOL "")
+
+# Apply local patches to nvrhi (submodule stays clean, patches live in patches/)
+find_package(Git QUIET)
+if(GIT_FOUND)
+    set(NVRHI_PATCH_SENTINEL "${CMAKE_SOURCE_DIR}/external/nvrhi/.patched-coopvec")
+    if(NOT EXISTS "${NVRHI_PATCH_SENTINEL}")
+        execute_process(
+            COMMAND ${GIT_EXECUTABLE} apply "${CMAKE_SOURCE_DIR}/patches/nvrhi-disable-coopvec.patch"
+            WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/external/nvrhi"
+            RESULT_VARIABLE PATCH_RESULT
+        )
+        if(PATCH_RESULT EQUAL 0)
+            file(TOUCH "${NVRHI_PATCH_SENTINEL}")
+            message(STATUS "Applied nvrhi patch: disable CoopVec")
+        else()
+            message(WARNING "Failed to apply nvrhi CoopVec patch (already applied?)")
+        endif()
+    endif()
+endif()
+
 add_subdirectory(external/nvrhi)
 
 # Hide NVRHI targets in External folder
@@ -269,6 +288,8 @@ set_property(GLOBAL PROPERTY PREDEFINED_TARGETS_FOLDER "CMake")
 add_custom_command(TARGET 007Renderer POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${SLANG_ROOT_DIR}/bin/slang.dll"
+        "${SLANG_ROOT_DIR}/bin/slang-rt.dll"
+        "${SLANG_ROOT_DIR}/bin/slang-compiler.dll"
         "${SLANG_ROOT_DIR}/bin/gfx.dll"
         $<TARGET_FILE_DIR:007Renderer>
 )
@@ -278,6 +299,8 @@ if(BUILD_TESTING)
     add_custom_command(TARGET 007Tests POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${SLANG_ROOT_DIR}/bin/slang.dll"
+            "${SLANG_ROOT_DIR}/bin/slang-rt.dll"
+            "${SLANG_ROOT_DIR}/bin/slang-compiler.dll"
             "${SLANG_ROOT_DIR}/bin/gfx.dll"
             $<TARGET_FILE_DIR:007Tests>
     )
