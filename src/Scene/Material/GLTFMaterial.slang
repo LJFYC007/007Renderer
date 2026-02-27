@@ -75,7 +75,7 @@ struct GLTFSpecularBRDF
 
 struct GLTFDiffuseBRDF
 {
-    float3 albedo;  // Specular albedo
+    float3 albedo;  // Diffuse albedo
     float metallic; // Metallic factor
     float alpha;    // GGX parameter (roughness squared)
 
@@ -117,14 +117,20 @@ struct GLTFDiffuseBRDF
     }
 };
 
+struct UVTransform
+{
+    float2 scale;
+    float2 offset;
+};
+
 struct GLTFMaterial : IMaterial
 {
     // Note: float3 in GPU buffers is padded to 16 bytes (same as float4)
     float3 baseColor;
-    float _padding0; // Padding to align float3 to 16 bytes
+    float _padding0;
 
     float3 emissive;
-    float _padding1; // Padding to align float3 to 16 bytes
+    float _padding1;
 
     float metallic = 1.f;
     float roughness = 0.f;
@@ -135,21 +141,16 @@ struct GLTFMaterial : IMaterial
     uint emissiveTextureId;
     uint normalTextureId;
 
-    // Constructor to initialize the material with a color
-    __init(float3 _baseColor, float3 _emissive, float _metallic, float _roughness)
-    {
-        baseColor = _baseColor;
-        emissive = _emissive;
-        metallic = _metallic;
-        roughness = _roughness;
-        baseColorTextureId = kInvalidTextureId;
-        metallicTextureId = kInvalidTextureId;
-        roughnessTextureId = kInvalidTextureId;
-        emissiveTextureId = kInvalidTextureId;
-        normalTextureId = kInvalidTextureId;
-    }
+    uint _padding2[3];
 
-    float3 getEmissive(float2 uv) { return sampleEmissive(emissiveTextureId, uv, emissive); }
+    UVTransform baseColorUV;
+    UVTransform metallicUV;
+    UVTransform roughnessUV;
+    UVTransform emissiveUV;
+
+    float2 applyUV(float2 uv, UVTransform t) { return uv * t.scale + t.offset; }
+
+    float3 getEmissive(float2 uv) { return sampleEmissive(emissiveTextureId, applyUV(uv, emissiveUV), emissive); }
 
     BSDFSample scatter<S : ISampleGenerator>(const ShadingData sd, inout S sg)
     {
@@ -161,10 +162,9 @@ struct GLTFMaterial : IMaterial
         float3 wiLocal = sd.toLocal(sd.V);
         float3 woLocal;
 
-        // Sample textures to get material properties
-        float3 sampledBaseColor = sampleBaseColor(baseColorTextureId, sd.uv, baseColor);
-        float sampledMetallic = sampleMetallic(metallicTextureId, sd.uv, metallic);
-        float sampledRoughness = sampleRoughness(roughnessTextureId, sd.uv, roughness);
+        float3 sampledBaseColor = sampleBaseColor(baseColorTextureId, applyUV(sd.uv, baseColorUV), baseColor);
+        float sampledMetallic = sampleMetallic(metallicTextureId, applyUV(sd.uv, metallicUV), metallic);
+        float sampledRoughness = sampleRoughness(roughnessTextureId, applyUV(sd.uv, roughnessUV), roughness);
         float alpha = max(kMinGGXAlpha, sampledRoughness * sampledRoughness);
 
         float uSelect = sampleNext1D(sg);

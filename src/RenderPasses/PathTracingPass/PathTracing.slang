@@ -55,8 +55,7 @@ void closestHitMain(inout Payload payload, BuiltInTriangleIntersectionAttributes
 {
     if (payload.depth >= maxDepth)
     {
-        // If we've reached the maximum depth, return environment color
-        payload.color = float3(gColor);
+        payload.color = float3(0.f);
         return;
     }
 
@@ -148,9 +147,6 @@ void closestHitMain(inout Payload payload, BuiltInTriangleIntersectionAttributes
     if (sample.pdf <= 0.0f)
         return;
     Ray bounceRay = Ray(sd.position, sample.wo);
-
-    // Create new sample generator for bounce ray to avoid correlation
-    uint2 newPixel = uint2(primitiveIndex, payload.depth);
 
     // Trace bounce ray
     Payload bouncePayload;

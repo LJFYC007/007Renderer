@@ -100,6 +100,14 @@ set_target_properties(tinyexr PROPERTIES FOLDER "External")
 set_target_properties(miniz PROPERTIES FOLDER "External")
 
 # ----------------------------------------------------------------------------
+# DirectXTex support (DDS loading)
+# ----------------------------------------------------------------------------
+set(BUILD_TOOLS OFF CACHE BOOL "" FORCE)
+set(BUILD_SAMPLE OFF CACHE BOOL "" FORCE)
+add_subdirectory(external/DirectXTex)
+set_target_properties(DirectXTex PROPERTIES FOLDER "External")
+
+# ----------------------------------------------------------------------------
 # GLM support
 # ----------------------------------------------------------------------------
 set(GLM_ENABLE_EXPERIMENTAL ON CACHE BOOL "Enable GLM experimental features")
@@ -187,6 +195,7 @@ target_include_directories(007Core PUBLIC
     ${IMGUI_INCLUDE_DIRS}
     external/imgui-node-editor
     external/tinyusdz/src
+    external/DirectXTex/DirectXTex
 )
 
 target_link_libraries(007Core PUBLIC
@@ -201,6 +210,7 @@ target_link_libraries(007Core PUBLIC
     miniz
     tinyexr
     tinyusdz::tinyusdz_static
+    DirectXTex
 )
 
 # ----------------------------------------------------------------------------

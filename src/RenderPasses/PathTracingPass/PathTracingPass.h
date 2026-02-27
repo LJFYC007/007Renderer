@@ -28,8 +28,8 @@ private:
     uint32_t mWidth;
     uint32_t mHeight;
     uint32_t mFrameCount = 0;
-    uint32_t mMaxDepth = 5;
-    float mGColorSlider = 1.f; // UI slider value
+    uint32_t mMaxDepth = 10;
+    float mGColorSlider = 0.f; // UI slider value
 
     struct PerFrameCB
     {
