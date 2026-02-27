@@ -147,6 +147,7 @@ struct GLTFMaterial : IMaterial
     UVTransform metallicUV;
     UVTransform roughnessUV;
     UVTransform emissiveUV;
+    UVTransform normalUV;
 
     float2 applyUV(float2 uv, UVTransform t) { return uv * t.scale + t.offset; }
 
@@ -159,7 +160,14 @@ struct GLTFMaterial : IMaterial
         sample.weight = float3(0.0f);
         sample.wo = float3(0.0f);
 
-        float3 wiLocal = sd.toLocal(sd.V);
+        // Perturb shading frame using normal map (tangent-space normal → world-space)
+        float3 tsN = sampleNormal(normalTextureId, applyUV(sd.uv, normalUV));
+        float3 N = normalize(tsN.x * sd.T + tsN.y * sd.B + tsN.z * sd.normal);
+        float3 T = normalize(sd.T - dot(sd.T, N) * N);
+        // Preserve UV handedness from sd.B (handles mirrored UV islands)
+        float3 B = sign(dot(cross(N, T), sd.B)) * cross(N, T);
+
+        float3 wiLocal = float3(dot(sd.V, T), dot(sd.V, B), dot(sd.V, N));
         float3 woLocal;
 
         float3 sampledBaseColor = sampleBaseColor(baseColorTextureId, applyUV(sd.uv, baseColorUV), baseColor);
@@ -178,7 +186,7 @@ struct GLTFMaterial : IMaterial
             {
                 sample.pdf = pdf * sampledMetallic;
                 sample.weight = weight / sampledMetallic;
-                sample.wo = sd.toWorld(woLocal);
+                sample.wo = woLocal.x * T + woLocal.y * B + woLocal.z * N;
             }
         }
         else
@@ -188,7 +196,7 @@ struct GLTFMaterial : IMaterial
             {
                 sample.pdf = pdf * (1.f - sampledMetallic);
                 sample.weight = weight / (1.f - sampledMetallic);
-                sample.wo = sd.toWorld(woLocal);
+                sample.wo = woLocal.x * T + woLocal.y * B + woLocal.z * N;
             }
         }
 

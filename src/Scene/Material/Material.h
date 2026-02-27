@@ -35,6 +35,7 @@ struct Material
     UVTransform metallicUV;
     UVTransform roughnessUV;
     UVTransform emissiveUV;
+    UVTransform normalUV;
 
     Material() = default;
 };

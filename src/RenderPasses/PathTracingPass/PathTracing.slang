@@ -85,8 +85,9 @@ void closestHitMain(inout Payload payload, BuiltInTriangleIntersectionAttributes
     float3 normal2 = gScene.vertices[i2].normal;
 
     float3 hitNormal = normalize(w * normal0 + u * normal1 + v * normal2);
-    if (dot(hitNormal, WorldRayDirection()) > 0.0f)
-        hitNormal = -hitNormal; // Ensure normal faces against the ray
+    bool frontFacing = dot(hitNormal, WorldRayDirection()) <= 0.0f;
+    if (!frontFacing)
+        hitNormal = -hitNormal;
     float3 hitPoint = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
 
     // Calculate tangent space vectors
@@ -96,29 +97,27 @@ void closestHitMain(inout Payload payload, BuiltInTriangleIntersectionAttributes
     float2 deltaUV2 = uv2 - uv0;
 
     float det = deltaUV1.x * deltaUV2.y - deltaUV1.y * deltaUV2.x;
-    float3 tangent, bitangent;
+    float3 tangent;
+    // UV handedness: +1 for standard winding, -1 for mirrored UV islands.
+    // Derived from det before any normal flip so it stays correct for back faces.
+    float handedness = 1.0f;
 
     if (abs(det) > 1e-6f)
     {
         float invDet = 1.0f / det;
         tangent = (deltaPos1 * deltaUV2.y - deltaPos2 * deltaUV1.y) * invDet;
-        bitangent = (deltaPos2 * deltaUV1.x - deltaPos1 * deltaUV2.x) * invDet;
+        handedness = det > 0.0f ? 1.0f : -1.0f;
     }
     else
     {
-        // Fallback: create orthonormal basis from normal
         float3 up = abs(hitNormal.y) < 0.9f ? float3(0, 1, 0) : float3(1, 0, 0);
         tangent = normalize(cross(up, hitNormal));
-        bitangent = cross(hitNormal, tangent);
     }
 
-    // Gram-Schmidt orthogonalization to ensure orthonormal tangent space
+    // Gram-Schmidt against the (possibly flipped) hitNormal, then derive bitangent
+    // using handedness so that cross(T, B) == hitNormal always holds.
     tangent = normalize(tangent - dot(tangent, hitNormal) * hitNormal);
-    // Preserve original bitangent direction but ensure orthogonality
-    float3 computedBitangent = cross(hitNormal, tangent);
-    if (dot(computedBitangent, bitangent) < 0.0f)
-        computedBitangent = -computedBitangent;
-    bitangent = computedBitangent;
+    float3 bitangent = handedness * cross(hitNormal, tangent);
 
     ShadingData sd;
     sd.normal = hitNormal;
@@ -127,6 +126,7 @@ void closestHitMain(inout Payload payload, BuiltInTriangleIntersectionAttributes
     sd.V = normalize(WorldRayOrigin() - hitPoint);
     sd.T = tangent;
     sd.B = bitangent;
+    sd.frontFacing = frontFacing;
 
     uint meshIndex = gScene.triangleToMesh[primitiveIndex];
     uint materialIndex = gScene.meshes[meshIndex].materialIndex;

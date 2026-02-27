@@ -62,6 +62,26 @@ set_target_properties(spdlog PROPERTIES FOLDER "External")
 # ----------------------------------------------------------------------------
 # TinyUSDZ support
 # ----------------------------------------------------------------------------
+
+# Apply local patches to tinyusdz (submodule stays clean, patches live in patches/)
+find_package(Git QUIET)
+if(GIT_FOUND)
+    set(TINYUSDZ_PATCH_SENTINEL "${CMAKE_SOURCE_DIR}/external/tinyusdz/.patched-raw-colorspace")
+    if(NOT EXISTS "${TINYUSDZ_PATCH_SENTINEL}")
+        execute_process(
+            COMMAND ${GIT_EXECUTABLE} apply "${CMAKE_SOURCE_DIR}/patches/tinyusdz-raw-colorspace-passthrough.patch"
+            WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/external/tinyusdz"
+            RESULT_VARIABLE PATCH_RESULT
+        )
+        if(PATCH_RESULT EQUAL 0)
+            file(TOUCH "${TINYUSDZ_PATCH_SENTINEL}")
+            message(STATUS "Applied tinyusdz patch: Raw colorspace passthrough")
+        else()
+            message(WARNING "Failed to apply tinyusdz Raw colorspace patch (already applied?)")
+        endif()
+    endif()
+endif()
+
 add_subdirectory(external/tinyusdz)
 set_target_properties(tinyusdz_static PROPERTIES FOLDER "External")
 

@@ -1,0 +1,28 @@
+diff --git a/src/tydra/render-data.cc b/src/tydra/render-data.cc
+index 866e4683..c3902ebe 100644
+--- a/src/tydra/render-data.cc
++++ b/src/tydra/render-data.cc
+@@ -4580,8 +4580,9 @@ bool RenderSceneConverter::ConvertUVTexture(const RenderSceneConverterEnv &env,
+             texImage.colorSpace = tydra::ColorSpace::Lin_sRGB;
+ 
+           } else {
+-            PUSH_ERROR(fmt::format("TODO: Color space {}",
+-                                   to_string(texImage.usdColorSpace)));
++            // Raw, Unknown, Rec709, etc. — no conversion, pass through as-is.
++            imageBuffer = std::move(assetImageBuffer);
++            texImage.colorSpace = texImage.usdColorSpace;
+           }
+ 
+         } else if (assetImageBuffer.componentType ==
+@@ -4623,8 +4624,9 @@ bool RenderSceneConverter::ConvertUVTexture(const RenderSceneConverterEnv &env,
+             imageBuffer = std::move(assetImageBuffer);
+ 
+           } else {
+-            PUSH_ERROR(fmt::format("TODO: Color space {}",
+-                                   to_string(texImage.usdColorSpace)));
++            // Raw, Unknown, Rec709, etc. — no conversion, pass through as-is.
++            imageBuffer = std::move(assetImageBuffer);
++            texImage.colorSpace = texImage.usdColorSpace;
+           }
+ 
+         } else {
