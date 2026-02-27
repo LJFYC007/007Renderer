@@ -19,3 +19,6 @@
 [submodule "external/tinyusdz"]
 	path = external/tinyusdz
 	url = git@github.com:lighttransport/tinyusdz.git
+[submodule "external/DirectXTex"]
+	path = external/DirectXTex
+	url = https://github.com/microsoft/DirectXTex
