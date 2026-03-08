@@ -17,12 +17,30 @@ cbuffer PerFrameCB
 ConstantBuffer<Camera> gCamera;
 RWTexture2D<float4> result;
 
-// Payload: defines what we pass between shaders
-struct Payload
+/**
+ * Payload for scatter ray
+ */
+struct ScatterRayData
 {
-    float3 color;
-    uint depth;
-    TinyUniformSampleGenerator sampleGen;
+    float3 radiance;  ///< Accumulated outgoing radiance from path.
+    bool terminated;  ///< Set to true when path is terminated.
+    float3 thp;       ///< Current path throughput. This is updated at each path vertex.
+    uint pathLength;  ///< Path length in number of path segments (0 at origin, 1 at first secondary hit, etc.). Max 2^31.
+    float3 origin;    ///< Next path segment origin.
+    float3 direction; ///< Next path segment direction.
+
+    TinyUniformSampleGenerator sg; ///< Per-ray state for the sample generator (up to 16B).
+
+    __init(TinyUniformSampleGenerator sg)
+    {
+        this.terminated = false;
+        this.pathLength = 0;
+        this.radiance = float3(0, 0, 0);
+        this.thp = float3(1, 1, 1);
+        this.origin = float3(0, 0, 0);
+        this.direction = float3(0, 0, 0);
+        this.sg = sg;
+    }
 };
 
 [shader("raygeneration")]
@@ -32,33 +50,31 @@ void rayGenMain()
     if (launchID.x >= gWidth || launchID.y >= gHeight)
         return;
 
+    ScatterRayData sd = ScatterRayData(TinyUniformSampleGenerator(launchID, frameCount));
     Ray ray = gCamera.computeRayPinhole(launchID, gCamera.data.enableJitter);
-    Payload payload;
-    payload.color = float3(0, 0, 0);
-    payload.depth = 1;
-    payload.sampleGen = TinyUniformSampleGenerator(launchID, frameCount);
 
-    TraceRay(gScene.rtAccel, RAY_FLAG_NONE, 0xFF, 0, 0, 0, ray.toRayDesc(), payload);
+    for (uint bounce = 0; bounce <= maxDepth; bounce++)
+    {
+        TraceRay(gScene.rtAccel, RAY_FLAG_NONE, 0xFF, 0, 0, 0, ray.toRayDesc(), sd);
+        if (sd.terminated)
+            break;
+        ray = Ray(sd.origin, sd.direction);
+        sd.pathLength++;
+    }
 
-    result[launchID] = float4(payload.color, 1.0);
+    result[launchID] = float4(sd.radiance, 1.0);
 }
 
 [shader("miss")]
-void missMain(inout Payload payload)
+void missMain(inout ScatterRayData sd)
 {
-    // Sky color as environment lighting
-    payload.color = float3(gColor);
+    sd.radiance += sd.thp * float3(gColor);
+    sd.terminated = true;
 }
 
 [shader("closesthit")]
-void closestHitMain(inout Payload payload, BuiltInTriangleIntersectionAttributes attribs)
+void closestHitMain(inout ScatterRayData sd, BuiltInTriangleIntersectionAttributes attribs)
 {
-    if (payload.depth >= maxDepth)
-    {
-        payload.color = float3(0.f);
-        return;
-    }
-
     // Get barycentric coordinates
     float u = attribs.barycentrics.x;
     float v = attribs.barycentrics.y;
@@ -119,42 +135,35 @@ void closestHitMain(inout Payload payload, BuiltInTriangleIntersectionAttributes
     tangent = normalize(tangent - dot(tangent, hitNormal) * hitNormal);
     float3 bitangent = handedness * cross(hitNormal, tangent);
 
-    ShadingData sd;
-    sd.normal = hitNormal;
-    sd.position = computeRayOrigin(hitPoint, hitNormal);
-    sd.uv = w * uv0 + u * uv1 + v * uv2;
-    sd.V = normalize(WorldRayOrigin() - hitPoint);
-    sd.T = tangent;
-    sd.B = bitangent;
-    sd.frontFacing = frontFacing;
+    ShadingData hit;
+    hit.normal = hitNormal;
+    hit.position = computeRayOrigin(hitPoint, hitNormal);
+    hit.uv = w * uv0 + u * uv1 + v * uv2;
+    hit.V = normalize(WorldRayOrigin() - hitPoint);
+    hit.T = tangent;
+    hit.B = bitangent;
+    hit.frontFacing = frontFacing;
 
     uint meshIndex = gScene.triangleToMesh[primitiveIndex];
     uint materialIndex = gScene.meshes[meshIndex].materialIndex;
     GLTFMaterial material = gScene.materials[materialIndex];
-    // Or use any material implementing IMaterial:
-    // LambertianMaterial material = LambertianMaterial(float3(1.0f, 0.5f, 0.5f));
 
-    // Emissive contribution
-    float3 emissive = material.getEmissive(sd.uv);
+    float3 emissive = material.getEmissive(hit.uv);
     if (any(emissive > 0.f))
     {
-        payload.color = emissive;
+        sd.radiance += sd.thp * emissive;
+        sd.terminated = true;
         return;
     }
 
-    // Sample BSDF using unified interface
-    BSDFSample sample = material.scatter(sd, payload.sampleGen);
+    BSDFSample sample = material.scatter(hit, sd.sg);
     if (sample.pdf <= 0.0f)
+    {
+        sd.terminated = true;
         return;
-    Ray bounceRay = Ray(sd.position, sample.wo);
+    }
 
-    // Trace bounce ray
-    Payload bouncePayload;
-    bouncePayload.color = float3(0, 0, 0);
-    bouncePayload.depth = payload.depth + 1;
-    bouncePayload.sampleGen = payload.sampleGen;
-
-    TraceRay(gScene.rtAccel, RAY_FLAG_NONE, 0xFF, 0, 0, 0, bounceRay.toRayDesc(), bouncePayload);
-
-    payload.color = sample.weight * bouncePayload.color;
+    sd.thp *= sample.weight;
+    sd.origin = hit.position;
+    sd.direction = sample.wo;
 }

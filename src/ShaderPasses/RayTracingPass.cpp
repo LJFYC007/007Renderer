@@ -25,10 +25,14 @@ RayTracingPass::RayTracingPass(
         if (pLayout)
             pipelineDesc.addBindingLayout(pLayout);
 
-    // Configure pipeline parameters - these are critical for D3D12
-    pipelineDesc.maxPayloadSize = 64;    // Size in bytes for ray payload
-    pipelineDesc.maxAttributeSize = 8;   // Size in bytes for hit attributes (typically 2 floats for barycentric coords)
-    pipelineDesc.maxRecursionDepth = 10; // Maximum trace recursion depth    // Add shaders with correct export names matching the shader
+    // ScatterRayData layout: float3 radiance(12) + bool terminated(4) + float3 thp(12) + uint pathLength(4)
+    //                        + float3 origin(12) + float3 direction(12) + TinyUniformSampleGenerator(16) = 72 bytes
+    // Bounce loop lives in rayGenMain, so recursion depth is always 1.
+    pipelineDesc.maxPayloadSize = 72;
+    pipelineDesc.maxAttributeSize = 8;
+    pipelineDesc.maxRecursionDepth = 1;
+
+    // Add shaders with correct export names matching the shader
     mRayGenShader = program.getShader("rayGenMain");
     mMissShader = program.getShader("missMain");
     mClosestHitShader = program.getShader("closestHitMain");

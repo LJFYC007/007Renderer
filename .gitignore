@@ -38,4 +38,5 @@
 /.vs
 imgui.ini
 editor.json
-external/nvrhi/.patched-*
+external/nvrhi/
+external/tinyusdz/
