@@ -22,7 +22,7 @@ build/RelWithDebInfo/bin/RelWithDebInfo/007Renderer.exe
 # Run all tests
 cmake --build build/Debug --target run_tests
 
-# Run tests excluding heavy *Full tests (CI mode)
+# Run the 9-test GitHub Actions subset (non-Full tests)
 cmake --build build/Debug --target run_tests_ci
 
 # Run a single test by filter
@@ -37,7 +37,15 @@ build/Debug/bin/Debug/007Tests.exe --gtest_filter="TestSuiteName.TestName"
 
 **Shader passes** (`src/ShaderPasses/`): `Pass` base class owns a `BindingSetManager` and supports `pass["resourceName"] = handle;` syntax for binding. `ComputePass` and `RayTracingPass` derive from it.
 
-**Scene** (`src/Scene/`): `Scene` holds geometry, materials, acceleration structures, and camera. Importers (`AssimpImporter`, `UsdImporter`) load from GLTF/OBJ/USD. `TextureManager` handles texture loading (PNG, JPG, EXR, DDS). Slang-side scene data defined in `Scene.slang` / `ShadingData.slang`.
+**Scene** (`src/Scene/`): `Scene` holds geometry, materials, acceleration structures, and camera. Importers (`AssimpImporter`, `UsdImporter`) load from GLTF/OBJ/USD. `TextureManager` handles texture loading (PNG, JPG, EXR, DDS). 
+
+**Slang** (`src/Scene/*.slang`, `src/RenderPasses/*/*.slang`): Path tracing follows the layered shading design described in `docs/coordinate-system-design.md`:
+- `VertexData.slang` gathers raw geometric hit data
+- `ShadingData.slang` converts that into a shading-ready surface, keeping immutable geometric references (`faceN`, `tangentW`) separate from the mutable shading frame (`T/B/N`)
+- `Material/Material.slang` and `Material/GLTFMaterial.slang` own `prepareShadingFrame()` and `scatter()`, including normal mapping and BSDF sampling
+- `Material/BSDFTypes.slang` defines `BSDFSample`, event types, and `isValidScatter()` for geometric-side validation
+
+`PathTracing.slang` should stay a thin orchestrator: fetch hit data, call `prepareShadingData()`, let the material refine the frame, validate the sample, and spawn the next ray. Do not substitute `faceN` for shading normal `N`: `faceN` is for sidedness/ray offsets, `N` is for BSDF evaluation.
 
 **Utils** (`src/Utils/`): GUI helpers (`GUI`, `GUIWrapper`, ImGui theming via `imgui_spectrum`), logging (`Logger`), image I/O (`ExrUtils`, `ResourceIO`), math primitives (`Math/`), and sampling utilities (`Sampling/` — `SampleGenerator` with Slang interface).
 
@@ -74,6 +82,4 @@ All vendored under `external/` as submodules (except Slang/DXC which are downloa
 
 ## Testing
 
-Tests live in `tests/`. Tests with `Full` in their name are heavy GPU tests excluded from CI (`--gtest_filter="-*Full"`). The test environment is set up in `tests/Environment.cpp` (device initialization shared across test cases).
-
-**Known test status:** `PathTracerTest.Full` currently fails because the path tracer is pending a rewrite (TODO). All other tests (9/9 in CI mode) pass.
+Tests live in `tests/`. The GitHub Actions test set consists of 9 non-`Full` tests. This subset is intended for the Actions environment, which does not provide a GPU. `Full` tests are intended for local execution and are used for correctness validation with a 4096 spp path tracing run. The shared test environment is set up in `tests/Environment.cpp` (device initialization shared across test cases).

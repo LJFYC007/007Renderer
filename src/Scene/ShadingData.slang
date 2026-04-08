@@ -1,14 +1,25 @@
+import Utils.Math.Ray;
+
 struct ShadingData
 {
-    float3 position;
-    float3 normal;
+    float3 posW; // Exact hit position (no ray-origin offset)
+    float3 V;    // View direction (toward camera)
     float2 uv;
-    float3 V;         // view direction: from shading point toward camera
-    float3 T;         // Tangent
-    float3 B;         // Bitangent (handedness-aware: cross(T,B)==normal)
-    bool frontFacing; // true when ray hit the geometrically outward face
 
-    float3 toLocal(float3 w) { return float3(dot(w, T), dot(w, B), dot(w, normal)); }
+    // Immutable geometric references — never modified after prepareShadingData
+    float3 faceN;    // Face normal, never flipped
+    float4 tangentW; // .xyz = tangent direction, .w = handedness. Never mutated.
+    bool frontFacing;
 
-    float3 toWorld(float3 w) { return w.x * T + w.y * B + w.z * normal; }
+    float3 getOrientedFaceNormal() { return frontFacing ? faceN : -faceN; }
+
+    // Mutable shading frame — set by prepareShadingData, refined by prepareShadingFrame
+    float3 T;
+    float3 B;
+    float3 N;
+
+    uint materialID;
+
+    float3 toLocal(float3 w) { return float3(dot(w, T), dot(w, B), dot(w, N)); }
+    float3 toWorld(float3 w) { return w.x * T + w.y * B + w.z * N; }
 };

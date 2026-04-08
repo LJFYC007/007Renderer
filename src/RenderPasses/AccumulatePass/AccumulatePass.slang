@@ -22,4 +22,7 @@ void main(uint3 dispatchThreadID: SV_DispatchThreadID)
 
     accumulateTexture[id] += input[id];
     output[id] = accumulateTexture[id] / frameCount;
+
+    // TODO: This is only a temporary solution for gamma correction, we should eventually add a proper tone mapping pass.
+    output[id].xyz = pow(output[id].xyz, float3(1.f / 2.2f));
 }
