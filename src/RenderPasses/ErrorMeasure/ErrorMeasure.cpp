@@ -40,7 +40,7 @@ ErrorMeasure::ErrorMeasure(ref<Device> pDevice) : RenderPass(pDevice)
     mpPass->addConstantBuffer(mCbPerFrame, &mPerFrameData, sizeof(PerFrameCB));
 
     // Load reference texture from EXR file
-    mpReferenceTexture = ExrUtils::loadExrToTexture(pDevice, std::string(PROJECT_DIR) + "/media/output.exr");
+    mpReferenceTexture = ExrUtils::loadExrToTexture(pDevice, std::string(PROJECT_DIR) + "/media/reference.exr");
     mWidth = mpReferenceTexture->getDesc().width;
     mHeight = mpReferenceTexture->getDesc().height;
 

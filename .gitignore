@@ -36,6 +36,8 @@
 /media
 /out
 /.vs
+/.claude
+
 imgui.ini
 editor.json
 external/nvrhi/

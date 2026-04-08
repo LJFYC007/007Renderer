@@ -113,6 +113,8 @@
     "cmake.buildDirectory": "${workspaceFolder}/build/${buildType}",
     "cmake.configureOnOpen": true,
     "cmake.configureOnEdit": true,
+    "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
+    "C_Cpp.default.compileCommands": "${workspaceFolder}/build/Debug/compile_commands.json",
     "cmake.outputLogEncoding": "gbk",
     "cmake.environment": {
         "VSLANG": "1033"
