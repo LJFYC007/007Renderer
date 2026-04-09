@@ -14,6 +14,9 @@ public:
     void setScene(ref<Scene> pScene) override
     {
         mpScene = pScene;
+        // Store a pointer to the live CPU-side CameraData. RayTracingPass uploads all
+        // registered constant buffers right before dispatch, so per-frame jitter updates
+        // written by Camera::calculateCameraParameters() are visible on the GPU.
         mpPass->addConstantBuffer(mCbCamera, &mpScene->camera->getCameraData(), sizeof(CameraData));
     }
 

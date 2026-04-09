@@ -10,19 +10,32 @@ namespace GUI
 void initialize();
 void shutdown();
 
-// Flag management
-RenderPassRefreshFlags getAndClearRefreshFlags();
+// Accumulation reset tracking
+RenderPassRefreshFlags getRefreshFlags();
+void clearRefreshFlags();
 void setRefreshFlag(RenderPassRefreshFlags flag);
 bool hasRefreshFlags();
 
-// === Commonly Used Interactive Widgets (with flag tracking) ===
+void pushAccumulationResetScope(bool enabled);
+void popAccumulationResetScope();
+bool isAccumulationResetScopeEnabled();
 
-// Sliders that trigger RenderOptionsChanged when modified
+class ScopedAccumulationReset
+{
+public:
+    explicit ScopedAccumulationReset(bool enabled) { pushAccumulationResetScope(enabled); }
+
+    ~ScopedAccumulationReset() { popAccumulationResetScope(); }
+};
+
+// === Commonly Used Interactive Widgets (with accumulation reset tracking) ===
+
+// Sliders that request accumulation reset when modified inside a reset scope.
 bool SliderFloat(const char* label, float* v, float v_min, float v_max, const char* format = "%.3f", ImGuiSliderFlags flags = 0);
 bool SliderFloat3(const char* label, float v[3], float v_min, float v_max, const char* format = "%.3f", ImGuiSliderFlags flags = 0);
 bool SliderInt(const char* label, int* v, int v_min, int v_max, const char* format = "%d", ImGuiSliderFlags flags = 0);
 
-// Drag controls that trigger RenderOptionsChanged when modified
+// Drag controls that request accumulation reset when modified inside a reset scope.
 bool DragFloat(
     const char* label,
     float* v,
@@ -47,7 +60,7 @@ bool Combo(const char* label, int* current_item, const char* const items[], int 
 bool ColorEdit3(const char* label, float col[3], ImGuiColorEditFlags flags = 0);
 bool ColorEdit4(const char* label, float col[4], ImGuiColorEditFlags flags = 0);
 
-// Radio buttons that trigger RenderOptionsChanged when modified
+// Radio buttons that request accumulation reset when modified inside a reset scope.
 bool RadioButton(const char* label, bool active);
 bool RadioButton(const char* label, int* v, int v_button);
 

@@ -480,6 +480,14 @@ Material UsdImporter::extractMaterial(const tinyusdz::tydra::RenderMaterial& usd
         material.emissiveFactor = glm::vec3(1000.f);
     }
 
+    // Normal map
+    if (surfaceShader.normal.is_texture())
+    {
+        int32_t texId = surfaceShader.normal.texture_id;
+        material.normalTextureId = loadTextureFromRenderScene(texId, scene);
+        material.normalUV = extractUVTransform(mRenderScene.textures[texId]);
+    }
+
     return material;
 }
 

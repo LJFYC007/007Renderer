@@ -101,6 +101,7 @@ void GUIManager::renderSettingsPanel(ref<Scene> scene, RenderGraphEditor* pRende
     {
         if (scene && scene->camera)
         {
+            GUI::ScopedAccumulationReset scope(true);
             scene->camera->renderUI();
             scene->camera->handleInput();
         }

@@ -57,6 +57,7 @@ public:
     const std::vector<RenderGraphNode>& getNodes() const { return mNodes; }
     const std::vector<RenderGraphConnection>& getConnections() const { return mConnections; }
     const std::vector<uint>& getExecutionOrder() const { return mExecutionOrder; }
+    bool isUpstreamOfAccumulator(const std::string& name) const;
 
 private:
     // Core graph operations
@@ -64,6 +65,7 @@ private:
     bool topologicalSort();
     bool validateGraph();
     void buildDependencyGraph();
+    void buildAccumulationResetMap();
 
     RenderData executePass(int nodeIndex);
     int findNode(const std::string& name) const;
@@ -76,6 +78,7 @@ private:
     std::vector<RenderGraphConnection> mConnections;
     std::vector<std::unordered_set<uint>> mDependencies; // Node indices this node depends on
     std::vector<uint> mExecutionOrder;
+    std::unordered_set<uint> mAccumulationResetPasses;                // Node indices upstream of (and including) the accumulator
     std::unordered_map<std::string, RenderData> mIntermediateResults; // UI state for output selection
     std::string mSelectedOutputKey;
     std::vector<std::string> mAvailableOutputs;

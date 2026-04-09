@@ -320,7 +320,10 @@ void RenderGraphEditor::renderUI()
     // Render individual pass UIs
     for (const auto& node : mpCurrentValidGraph->getNodes())
         if (GUI::CollapsingHeader(node.name.c_str(), ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            GUI::ScopedAccumulationReset scope(mpCurrentValidGraph->isUpstreamOfAccumulator(node.name));
             node.pass->renderUI();
+        }
 }
 
 void RenderGraphEditor::renderNodeEditor()

@@ -19,6 +19,7 @@ public:
 
     // RenderGraph interface
     std::string getName() const override { return "Accumulate"; }
+    bool accumulatesHistory() const override { return true; }
     std::vector<RenderPassInput> getInputs() const override;
     std::vector<RenderPassOutput> getOutputs() const override;
 

@@ -66,6 +66,10 @@ public:
     // Get display name for the pass
     virtual std::string getName() const = 0;
 
+    // Returns true if this pass accumulates history (e.g. temporal accumulation).
+    // The render graph uses this to determine which upstream passes should trigger a reset.
+    virtual bool accumulatesHistory() const { return false; }
+
 protected:
     ref<Device> mpDevice;
     ref<Scene> mpScene;

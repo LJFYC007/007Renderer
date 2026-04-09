@@ -96,6 +96,7 @@ void Camera::handleInput()
 
 void Camera::calculateCameraParameters()
 {
+    // Must run before the dirty early-out so jitter advances every frame even when the camera is static.
     if (mData.enableJitter)
         mData.jitter = mSampleGenerator.nextFloat2() - float2(0.5f, 0.5f);
 

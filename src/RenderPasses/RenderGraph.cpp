@@ -33,6 +33,7 @@ bool RenderGraph::build(const std::vector<RenderGraphNode>& nodes, const std::ve
     if (!validateGraph())
         return false;
     buildDependencyGraph();
+    buildAccumulationResetMap();
 
     if (!topologicalSort())
     {
@@ -51,6 +52,23 @@ void RenderGraph::buildDependencyGraph()
         int toNodeIndex = findNode(conn.toPass);
         mDependencies[toNodeIndex].insert(fromNodeIndex);
     }
+}
+
+void RenderGraph::buildAccumulationResetMap()
+{
+    mAccumulationResetPasses.clear();
+
+    std::function<void(uint)> markUpstream = [&](uint nodeIndex)
+    {
+        if (!mAccumulationResetPasses.insert(nodeIndex).second)
+            return;
+        for (uint dep : mDependencies[nodeIndex])
+            markUpstream(dep);
+    };
+
+    for (uint i = 0; i < mNodes.size(); ++i)
+        if (mNodes[i].pass->accumulatesHistory())
+            markUpstream(i);
 }
 
 bool RenderGraph::validateGraph()
@@ -188,6 +206,7 @@ RenderData RenderGraph::execute()
         for (const auto& output : mNodes[nodeIndex].pass->getOutputs())
             finalOutput[mNodes[nodeIndex].name + "." + output.name] = result[output.name];
     }
+    GUI::clearRefreshFlags();
     return finalOutput;
 }
 
@@ -217,6 +236,12 @@ int RenderGraph::findNode(const std::string& name) const
 {
     auto it = std::find_if(mNodes.begin(), mNodes.end(), [&name](const RenderGraphNode& node) { return node.name == name; });
     return it != mNodes.end() ? static_cast<int>(it - mNodes.begin()) : -1;
+}
+
+bool RenderGraph::isUpstreamOfAccumulator(const std::string& name) const
+{
+    int index = findNode(name);
+    return index >= 0 && mAccumulationResetPasses.count(static_cast<uint>(index));
 }
 
 nvrhi::TextureHandle RenderGraph::getFinalOutputTexture()

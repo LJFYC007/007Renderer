@@ -1,12 +1,11 @@
 #pragma once
 #include <cstdint>
 
-// Global flags system for tracking render pass refresh requirements
+// Global flags system for tracking render pass refresh requirements.
 enum class RenderPassRefreshFlags : uint32_t
 {
     None = 0x0,
-    LightingChanged = 0x1,      ///< Lighting has changed.
-    RenderOptionsChanged = 0x2, ///< Options that affect the rendering have changed.
+    ResetAccumulation = 0x1, ///< Requests that accumulation be reset on the next frame.
 };
 
 // Bitwise operations for the flags

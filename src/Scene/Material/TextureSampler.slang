@@ -35,13 +35,18 @@ float3 sampleEmissive(uint textureId, float2 uv, float3 emissive)
     return emissive;
 }
 
-// Sample normal map texture (returns tangent space normal)
+// Sample normal map texture (returns tangent space normal).
+// Only RG channels are used; Z is reconstructed via Z = sqrt(1 - X^2 - Y^2).
+// This correctly handles BC5/ATI2 DDS normal maps where the B channel is not
+// stored (decompressed as 0), as well as standard RGB normal maps.
 float3 sampleNormal(uint textureId, float2 uv)
 {
     if (textureId != kInvalidTextureId && textureId < kMaxTextures)
     {
-        float3 normal = gMaterialTextures.textures[textureId].SampleLevel(gMaterialSampler.sampler, uv, 0).rgb;
-        return normalize(normal * 2.0f - 1.0f); // Convert from [0,1] to [-1,1]
+        float2 rg = gMaterialTextures.textures[textureId].SampleLevel(gMaterialSampler.sampler, uv, 0).rg;
+        float2 nxy = rg * 2.0f - 1.0f;
+        float nz = sqrt(max(0.0f, 1.0f - dot(nxy, nxy)));
+        return normalize(float3(nxy, nz));
     }
     return float3(0, 0, 1); // Default tangent space normal
 }

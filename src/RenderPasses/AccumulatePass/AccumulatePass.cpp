@@ -61,8 +61,7 @@ RenderData AccumulatePass::execute(const RenderData& renderData)
         prepareResources();
     }
 
-    // Check for GUI refresh flags
-    if (GUI::getAndClearRefreshFlags() != RenderPassRefreshFlags::None)
+    if (hasFlag(GUI::getRefreshFlags(), RenderPassRefreshFlags::ResetAccumulation))
         mReset = true;
 
     mPerFrameData.gWidth = mWidth;
