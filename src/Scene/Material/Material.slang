@@ -31,8 +31,9 @@ interface IMaterial
 
     /** Sample the BSDF. Must be called after prepareShadingFrame.
         Returns wo in world space with eventType set.
+        \param[in] furnaceMode 0 = off, 1 = WeakWhiteFurnace (G1-only masking).
     */
-    BSDFSample scatter<S : ISampleGenerator>(const ShadingData sd, inout S sg);
+    BSDFSample scatter<S : ISampleGenerator>(const ShadingData sd, inout S sg, uint furnaceMode = 0);
 
     float3 getEmissive(float2 uv);
 }

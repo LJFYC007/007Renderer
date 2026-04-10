@@ -85,3 +85,9 @@ All vendored under `external/` as submodules (except Slang/DXC which are downloa
 ## Testing
 
 Tests live in `tests/`. The GitHub Actions test set consists of 9 non-`Full` tests. This subset is intended for the Actions environment, which does not provide a GPU. `Full` tests are intended for local execution and are used for correctness validation with a 4096 spp path tracing run. The shared test environment is set up in `tests/Environment.cpp` (device initialization shared across test cases).
+
+### WhiteFurnace test — weak white furnace (Heitz 2014 Sec 5.2)
+
+`PathTracerTest.WhiteFurnace` sets metallic=1, baseColor=white (F=1 everywhere), uses G1-only masking, and checks convergence to 1.0. The test evaluates a single-bounce integral: on each hit the BRDF sample weight is accumulated against the constant white environment and the path terminates immediately. Below-surface reflections (`wo.z < 0`) are kept because the G1 normalization identity integrates over all microfacet normals — the sample weight `G1(wi)*dot(wo,h)/(wi.z*h.z)` is independent of the sign of `wo.z`. Production-path `isValidScatter()` rejection is intentionally bypassed in furnace mode.
+
+**Note:** This test validates the *weak* furnace (single-scattering G1 normalization) only. The production BRDF with G2 joint masking still exhibits single-scattering energy loss at high roughness, which requires Kulla-Conty (2017) multi-scattering compensation — that is a separate task.

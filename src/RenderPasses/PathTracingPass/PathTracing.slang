@@ -15,6 +15,7 @@ cbuffer PerFrameCB
     uint maxDepth;
     uint frameCount;
     float gColor;
+    uint furnaceMode; // 0 = Off, 1 = WeakWhiteFurnace
 };
 
 ConstantBuffer<Camera> gCamera;
@@ -81,21 +82,63 @@ void closestHitMain(inout ScatterRayData scatterRay, BuiltInTriangleIntersection
     // Shading data — geometry only (no normal map, no back-face flip)
     ShadingData hit = prepareShadingData(vd, WorldRayOrigin(), WorldRayDirection(), RayTCurrent());
 
-    // Emissive early-out
     GLTFMaterial material = gScene.materials[hit.materialID];
-    float3 emissive = material.getEmissive(hit.uv);
-    if (any(emissive > 0.f))
+
+    if (furnaceMode == 0)
     {
-        scatterRay.radiance += scatterRay.thp * emissive;
+        // --- Production path ---
+
+        // Emissive early-out
+        float3 emissive = material.getEmissive(hit.uv);
+        if (any(emissive > 0.f))
+        {
+            scatterRay.radiance += scatterRay.thp * emissive;
+            scatterRay.terminated = true;
+            return;
+        }
+
+        // Apply normal map and back-face flip
+        material.prepareShadingFrame(hit);
+    }
+    else
+    {
+        // --- Furnace mode ---
+        // Override material: metallic=1 + white baseColor gives F0=1 (F=1 everywhere).
+        // Only roughness is preserved from the scene material.
+        material.baseColor = float3(1, 1, 1);
+        material.emissive = float3(0, 0, 0);
+        material.metallic = 1.f;
+        material.transmissionFactor = 0.f;
+        material.baseColorTextureId = kInvalidTextureId;
+        material.metallicTextureId = kInvalidTextureId;
+        material.roughnessTextureId = kInvalidTextureId;
+        material.emissiveTextureId = kInvalidTextureId;
+        material.normalTextureId = kInvalidTextureId;
+        material.transmissionTextureId = kInvalidTextureId;
+
+        // Rebuild the shading frame from the flat face normal so the
+        // shading hemisphere aligns with the geometric hemisphere used
+        // by isValidScatter(). This isolates the BRDF energy loss from
+        // smooth-normal / face-normal divergence.
+        float3 N = hit.frontFacing ? hit.faceN : -hit.faceN;
+        float3 t = hit.tangentW.xyz - dot(hit.tangentW.xyz, N) * N;
+        hit.T = normalize(t);
+        hit.B = hit.tangentW.w * cross(N, hit.T);
+        hit.N = N;
+    }
+
+    BSDFSample sample = material.scatter(hit, scatterRay.sg, furnaceMode);
+
+    if (furnaceMode != 0)
+    {
+        // Weak white furnace (Heitz 2014 Sec 5.2): single-bounce integral
+        // against the constant environment. Accumulate weight directly and
+        // terminate — no geometric validation or further path tracing.
+        if (sample.pdf > 0.0f)
+            scatterRay.radiance += scatterRay.thp * sample.weight * float3(gColor);
         scatterRay.terminated = true;
         return;
     }
-
-    // Apply normal map and back-face flip
-    material.prepareShadingFrame(hit);
-
-    // Sample BSDF
-    BSDFSample sample = material.scatter(hit, scatterRay.sg);
 
     // Reject samples that cross the geometric surface (prevents light leaks)
     if (!isValidScatter(hit, sample))

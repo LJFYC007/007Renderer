@@ -67,6 +67,7 @@ RenderData AccumulatePass::execute(const RenderData& renderData)
     mPerFrameData.gWidth = mWidth;
     mPerFrameData.gHeight = mHeight;
     mPerFrameData.reset = mReset;
+    mPerFrameData.enableGamma = mEnableGammaCorrection ? 1 : 0;
     if (mReset)
     {
         mFrameCount = 0;

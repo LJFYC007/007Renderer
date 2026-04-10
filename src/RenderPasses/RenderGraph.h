@@ -59,6 +59,15 @@ public:
     const std::vector<uint>& getExecutionOrder() const { return mExecutionOrder; }
     bool isUpstreamOfAccumulator(const std::string& name) const;
 
+    template<typename T>
+    ref<T> getPassByName(const std::string& name) const
+    {
+        for (const auto& node : mNodes)
+            if (node.name == name)
+                return std::dynamic_pointer_cast<T>(node.pass);
+        return nullptr;
+    }
+
 private:
     // Core graph operations
     bool build(const std::vector<RenderGraphNode>& nodes, const std::vector<RenderGraphConnection>& connections);

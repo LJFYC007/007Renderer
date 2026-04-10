@@ -2,6 +2,12 @@
 #include "RenderPasses/RenderPass.h"
 #include "ShaderPasses/RayTracingPass.h"
 
+enum class FurnaceMode : uint32_t
+{
+    Off = 0,
+    WeakWhiteFurnace = 1,
+};
+
 class PathTracingPass : public RenderPass
 {
 public:
@@ -10,6 +16,9 @@ public:
     RenderData execute(const RenderData& input = RenderData()) override;
 
     void renderUI() override;
+
+    void setMissColor(float c) { mGColorSlider = c; }
+    void setFurnaceMode(FurnaceMode mode) { mFurnaceMode = mode; }
 
     void setScene(ref<Scene> pScene) override
     {
@@ -33,6 +42,7 @@ private:
     uint32_t mFrameCount = 0;
     uint32_t mMaxDepth = 10;
     float mGColorSlider = 0.f; // UI slider value
+    FurnaceMode mFurnaceMode = FurnaceMode::Off;
 
     struct PerFrameCB
     {
@@ -41,6 +51,7 @@ private:
         uint32_t maxDepth;
         uint32_t frameCount;
         float gColor;
+        uint32_t furnaceMode;
     } mPerFrameData;
 
     nvrhi::BufferHandle mCbPerFrame;

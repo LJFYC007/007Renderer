@@ -40,30 +40,14 @@ ErrorMeasure::ErrorMeasure(ref<Device> pDevice) : RenderPass(pDevice)
     mpPass->addConstantBuffer(mCbPerFrame, &mPerFrameData, sizeof(PerFrameCB));
 
     // Load reference texture from EXR file
-    mpReferenceTexture = ExrUtils::loadExrToTexture(pDevice, std::string(PROJECT_DIR) + "/media/reference.exr");
-    mWidth = mpReferenceTexture->getDesc().width;
-    mHeight = mpReferenceTexture->getDesc().height;
-
-    nvrhi::TextureDesc textureDesc = nvrhi::TextureDesc()
-                                         .setWidth(mWidth)
-                                         .setHeight(mHeight)
-                                         .setFormat(nvrhi::Format::RGBA32_FLOAT)
-                                         .setInitialState(nvrhi::ResourceStates::UnorderedAccess)
-                                         .setDebugName("ErrorMeasure/differenceTexture")
-                                         .setIsUAV(true)
-                                         .setKeepInitialState(true);
-    mpDifferenceTexture = mpDevice->getDevice()->createTexture(textureDesc);
-
-    // Create unified output texture that will always be returned
-    nvrhi::TextureDesc outputTextureDesc = nvrhi::TextureDesc()
-                                               .setWidth(mWidth)
-                                               .setHeight(mHeight)
-                                               .setFormat(nvrhi::Format::RGBA32_FLOAT)
-                                               .setInitialState(nvrhi::ResourceStates::UnorderedAccess)
-                                               .setDebugName("ErrorMeasure/outputTexture")
-                                               .setIsUAV(true)
-                                               .setKeepInitialState(true);
-    mpOutputTexture = mpDevice->getDevice()->createTexture(outputTextureDesc);
+    std::string refPath = std::string(PROJECT_DIR) + "/media/reference.exr";
+    mpReferenceTexture = ExrUtils::loadExrToTexture(pDevice, refPath);
+    if (mpReferenceTexture)
+    {
+        mWidth = mpReferenceTexture->getDesc().width;
+        mHeight = mpReferenceTexture->getDesc().height;
+        prepareResources(mWidth, mHeight);
+    }
 }
 
 std::vector<RenderPassInput> ErrorMeasure::getInputs() const
@@ -80,26 +64,43 @@ RenderData ErrorMeasure::execute(const RenderData& renderData)
 {
     mpSourceTexture = dynamic_cast<nvrhi::ITexture*>(renderData[kSourceName].Get());
     uint2 resolution = uint2(mpSourceTexture->getDesc().width, mpSourceTexture->getDesc().height);
+
     if (resolution.x != mWidth || resolution.y != mHeight)
     {
-        LOG_WARN("Resolution mismatch: source({}x{}) vs reference({}x{})", resolution.x, resolution.y, mWidth, mHeight);
-        RenderData output;
-        output.setResource("output", mpSourceTexture);
-        mSelectedOutput = OutputId::Source; // Fallback to source
-        return output;
+        mWidth = resolution.x;
+        mHeight = resolution.y;
+        prepareResources(mWidth, mHeight);
+    }
+
+    // Resolution mismatch check only applies in Texture mode
+    if (mReferenceMode == ReferenceMode::Texture && mpReferenceTexture)
+    {
+        uint2 refRes = uint2(mpReferenceTexture->getDesc().width, mpReferenceTexture->getDesc().height);
+        if (resolution.x != refRes.x || resolution.y != refRes.y)
+        {
+            LOG_WARN("Resolution mismatch: source({}x{}) vs reference({}x{})", resolution.x, resolution.y, refRes.x, refRes.y);
+            RenderData output;
+            output.setResource(kOutputName, mpSourceTexture);
+            mSelectedOutput = OutputId::Source;
+            return output;
+        }
     }
 
     mPerFrameData.gWidth = mWidth;
     mPerFrameData.gHeight = mHeight;
     mPerFrameData.gSelectedOutput = static_cast<uint32_t>(mSelectedOutput);
+    mPerFrameData.gReferenceMode = static_cast<uint32_t>(mReferenceMode);
+    mPerFrameData.gConstantColor = mConstantReferenceColor;
 
     (*mpPass)["PerFrameCB"] = mCbPerFrame;
     (*mpPass)["source"] = mpSourceTexture;
-    (*mpPass)["reference"] = mpReferenceTexture;
+    if (mReferenceMode == ReferenceMode::Texture && mpReferenceTexture)
+        (*mpPass)["reference"] = mpReferenceTexture;
+    else
+        (*mpPass)["reference"] = mpSourceTexture; // Dummy bind; shader won't read it in Constant mode
     (*mpPass)["output"] = mpOutputTexture;
     mpPass->execute(mWidth, mHeight, 1);
 
-    // Always return the unified output texture
     RenderData output;
     output.setResource(kOutputName, mpOutputTexture);
     return output;
@@ -114,4 +115,17 @@ void ErrorMeasure::renderUI()
         mSelectedOutput = OutputId::Reference;
     if (GUI::RadioButton("Difference", mSelectedOutput == OutputId::Difference))
         mSelectedOutput = OutputId::Difference;
+}
+
+void ErrorMeasure::prepareResources(uint32_t width, uint32_t height)
+{
+    nvrhi::TextureDesc textureDesc = nvrhi::TextureDesc()
+                                         .setWidth(width)
+                                         .setHeight(height)
+                                         .setFormat(nvrhi::Format::RGBA32_FLOAT)
+                                         .setInitialState(nvrhi::ResourceStates::UnorderedAccess)
+                                         .setDebugName("ErrorMeasure/outputTexture")
+                                         .setIsUAV(true)
+                                         .setKeepInitialState(true);
+    mpOutputTexture = mpDevice->getDevice()->createTexture(textureDesc);
 }

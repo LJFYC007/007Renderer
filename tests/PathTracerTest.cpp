@@ -3,8 +3,10 @@
 #include <iostream>
 
 #include "Scene/Importer/Importer.h"
-#include "RenderPasses/RenderGraphEditor.h"
 #include "RenderPasses/RenderGraphBuilder.h"
+#include "RenderPasses/PathTracingPass/PathTracingPass.h"
+#include "RenderPasses/AccumulatePass/AccumulatePass.h"
+#include "RenderPasses/ErrorMeasure/ErrorMeasure.h"
 #include "Utils/ExrUtils.h"
 #include "Environment.h"
 
@@ -31,7 +33,6 @@ TEST_F(PathTracerTest, Basic)
         FAIL() << "Failed to load scene from file.";
     scene->buildAccelStructs();
 
-    RenderGraphEditor renderGraphEditor(mpDevice);
     auto renderGraph = RenderGraphBuilder::createDefaultGraph(mpDevice);
     renderGraph->setScene(scene);
 
@@ -57,32 +58,82 @@ TEST_F(PathTracerTest, Full)
         FAIL() << "Failed to load scene from file.";
     scene->buildAccelStructs();
 
-    // Create render graph
-    RenderGraphEditor renderGraphEditor(mpDevice);
     auto renderGraph = RenderGraphBuilder::createDefaultGraph(mpDevice);
     renderGraph->setScene(scene);
 
-    // Render the scene
     for (uint i = 0; i < spp; ++i)
     {
         scene->camera->calculateCameraParameters();
         renderGraph->execute();
     }
 
-    // Get the convergence result
-    const auto& nodes = renderGraph->getNodes();
-    ref<TextureAverage> textureAveragePass;
-    for (const auto& node : nodes)
-        if (node.name == "TextureAverage")
-        {
-            textureAveragePass = std::dynamic_pointer_cast<TextureAverage>(node.pass);
-            break;
-        }
-    auto average = textureAveragePass->mAverageResult;
+    auto textureAveragePass = renderGraph->getPassByName<TextureAverage>("TextureAverage");
+    auto average = textureAveragePass->getAverageResult();
     EXPECT_TRUE(average.r < threshold && average.g < threshold && average.b < threshold)
         << "Average result: r=" << average.r << ", g=" << average.g << ", b=" << average.b;
 
     // Save the final output texture to EXR file
     nvrhi::TextureHandle imageTexture = renderGraph->getFinalOutputTexture();
     ExrUtils::saveTextureToExr(mpDevice, imageTexture, "output.exr");
+}
+
+TEST_F(PathTracerTest, WhiteFurnace)
+{
+    const uint spp = 1024;
+    const float threshold = 0.03f;
+    const float roughnessValues[] = {0.05f, 0.25f, 0.5f, 0.75f, 1.0f};
+
+    for (float roughness : roughnessValues)
+    {
+        // Load scene fresh for each roughness
+        ref<Scene> scene = loadSceneWithImporter(std::string(PROJECT_DIR) + "/media/sphere.usdc", mpDevice);
+        ASSERT_NE(scene, nullptr) << "Failed to load scene";
+
+        // Set roughness on all materials (furnace mode overrides baseColor/metallic/etc on the GPU)
+        for (auto& mat : scene->materials)
+            mat.roughnessFactor = roughness;
+        scene->buildAccelStructs();
+
+        // Create and configure render graph
+        auto renderGraph = RenderGraphBuilder::createDefaultGraph(mpDevice);
+
+        auto pathTracing = renderGraph->getPassByName<PathTracingPass>("PathTracing");
+        ASSERT_NE(pathTracing, nullptr);
+        pathTracing->setMissColor(1.0f);
+        pathTracing->setFurnaceMode(FurnaceMode::WeakWhiteFurnace);
+
+        auto accumulate = renderGraph->getPassByName<AccumulatePass>("Accumulate");
+        ASSERT_NE(accumulate, nullptr);
+        accumulate->setEnableGammaCorrection(false);
+
+        auto errorMeasure = renderGraph->getPassByName<ErrorMeasure>("ErrorMeasure");
+        ASSERT_NE(errorMeasure, nullptr);
+        errorMeasure->setConstantReference({1.f, 1.f, 1.f});
+
+        renderGraph->setScene(scene);
+
+        // Render
+        for (uint i = 0; i < spp; ++i)
+        {
+            scene->camera->calculateCameraParameters();
+            renderGraph->execute();
+        }
+
+        auto textureAverage = renderGraph->getPassByName<TextureAverage>("TextureAverage");
+        ASSERT_NE(textureAverage, nullptr);
+        auto avg = textureAverage->getAverageResult();
+
+        std::cout << "WeakWhiteFurnace roughness=" << roughness << " avg error: r=" << avg.r << " g=" << avg.g << " b=" << avg.b << std::endl;
+
+        // Save debug EXRs
+        std::string suffix = std::to_string(roughness);
+        nvrhi::TextureHandle outputTex = renderGraph->getFinalOutputTexture();
+        if (outputTex)
+            ExrUtils::saveTextureToExr(mpDevice, outputTex, "furnace_diff_rough" + suffix + ".exr");
+
+        // Assert convergence to white
+        EXPECT_LT(avg.r, threshold) << "roughness=" << roughness;
+        EXPECT_LT(avg.g, threshold) << "roughness=" << roughness;
+        EXPECT_LT(avg.b, threshold) << "roughness=" << roughness;
+    }
 }

@@ -10,15 +10,26 @@ float evalNdfGGX(float cosTheta, float alpha2)
     return alpha2 / (PI * denom * denom);
 }
 
-/*
-    \param[in] cosTheta Dot product between shading normal and evaluated direction
-    \param[in] alpha2 Squared GGX parameter (squared alpha)
-*/
-float evalG1GGX(float cosTheta, float alpha2)
+// Lambda function for Smith masking: Λ(v) = (sqrt(1 + α²·tan²θ) - 1) / 2
+float evalLambdaGGX(float cosTheta, float alpha2)
 {
     float cosTheta2 = cosTheta * cosTheta;
     float tanThetaSqr = max(1 - cosTheta2, 0) / cosTheta2;
-    return 2 / (1 + sqrt(1 + alpha2 * tanThetaSqr));
+    return (sqrt(1 + alpha2 * tanThetaSqr) - 1) * 0.5f;
+}
+
+float evalG1GGX(float cosTheta, float alpha2)
+{
+    return 1.0f / (1.0f + evalLambdaGGX(cosTheta, alpha2));
+}
+
+// Height-correlated Smith G2 (Heitz 2014, Eq. 99):
+// G2(wi, wo) = 1 / (1 + Λ(wi) + Λ(wo))
+float evalG2GGX(float cosThetaI, float cosThetaO, float alpha2)
+{
+    float lambdaI = evalLambdaGGX(cosThetaI, alpha2);
+    float lambdaO = evalLambdaGGX(cosThetaO, alpha2);
+    return 1.0f / (1.0f + lambdaI + lambdaO);
 }
 
 float schlickPow5(float x)
@@ -51,6 +62,7 @@ float evalFresnelDielectric(float cosThetaI, float eta)
     return 0.5f * (rs * rs + rp * rp);
 }
 
+// Sample a GGX half-vector from the NDF (not VNDF) using inverse-CDF mapping.
 float3 sampleGGXHalfVector(float2 u, float alpha2)
 {
     float cosTheta = sqrt((1.0f - u.x) / (1.0f + (alpha2 - 1.0f) * u.x));

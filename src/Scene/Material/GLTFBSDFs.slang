@@ -12,15 +12,24 @@ struct GLTFSpecularBRDF
 {
     float3 albedo;
     float metallic;
-    float alpha; // GGX roughness^2
-    float eta;   // n_incident / n_transmitted for the dielectric branch
+    float alpha;          // GGX roughness^2
+    float eta;            // n_incident / n_transmitted for the dielectric branch
+    bool weakFurnaceMode; // true = use single-sided G1(wi) instead of joint G2
 
-    __init(float3 _albedo, float _metallic, float _alpha, float _eta = (1.0f / 1.5f))
+    __init(float3 _albedo, float _metallic, float _alpha, float _eta = (1.0f / 1.5f), bool _weakFurnaceMode = false)
     {
         albedo = _albedo;
         metallic = _metallic;
         alpha = _alpha;
         eta = _eta;
+        weakFurnaceMode = _weakFurnaceMode;
+    }
+
+    // Weak furnace test (Heitz 2014 Sec 5.2) uses G1(wi) only;
+    // production uses height-correlated G2.
+    float evalMasking(float cosThetaI, float cosThetaO, float alpha2)
+    {
+        return weakFurnaceMode ? evalG1GGX(cosThetaI, alpha2) : evalG2GGX(cosThetaI, cosThetaO, alpha2);
     }
 
     float3 eval<S : ISampleGenerator>(const float3 wi, const float3 wo, inout S sg)
@@ -33,11 +42,11 @@ struct GLTFSpecularBRDF
 
         float alpha2 = alpha * alpha;
         float D = evalNdfGGX(h.z, alpha2);
-        float G = evalG1GGX(wi.z, alpha2) * evalG1GGX(abs(wo.z), alpha2);
+        float G = evalMasking(wi.z, wo.z, alpha2);
         float dielectricF = evalFresnelDielectric(dot(h, wi), eta);
         float3 metallicF = evalFresnelSchlick(dot(h, wi), albedo);
         float3 F = lerp(float3(dielectricF), metallicF, metallic);
-        return F * D * G / (4.f * wi.z * abs(wo.z));
+        return F * D * G / (4.f * wi.z * wo.z);
     }
 
     bool sampleGivenHalfVector(const float3 wi, const float3 h, out float3 wo, out float pdf, out float3 weight)
@@ -47,19 +56,30 @@ struct GLTFSpecularBRDF
 
         wo = reflect(-wi, h);
 
-        if (wo.z < kMinCosTheta || dot(h, wi) < kMinCosTheta || dot(h, wo) < kMinCosTheta)
+        if (dot(h, wi) < kMinCosTheta)
+            return false;
+
+        // In weak furnace mode, allow wo below the macrosurface (wo.z < 0).
+        // The weak white furnace identity (Heitz 2014 Sec 5.2) integrates over
+        // ALL microfacet normals — including those whose reflection exits through
+        // the lower hemisphere. The sample weight G1(wi)*dot(wo,h)/(wi.z*h.z) is
+        // independent of the sign of wo.z (since dot(wo,h) == dot(wi,h) for
+        // reflection), so the estimator is well-defined.
+        if (!weakFurnaceMode && (wo.z < kMinCosTheta || dot(h, wo) < kMinCosTheta))
             return false;
 
         float alpha2 = alpha * alpha;
         float D = evalNdfGGX(h.z, alpha2);
-        float G1wi = evalG1GGX(wi.z, alpha2);
-        float G1wo = evalG1GGX(wo.z, alpha2);
+        float G = evalMasking(wi.z, wo.z, alpha2);
         float dielectricF = evalFresnelDielectric(dot(h, wi), eta);
         float3 metallicF = evalFresnelSchlick(dot(h, wi), albedo);
         float3 F = lerp(float3(dielectricF), metallicF, metallic);
 
         pdf = D * h.z / (4.0f * dot(wo, h));
-        weight = F * D * G1wi * G1wo * 0.25f / (wi.z * wo.z) * wo.z / pdf;
+        // weight = f(wi,wo) * cos(wo) / pdf
+        //        = F * D * G / (4 * wi.z * wo.z) * wo.z / (D * h.z / (4 * woDotH))
+        //        = F * G * woDotH / (wi.z * h.z)
+        weight = F * G * dot(wo, h) / (wi.z * h.z);
         return true;
     }
 

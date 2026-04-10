@@ -36,7 +36,6 @@ PathTracingPass::PathTracingPass(ref<Device> pDevice) : RenderPass(pDevice)
     cbDesc.debugName = "PathTracingPass/Camera";
     mCbCamera = mpDevice->getDevice()->createBuffer(cbDesc);
 
-    // Create texture sampler
     nvrhi::SamplerDesc samplerDesc;
     samplerDesc.setAllFilters(true);
     samplerDesc.setMaxAnisotropy(16.f);
@@ -65,6 +64,7 @@ RenderData PathTracingPass::execute(const RenderData& input)
     mPerFrameData.maxDepth = mMaxDepth;
     mPerFrameData.frameCount = ++mFrameCount;
     mPerFrameData.gColor = mGColorSlider;
+    mPerFrameData.furnaceMode = static_cast<uint32_t>(mFurnaceMode);
 
     RenderData output;
     output.setResource("output", mTextureOut);
@@ -92,6 +92,11 @@ RenderData PathTracingPass::execute(const RenderData& input)
 void PathTracingPass::renderUI()
 {
     GUI::SliderFloat("gColor", &mGColorSlider, 0.0f, 5.0f);
+
+    static const char* furnaceModeLabels[] = {"Off", "Weak White Furnace"};
+    int furnaceIdx = static_cast<int>(mFurnaceMode);
+    if (GUI::Combo("Furnace Mode", &furnaceIdx, furnaceModeLabels, 2))
+        mFurnaceMode = static_cast<FurnaceMode>(furnaceIdx);
 }
 
 void PathTracingPass::prepareResources()

@@ -71,7 +71,7 @@ struct GLTFMaterial : IMaterial
         sd.B = B;
     }
 
-    BSDFSample scatter<S : ISampleGenerator>(const ShadingData sd, inout S sg)
+    BSDFSample scatter<S : ISampleGenerator>(const ShadingData sd, inout S sg, uint furnaceMode = 0)
     {
         BSDFSample sample;
         sample.pdf = 0.0f;
@@ -111,7 +111,7 @@ struct GLTFMaterial : IMaterial
         {
             // Specular lobe: the BRDF already blends metallic/dielectric via lerped F0,
             // so its weight is the full specular contribution — no extra mixing needed.
-            GLTFSpecularBRDF specularBRDF = GLTFSpecularBRDF(sampledBaseColor, sampledMetallic, alpha, eta);
+            GLTFSpecularBRDF specularBRDF = GLTFSpecularBRDF(sampledBaseColor, sampledMetallic, alpha, eta, furnaceMode == 1);
             if (pSpecular > 0.0f && specularBRDF.sample(wiLocal, woLocal, pdf, weight, sg))
             {
                 sample.pdf = pdf * pSpecular;
@@ -121,9 +121,8 @@ struct GLTFMaterial : IMaterial
         }
         else if (uSelect < pSpecular + pTransmission)
         {
-            // Transmission lobe: the BTDF returns the core microfacet weight (with Fresnel).
-            // We must apply the missing mixing factors: (1-metallic) * transmission * baseColor.
-            // For TIR, light is reflected without passing through the medium, so no baseColor tint.
+            // Transmission lobe: the BTDF returns the core microfacet weight.
+            // We apply the mixing factors: (1-metallic) * transmission * baseColor.
             GLTFDielectricBTDF btdf = GLTFDielectricBTDF(alpha, eta);
             bool isTransmission;
             if (pTransmission > 0.0f && btdf.sampleOrTIR(wiLocal, isTransmission, woLocal, pdf, weight, sg))
@@ -137,6 +136,7 @@ struct GLTFMaterial : IMaterial
                 }
                 else
                 {
+                    // TIR: light reflects without entering the medium, so no baseColor tint.
                     sample.eventType = BSDFEventType.Reflection;
                     sample.weight = dielectricWeight * sampledTransmission * weight / pTransmission;
                 }
