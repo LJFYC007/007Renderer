@@ -88,10 +88,6 @@ struct GLTFMaterial : IMaterial
         float sampledTransmission = sampleTransmission(transmissionTextureId, applyUV(sd.uv, transmissionUV), transmissionFactor);
         float alpha = max(kMinGGXAlpha, sampledRoughness * sampledRoughness);
 
-        // Dielectric F0 derived from IOR: ((ior-1)/(ior+1))^2
-        float iorRatio = (ior - 1.0f) / (ior + 1.0f);
-        float dielectricF0 = iorRatio * iorRatio;
-
         float uSelect = sampleNext1D(sg);
         float pdf;
         float3 weight;
@@ -104,18 +100,7 @@ struct GLTFMaterial : IMaterial
         // stays purely specular. Applies to opaque dielectrics too — otherwise the
         // specular highlight on non-metals would never be sampled.
         float cosI = wiLocal.z;
-        float sin2T = eta * eta * (1.0f - cosI * cosI);
-        float macroF;
-        if (sin2T >= 1.0f)
-        {
-            macroF = 1.0f;
-        }
-        else
-        {
-            float cosSchlick = (eta > 1.0f) ? sqrt(1.0f - sin2T) : cosI;
-            macroF = schlickPow5(clamp(1.0f - abs(cosSchlick), 0.0f, 1.0f));
-            macroF = dielectricF0 + (1.0f - dielectricF0) * macroF;
-        }
+        float macroF = evalFresnelDielectric(cosI, eta);
 
         float baseBudget = dielectricWeight * (1.0f - macroF);
         float pSpecular = sampledMetallic + dielectricWeight * macroF;
@@ -126,7 +111,7 @@ struct GLTFMaterial : IMaterial
         {
             // Specular lobe: the BRDF already blends metallic/dielectric via lerped F0,
             // so its weight is the full specular contribution — no extra mixing needed.
-            GLTFSpecularBRDF specularBRDF = GLTFSpecularBRDF(sampledBaseColor, sampledMetallic, alpha, dielectricF0);
+            GLTFSpecularBRDF specularBRDF = GLTFSpecularBRDF(sampledBaseColor, sampledMetallic, alpha, eta);
             if (pSpecular > 0.0f && specularBRDF.sample(wiLocal, woLocal, pdf, weight, sg))
             {
                 sample.pdf = pdf * pSpecular;
@@ -139,7 +124,7 @@ struct GLTFMaterial : IMaterial
             // Transmission lobe: the BTDF returns the core microfacet weight (with Fresnel).
             // We must apply the missing mixing factors: (1-metallic) * transmission * baseColor.
             // For TIR, light is reflected without passing through the medium, so no baseColor tint.
-            GLTFDielectricBTDF btdf = GLTFDielectricBTDF(alpha, eta, dielectricF0);
+            GLTFDielectricBTDF btdf = GLTFDielectricBTDF(alpha, eta);
             bool isTransmission;
             if (pTransmission > 0.0f && btdf.sampleOrTIR(wiLocal, isTransmission, woLocal, pdf, weight, sg))
             {
@@ -161,7 +146,7 @@ struct GLTFMaterial : IMaterial
         {
             // Diffuse lobe: the BRDF returns (1-F)*cDiff (with cDiff = (1-metallic)*baseColor).
             // We must apply the missing (1-transmission) factor to match the full BSDF.
-            GLTFDiffuseBRDF diffuseBRDF = GLTFDiffuseBRDF(sampledBaseColor, sampledMetallic, dielectricF0);
+            GLTFDiffuseBRDF diffuseBRDF = GLTFDiffuseBRDF(sampledBaseColor, sampledMetallic, eta);
             if (pDiffuse > 0.0f && diffuseBRDF.sample(wiLocal, woLocal, pdf, weight, sg))
             {
                 sample.pdf = pdf * pDiffuse;

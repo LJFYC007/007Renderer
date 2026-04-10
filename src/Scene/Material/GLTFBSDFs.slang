@@ -12,15 +12,15 @@ struct GLTFSpecularBRDF
 {
     float3 albedo;
     float metallic;
-    float alpha;        // GGX roughness^2
-    float dielectricF0; // ((ior-1)/(ior+1))^2, default 0.04 for ior=1.5
+    float alpha; // GGX roughness^2
+    float eta;   // n_incident / n_transmitted for the dielectric branch
 
-    __init(float3 _albedo, float _metallic, float _alpha, float _dielectricF0 = 0.04f)
+    __init(float3 _albedo, float _metallic, float _alpha, float _eta = (1.0f / 1.5f))
     {
         albedo = _albedo;
         metallic = _metallic;
         alpha = _alpha;
-        dielectricF0 = _dielectricF0;
+        eta = _eta;
     }
 
     float3 eval<S : ISampleGenerator>(const float3 wi, const float3 wo, inout S sg)
@@ -34,7 +34,9 @@ struct GLTFSpecularBRDF
         float alpha2 = alpha * alpha;
         float D = evalNdfGGX(h.z, alpha2);
         float G = evalG1GGX(wi.z, alpha2) * evalG1GGX(abs(wo.z), alpha2);
-        float3 F = evalFresnelSchlick(dot(h, wi), lerp(float3(dielectricF0), albedo, metallic));
+        float dielectricF = evalFresnelDielectric(dot(h, wi), eta);
+        float3 metallicF = evalFresnelSchlick(dot(h, wi), albedo);
+        float3 F = lerp(float3(dielectricF), metallicF, metallic);
         return F * D * G / (4.f * wi.z * abs(wo.z));
     }
 
@@ -52,7 +54,9 @@ struct GLTFSpecularBRDF
         float D = evalNdfGGX(h.z, alpha2);
         float G1wi = evalG1GGX(wi.z, alpha2);
         float G1wo = evalG1GGX(wo.z, alpha2);
-        float3 F = evalFresnelSchlick(dot(h, wi), lerp(float3(dielectricF0), albedo, metallic));
+        float dielectricF = evalFresnelDielectric(dot(h, wi), eta);
+        float3 metallicF = evalFresnelSchlick(dot(h, wi), albedo);
+        float3 F = lerp(float3(dielectricF), metallicF, metallic);
 
         pdf = D * h.z / (4.0f * dot(wo, h));
         weight = F * D * G1wi * G1wo * 0.25f / (wi.z * wo.z) * wo.z / pdf;
@@ -73,17 +77,17 @@ struct GLTFDiffuseBRDF
 {
     float3 albedo;
     float metallic;
-    float dielectricF0;
+    float eta;
 
-    __init(float3 _albedo, float _metallic, float _dielectricF0 = 0.04f)
+    __init(float3 _albedo, float _metallic, float _eta = (1.0f / 1.5f))
     {
         albedo = _albedo;
         metallic = _metallic;
-        dielectricF0 = _dielectricF0;
+        eta = _eta;
     }
 
-    // Evaluate the diffuse BRDF. The Fresnel term uses only the dielectric F0
-    // (not the metallic-blended F0) because metallic surfaces have zero diffuse.
+    // Evaluate the diffuse BRDF. The Fresnel term uses the exact dielectric
+    // interface reflectance because metallic surfaces have zero diffuse.
     float3 eval<S : ISampleGenerator>(const float3 wi, const float3 wo, inout S sg)
     {
         float3 h = normalize(wi + wo);
@@ -91,7 +95,7 @@ struct GLTFDiffuseBRDF
             return float3(0.f);
 
         float3 cDiff = lerp(albedo, float3(0.f), metallic);
-        float3 F = evalFresnelSchlick(dot(h, wi), float3(dielectricF0));
+        float3 F = float3(evalFresnelDielectric(dot(h, wi), eta));
         return (1.f - F) * (1 / PI) * cDiff;
     }
 
@@ -108,7 +112,7 @@ struct GLTFDiffuseBRDF
         pdf = wo.z * INV_PI;
         float3 h = normalize(wi + wo);
         float3 cDiff = lerp(albedo, float3(0.f), metallic);
-        float3 F = evalFresnelSchlick(dot(h, wi), float3(dielectricF0));
+        float3 F = float3(evalFresnelDielectric(dot(h, wi), eta));
         weight = (1.f - F) * (1 / PI) * cDiff * wo.z / pdf;
         return true;
     }
@@ -121,13 +125,11 @@ struct GLTFDielectricBTDF
 {
     float alpha; // GGX roughness^2
     float eta;   // n_incident / n_transmitted
-    float dielectricF0;
 
-    __init(float _alpha, float _eta, float _dielectricF0)
+    __init(float _alpha, float _eta)
     {
         alpha = _alpha;
         eta = _eta;
-        dielectricF0 = _dielectricF0;
     }
 
     bool sampleOrTIR<
@@ -172,12 +174,6 @@ struct GLTFDielectricBTDF
 
         isTransmission = true;
 
-        // Fresnel (Schlick): evaluate at the cosine of the angle in the less-dense medium.
-        // Outside->inside (eta < 1): that's the incident side, wiDotH.
-        // Inside->outside (eta > 1): that's the transmitted (air) side, cosThetaT.
-        float cosForFresnel = (eta > 1.0f) ? cosThetaT : wiDotH;
-        float3 F = evalFresnelSchlick(cosForFresnel, float3(dielectricF0));
-
         float G1wo = evalG1GGX(abs(wo.z), alpha2);
 
         // Walter et al. Jacobian: |dH/dwo| = |wo·H| / (eta·wi·H + wo·H)^2
@@ -189,7 +185,9 @@ struct GLTFDielectricBTDF
 
         // Non-symmetric radiance transport correction: (n_t/n_i)^2 = 1/eta^2.
         // In a camera-traced path tracer, radiance concentrates in denser media.
-        weight = (1.0f / eta2) * (1.0f - F) * G1wi * G1wo * wiDotH / (wi.z * h.z);
+        // The dielectric base-layer Fresnel mix is applied by GLTFMaterial, so the
+        // BTDF core weight here must not multiply an extra (1 - F) term.
+        weight = (1.0f / eta2) * G1wi * G1wo * wiDotH / (wi.z * h.z);
         return true;
     }
 };
