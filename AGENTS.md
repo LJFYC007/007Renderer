@@ -6,6 +6,8 @@
 
 Prerequisites: run `.\setup.ps1` (PowerShell) to download Slang and DXC binaries into `external/`.
 
+The PowerShell environment for this project is expected to already be initialized with the Visual Studio toolchain. Opening PowerShell in this workspace should automatically provide `cmake`, `Ninja`, and MSVC. So do not re-run `vcvarsall.bat` or manually reconfigure the compiler environment unless a command shows that the setup is actually missing.
+
 ```bash
 # Configure (Ninja generator, MSVC x64 toolchain)
 cmake -S . -B build/Debug -G Ninja -DCMAKE_BUILD_TYPE=Debug

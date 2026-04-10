@@ -112,6 +112,18 @@ bool ddsTextureLoader(
     return true;
 }
 
+size_t uvChannelIndex(tinyusdz::tydra::UVTexture::Channel ch)
+{
+    using Ch = tinyusdz::tydra::UVTexture::Channel;
+    if (ch == Ch::G)
+        return 1;
+    if (ch == Ch::B)
+        return 2;
+    if (ch == Ch::A)
+        return 3;
+    return 0;
+}
+
 } // namespace
 
 // key = Full absolute prim path(e.g. `/bora/dora`)
@@ -488,6 +500,63 @@ Material UsdImporter::extractMaterial(const tinyusdz::tydra::RenderMaterial& usd
         material.normalUV = extractUVTransform(mRenderScene.textures[texId]);
     }
 
+    // Transmission (derived from USD opacity: transmission = 1 - opacity)
+    if (!surfaceShader.opacity.is_texture())
+    {
+        float opacity = surfaceShader.opacity.value;
+        material.transmissionFactor = 1.0f - opacity;
+    }
+    else
+    {
+        // For textured opacity, invert each texel (1 - opacity) at load time so the
+        // shader can sample transmission directly without runtime inversion.
+        int32_t texId = surfaceShader.opacity.texture_id;
+        const auto& uvTexture = mRenderScene.textures[texId];
+        const auto& texImage = mRenderScene.images[uvTexture.texture_image_id];
+        const auto& buffer = mRenderScene.buffers[texImage.buffer_id];
+
+        std::string cacheKey = texImage.asset_identifier + "_transmission";
+        auto cacheIt = mTransmissionTextureCache.find(cacheKey);
+        if (cacheIt != mTransmissionTextureCache.end())
+        {
+            material.transmissionTextureId = cacheIt->second;
+            material.transmissionUV = extractUVTransform(uvTexture);
+            material.transmissionFactor = 1.0f;
+        }
+        else if (!buffer.data.empty())
+        {
+            size_t nCh = static_cast<size_t>(texImage.channels);
+            size_t pixelCount = static_cast<size_t>(texImage.width) * texImage.height;
+            size_t expectedUint8Size = pixelCount * nCh * sizeof(uint8_t);
+            size_t expectedFloat32Size = pixelCount * nCh * sizeof(float);
+
+            size_t srcCh = uvChannelIndex(uvTexture.connectedOutputChannel);
+
+            std::vector<float> transmissionData(pixelCount);
+
+            if (buffer.data.size() == expectedFloat32Size)
+            {
+                const float* floatData = reinterpret_cast<const float*>(buffer.data.data());
+                for (size_t i = 0; i < pixelCount; ++i)
+                    transmissionData[i] = 1.0f - floatData[i * nCh + srcCh];
+            }
+            else if (buffer.data.size() == expectedUint8Size)
+            {
+                for (size_t i = 0; i < pixelCount; ++i)
+                    transmissionData[i] = 1.0f - buffer.data[i * nCh + srcCh] / 255.0f;
+            }
+
+            uint32_t engineTexId = scene->loadTexture(transmissionData.data(), texImage.width, texImage.height, 1, cacheKey);
+            mTransmissionTextureCache[cacheKey] = engineTexId;
+            material.transmissionTextureId = engineTexId;
+            material.transmissionUV = extractUVTransform(uvTexture);
+            material.transmissionFactor = 1.0f;
+        }
+    }
+
+    // IOR
+    material.ior = surfaceShader.ior.value;
+
     return material;
 }
 
@@ -553,21 +622,15 @@ uint32_t UsdImporter::loadTextureFromRenderScene(int32_t textureId, ref<Scene> s
     // 1-channel texture so the shader can always sample .r correctly.
     if (isSingleChannel && texImage.channels > 1)
     {
-        int srcCh = 0;
-        if (uvTexture.connectedOutputChannel == Ch::G)
-            srcCh = 1;
-        else if (uvTexture.connectedOutputChannel == Ch::B)
-            srcCh = 2;
-        else if (uvTexture.connectedOutputChannel == Ch::A)
-            srcCh = 3;
-
+        size_t srcCh = uvChannelIndex(uvTexture.connectedOutputChannel);
         float scale = uvTexture.scale[srcCh];
         float bias = uvTexture.bias[srcCh];
 
+        size_t nCh = static_cast<size_t>(texImage.channels);
         size_t numPixels = static_cast<size_t>(texImage.width) * texImage.height;
         std::vector<float> extracted(numPixels);
         for (size_t i = 0; i < numPixels; ++i)
-            extracted[i] = floatData[i * texImage.channels + srcCh] * scale + bias;
+            extracted[i] = floatData[i * nCh + srcCh] * scale + bias;
 
         engineTextureId = scene->loadTexture(extracted.data(), texImage.width, texImage.height, 1, texImage.asset_identifier);
     }

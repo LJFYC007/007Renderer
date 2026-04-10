@@ -37,4 +37,5 @@ private:
     // Cache keyed by (textureId, channelKey) to handle ORM-packed textures where
     // the same image is referenced with different channel selectors (e.g., .g / .b)
     std::map<std::pair<int32_t, int>, uint32_t> mUsdTextureIdChannelToEngineId;
+    std::unordered_map<std::string, uint32_t> mTransmissionTextureCache;
 };

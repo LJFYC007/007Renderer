@@ -22,20 +22,24 @@ struct Material
 
     float metallicFactor = 0.f;
     float roughnessFactor = 1.f;
+    float transmissionFactor = 0.f;
+    float ior = 1.5f;
 
     uint baseColorTextureId = kInvalidTextureId;
     uint metallicTextureId = kInvalidTextureId;
     uint roughnessTextureId = kInvalidTextureId;
     uint emissiveTextureId = kInvalidTextureId;
     uint normalTextureId = kInvalidTextureId;
+    uint transmissionTextureId = kInvalidTextureId;
 
-    uint _padding2[3]; // pad to 16-byte boundary before UV transforms
+    uint _padding2[2]; // pad to 16-byte boundary before UV transforms
 
     UVTransform baseColorUV;
     UVTransform metallicUV;
     UVTransform roughnessUV;
     UVTransform emissiveUV;
     UVTransform normalUV;
+    UVTransform transmissionUV;
 
     Material() = default;
 };

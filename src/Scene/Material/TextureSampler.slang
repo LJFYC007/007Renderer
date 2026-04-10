@@ -35,6 +35,14 @@ float3 sampleEmissive(uint textureId, float2 uv, float3 emissive)
     return emissive;
 }
 
+// Sample transmission texture (red channel for grayscale)
+float sampleTransmission(uint textureId, float2 uv, float transmission)
+{
+    if (textureId != kInvalidTextureId && textureId < kMaxTextures)
+        return gMaterialTextures.textures[textureId].SampleLevel(gMaterialSampler.sampler, uv, 0).r * transmission;
+    return transmission;
+}
+
 // Sample normal map texture (returns tangent space normal).
 // Only RG channels are used; Z is reconstructed via Z = sqrt(1 - X^2 - Y^2).
 // This correctly handles BC5/ATI2 DDS normal maps where the B channel is not
