@@ -77,7 +77,20 @@ TEST_F(PathTracerTest, Full)
     ExrUtils::saveTextureToExr(mpDevice, imageTexture, "output.exr");
 }
 
-TEST_F(PathTracerTest, WhiteFurnace)
+// Weak white furnace test (Heitz 2014 Sec 5.2)
+//
+// Sets metallic=1, baseColor=white (F=1 everywhere), uses G1-only masking, and checks
+// convergence to 1.0. Evaluates a single-bounce integral: on each hit the BRDF sample weight
+// is accumulated against the constant white environment and the path terminates immediately.
+// Below-surface reflections (wo.z < 0) are kept because the G1 normalization identity
+// integrates over all microfacet normals — the sample weight G1(wi)*dot(wo,h)/(wi.z*h.z)
+// is independent of the sign of wo.z. Production-path isValidScatter() rejection is
+// intentionally bypassed in furnace mode.
+//
+// Note: validates the *weak* furnace (single-scattering G1 normalization) only. The production
+// BRDF with G2 joint masking still exhibits single-scattering energy loss at high roughness,
+// which requires Kulla-Conty (2017) multi-scattering compensation — that is a separate task.
+TEST_F(PathTracerTest, WhiteFurnaceFull)
 {
     const uint spp = 1024;
     const float threshold = 0.03f;
