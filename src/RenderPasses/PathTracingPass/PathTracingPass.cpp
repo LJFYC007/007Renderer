@@ -1,4 +1,5 @@
 #include "PathTracingPass.h"
+#include "Utils/Logger.h"
 #include "Utils/ResourceIO.h"
 
 namespace
@@ -42,11 +43,32 @@ PathTracingPass::PathTracingPass(ref<Device> pDevice) : RenderPass(pDevice)
     samplerDesc.setAllAddressModes(nvrhi::SamplerAddressMode::Repeat);
     mTextureSampler = mpDevice->getDevice()->createSampler(samplerDesc);
 
+    buildRayTracingPass();
+}
+
+void PathTracingPass::buildRayTracingPass()
+{
+    LOG_DEBUG("[PathTracingPass] Recompiling path tracing shader program (furnaceMode={})", static_cast<uint32_t>(mFurnaceMode));
     std::unordered_map<std::string, nvrhi::ShaderType> entryPoints = {
         {"rayGenMain", nvrhi::ShaderType::RayGeneration}, {"missMain", nvrhi::ShaderType::Miss}, {"closestHitMain", nvrhi::ShaderType::ClosestHit}
     };
-    mpPass = make_ref<RayTracingPass>(pDevice, "/src/RenderPasses/PathTracingPass/PathTracing.slang", entryPoints);
+    std::vector<std::pair<std::string, std::string>> defines;
+    if (mFurnaceMode == FurnaceMode::WeakWhiteFurnace)
+        defines.emplace_back("WEAK_WHITE_FURNACE", "1");
+
+    mpPass.reset();
+    mpPass = make_ref<RayTracingPass>(mpDevice, "/src/RenderPasses/PathTracingPass/PathTracing.slang", entryPoints, defines);
     mpPass->addConstantBuffer(mCbPerFrame, &mPerFrameData, sizeof(PerFrameCB));
+    if (mpScene)
+        mpPass->addConstantBuffer(mCbCamera, &mpScene->camera->getCameraData(), sizeof(CameraData));
+}
+
+void PathTracingPass::setFurnaceMode(FurnaceMode mode)
+{
+    if (mode == mFurnaceMode)
+        return;
+    mFurnaceMode = mode;
+    buildRayTracingPass();
 }
 
 RenderData PathTracingPass::execute(const RenderData& input)
@@ -64,7 +86,6 @@ RenderData PathTracingPass::execute(const RenderData& input)
     mPerFrameData.maxDepth = mMaxDepth;
     mPerFrameData.frameCount = ++mFrameCount;
     mPerFrameData.gColor = mGColorSlider;
-    mPerFrameData.furnaceMode = static_cast<uint32_t>(mFurnaceMode);
 
     RenderData output;
     output.setResource("output", mTextureOut);
@@ -96,7 +117,7 @@ void PathTracingPass::renderUI()
     static const char* furnaceModeLabels[] = {"Off", "Weak White Furnace"};
     int furnaceIdx = static_cast<int>(mFurnaceMode);
     if (GUI::Combo("Furnace Mode", &furnaceIdx, furnaceModeLabels, 2))
-        mFurnaceMode = static_cast<FurnaceMode>(furnaceIdx);
+        setFurnaceMode(static_cast<FurnaceMode>(furnaceIdx));
 }
 
 void PathTracingPass::prepareResources()

@@ -12,24 +12,26 @@ struct GLTFSpecularBRDF
 {
     float3 albedo;
     float metallic;
-    float alpha;          // GGX roughness^2
-    float eta;            // n_incident / n_transmitted for the dielectric branch
-    bool weakFurnaceMode; // true = use single-sided G1(wi) instead of joint G2
+    float alpha; // GGX roughness^2
+    float eta;   // n_incident / n_transmitted for the dielectric branch
 
-    __init(float3 _albedo, float _metallic, float _alpha, float _eta = (1.0f / 1.5f), bool _weakFurnaceMode = false)
+    __init(float3 _albedo, float _metallic, float _alpha, float _eta = (1.0f / 1.5f))
     {
         albedo = _albedo;
         metallic = _metallic;
         alpha = _alpha;
         eta = _eta;
-        weakFurnaceMode = _weakFurnaceMode;
     }
 
     // Weak furnace test (Heitz 2014 Sec 5.2) uses G1(wi) only;
     // production uses height-correlated G2.
     float evalMasking(float cosThetaI, float cosThetaO, float alpha2)
     {
-        return weakFurnaceMode ? evalG1GGX(cosThetaI, alpha2) : evalG2GGX(cosThetaI, cosThetaO, alpha2);
+#ifdef WEAK_WHITE_FURNACE
+        return evalG1GGX(cosThetaI, alpha2);
+#else
+        return evalG2GGX(cosThetaI, cosThetaO, alpha2);
+#endif
     }
 
     float3 eval<S : ISampleGenerator>(const float3 wi, const float3 wo, inout S sg)
@@ -59,14 +61,16 @@ struct GLTFSpecularBRDF
         if (dot(h, wi) < kMinCosTheta)
             return false;
 
+#ifndef WEAK_WHITE_FURNACE
         // In weak furnace mode, allow wo below the macrosurface (wo.z < 0).
         // The weak white furnace identity (Heitz 2014 Sec 5.2) integrates over
         // ALL microfacet normals — including those whose reflection exits through
         // the lower hemisphere. The sample weight G1(wi)*dot(wo,h)/(wi.z*h.z) is
         // independent of the sign of wo.z (since dot(wo,h) == dot(wi,h) for
         // reflection), so the estimator is well-defined.
-        if (!weakFurnaceMode && (wo.z < kMinCosTheta || dot(h, wo) < kMinCosTheta))
+        if (wo.z < kMinCosTheta || dot(h, wo) < kMinCosTheta)
             return false;
+#endif
 
         float alpha2 = alpha * alpha;
         float D = evalNdfGGX(h.z, alpha2);

@@ -1,29 +1,47 @@
 #include "Program.h"
 
-void Program::initializeSession(const std::string& profile)
+void Program::initializeSession(const std::string& profile, const std::vector<std::pair<std::string, std::string>>& defines)
 {
     slang::createGlobalSession(mGlobalSession.writeRef());
 
+    // Target-level options: affect code generation (debug info, optimization level).
+    std::vector<slang::CompilerOptionEntry> targetOptions;
 #ifdef _DEBUG
     LOG_INFO("[Program] Using DEBUG compilation options with profile: {}", profile);
-    slang::CompilerOptionEntry debugOptions[] = {
-        {slang::CompilerOptionName::DebugInformation, {slang::CompilerOptionValueKind::Int, SLANG_DEBUG_INFO_LEVEL_MAXIMAL, 0, nullptr, nullptr}},
-        {slang::CompilerOptionName::Optimization, {slang::CompilerOptionValueKind::Int, SLANG_OPTIMIZATION_LEVEL_NONE, 0, nullptr, nullptr}},
-    };
+    targetOptions.push_back(
+        {slang::CompilerOptionName::DebugInformation, {slang::CompilerOptionValueKind::Int, SLANG_DEBUG_INFO_LEVEL_MAXIMAL, 0, nullptr, nullptr}}
+    );
+    targetOptions.push_back(
+        {slang::CompilerOptionName::Optimization, {slang::CompilerOptionValueKind::Int, SLANG_OPTIMIZATION_LEVEL_NONE, 0, nullptr, nullptr}}
+    );
 #else
     LOG_INFO("[Program] Using RELEASE compilation options with profile: {}", profile);
-    slang::CompilerOptionEntry debugOptions[] = {
-        {slang::CompilerOptionName::DebugInformation, {slang::CompilerOptionValueKind::Int, SLANG_DEBUG_INFO_LEVEL_MINIMAL, 0, nullptr, nullptr}},
-        {slang::CompilerOptionName::Optimization, {slang::CompilerOptionValueKind::Int, SLANG_OPTIMIZATION_LEVEL_HIGH, 0, nullptr, nullptr}},
-    };
+    targetOptions.push_back(
+        {slang::CompilerOptionName::DebugInformation, {slang::CompilerOptionValueKind::Int, SLANG_DEBUG_INFO_LEVEL_MINIMAL, 0, nullptr, nullptr}}
+    );
+    targetOptions.push_back(
+        {slang::CompilerOptionName::Optimization, {slang::CompilerOptionValueKind::Int, SLANG_OPTIMIZATION_LEVEL_HIGH, 0, nullptr, nullptr}}
+    );
 #endif
-    const int optionCount = 2;
+
+    // Session-level options: preprocessor macros must live here so they affect module
+    // loading / #ifdef evaluation across all imported modules, not just code generation.
+    std::vector<slang::CompilerOptionEntry> sessionOptions;
+    for (const auto& [name, value] : defines)
+    {
+        slang::CompilerOptionEntry entry{};
+        entry.name = slang::CompilerOptionName::MacroDefine;
+        entry.value.kind = slang::CompilerOptionValueKind::String;
+        entry.value.stringValue0 = name.c_str();
+        entry.value.stringValue1 = value.c_str();
+        sessionOptions.push_back(entry);
+    }
 
     slang::TargetDesc targetDesc = {};
     targetDesc.format = SLANG_DXIL;
     targetDesc.profile = mGlobalSession->findProfile(profile.c_str());
-    targetDesc.compilerOptionEntries = debugOptions;
-    targetDesc.compilerOptionEntryCount = optionCount;
+    targetDesc.compilerOptionEntries = targetOptions.data();
+    targetDesc.compilerOptionEntryCount = static_cast<uint32_t>(targetOptions.size());
 
     const char* searchPaths[] = {PROJECT_SHADER_DIR, PROJECT_SRC_DIR};
 
@@ -32,6 +50,8 @@ void Program::initializeSession(const std::string& profile)
     sessionDesc.targetCount = 1;
     sessionDesc.searchPaths = searchPaths;
     sessionDesc.searchPathCount = 2;
+    sessionDesc.compilerOptionEntries = sessionOptions.data();
+    sessionDesc.compilerOptionEntryCount = static_cast<uint32_t>(sessionOptions.size());
 
     auto sessionResult = mGlobalSession->createSession(sessionDesc, mSession.writeRef());
     if (SLANG_FAILED(sessionResult))
@@ -42,12 +62,13 @@ Program::Program(
     nvrhi::IDevice* device,
     const std::string& filePath,
     const std::unordered_map<std::string, nvrhi::ShaderType>& entryPoints,
-    const std::string& profile
+    const std::string& profile,
+    const std::vector<std::pair<std::string, std::string>>& defines
 )
 {
     if (entryPoints.empty())
         LOG_ERROR_RETURN("[Program] No entry points provided");
-    initializeSession(profile);
+    initializeSession(profile, defines);
 
     // Load module
     Slang::ComPtr<slang::IModule> pModule;

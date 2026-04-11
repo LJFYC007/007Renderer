@@ -5,13 +5,14 @@
 RayTracingPass::RayTracingPass(
     ref<Device> pDevice,
     const std::string& shaderPath,
-    const std::unordered_map<std::string, nvrhi::ShaderType>& entryPoints
+    const std::unordered_map<std::string, nvrhi::ShaderType>& entryPoints,
+    const std::vector<std::pair<std::string, std::string>>& defines
 )
     : Pass(pDevice)
 {
     auto pNvrhiDevice = pDevice->getDevice();
     std::string shaderVersion = getLatestLibVersion();
-    Program program(pNvrhiDevice, std::string(PROJECT_DIR) + shaderPath, entryPoints, shaderVersion);
+    Program program(pNvrhiDevice, std::string(PROJECT_DIR) + shaderPath, entryPoints, shaderVersion, defines);
     // program.printReflectionInfo();
 
     if (!program.generateBindingLayout())

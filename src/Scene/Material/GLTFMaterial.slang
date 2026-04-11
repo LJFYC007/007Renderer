@@ -71,7 +71,7 @@ struct GLTFMaterial : IMaterial
         sd.B = B;
     }
 
-    BSDFSample scatter<S : ISampleGenerator>(const ShadingData sd, inout S sg, uint furnaceMode = 0)
+    BSDFSample scatter<S : ISampleGenerator>(const ShadingData sd, inout S sg)
     {
         BSDFSample sample;
         sample.pdf = 0.0f;
@@ -111,7 +111,7 @@ struct GLTFMaterial : IMaterial
         {
             // Specular lobe: the BRDF already blends metallic/dielectric via lerped F0,
             // so its weight is the full specular contribution — no extra mixing needed.
-            GLTFSpecularBRDF specularBRDF = GLTFSpecularBRDF(sampledBaseColor, sampledMetallic, alpha, eta, furnaceMode == 1);
+            GLTFSpecularBRDF specularBRDF = GLTFSpecularBRDF(sampledBaseColor, sampledMetallic, alpha, eta);
             if (pSpecular > 0.0f && specularBRDF.sample(wiLocal, woLocal, pdf, weight, sg))
             {
                 sample.pdf = pdf * pSpecular;

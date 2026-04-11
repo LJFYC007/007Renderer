@@ -5,6 +5,8 @@
 #include <nvrhi/nvrhi.h>
 #include <string>
 #include <unordered_map>
+#include <utility>
+#include <vector>
 
 #include "Utils/Logger.h"
 #include "Core/Program/ReflectionInfo.h"
@@ -16,7 +18,8 @@ public:
         nvrhi::IDevice* device,
         const std::string& filePath,
         const std::unordered_map<std::string, nvrhi::ShaderType>& entryPoints,
-        const std::string& profile
+        const std::string& profile,
+        const std::vector<std::pair<std::string, std::string>>& defines = {}
     );
 
     nvrhi::ShaderHandle getShader(const std::string& entryPoint) const;
@@ -31,7 +34,7 @@ public:
 
 private:
     // Initialize session for Slang compilation
-    void initializeSession(const std::string& profile);
+    void initializeSession(const std::string& profile, const std::vector<std::pair<std::string, std::string>>& defines);
 
     void printScope(slang::VariableLayoutReflection* pScopeVarLayout, int indent) const;
 

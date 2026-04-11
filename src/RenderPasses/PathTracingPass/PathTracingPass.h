@@ -18,7 +18,7 @@ public:
     void renderUI() override;
 
     void setMissColor(float c) { mGColorSlider = c; }
-    void setFurnaceMode(FurnaceMode mode) { mFurnaceMode = mode; }
+    void setFurnaceMode(FurnaceMode mode);
 
     void setScene(ref<Scene> pScene) override
     {
@@ -36,6 +36,7 @@ public:
 
 private:
     void prepareResources();
+    void buildRayTracingPass();
 
     uint32_t mWidth;
     uint32_t mHeight;
@@ -51,7 +52,6 @@ private:
         uint32_t maxDepth;
         uint32_t frameCount;
         float gColor;
-        uint32_t furnaceMode;
     } mPerFrameData;
 
     nvrhi::BufferHandle mCbPerFrame;

@@ -8,7 +8,9 @@ Prerequisites: run `.\setup.ps1` (PowerShell) to download Slang (v2026.3.1) and 
 
 ### Shell Environment (Important)
 
-**All build commands must be run through `powershell -Command "..."`** — the user's PowerShell `$PROFILE` initializes MSVC/cmake/Ninja. Non-PowerShell shells (bash, cmd) lack these environment variables.
+**All build commands must be run through `powershell -Command "..."`** — the user's PowerShell `$PROFILE` initializes MSVC/cmake/Ninja and adds Windows SDK tools to PATH. Non-PowerShell shells (bash, cmd) lack these environment variables.
+
+**Why this matters:** `cmake` and `ninja` are available from bash, so configure may succeed, but the build will fail with `'fxc.exe' is not recognized` — `fxc.exe` (Windows SDK FX Compiler, used for HLSL shaders) is only in PATH after PowerShell's `$PROFILE` runs. Always wrap build commands in `powershell -Command "..."` to get the full SDK environment.
 
 ```bash
 # Configure (Ninja generator, MSVC x64 toolchain)
@@ -31,9 +33,7 @@ powershell -Command "cmake --build build/RelWithDebInfo --target run_tests_ci"
 
 ### Core (`src/Core/`)
 
-`Device` wraps D3D12 + NVRHI initialization, command list, and debug validation. `Window` wraps Win32 window creation and the application message loop. `Program` (`src/Core/Program/`) handles Slang shader compilation and reflection-based binding via `BindingSetManager`; `ReflectionInfo` stores per-binding metadata extracted from Slang reflection. `RenderData` (`src/Core/RenderData.h`) is a `string → nvrhi::ResourceHandle` map used to pass resources between render passes.
-
-`ref<T>` (alias for `shared_ptr<T>`, defined in `src/Core/Pointer.h`) is the standard smart pointer; use `make_ref<T>(...)` to construct.
+`Device` wraps D3D12 + NVRHI initialization, command list, and debug validation. `Window` wraps Win32 window creation and the message loop. `Program` (`src/Core/Program/`) handles Slang shader compilation and reflection-based binding via `BindingSetManager`; `ReflectionInfo` stores per-binding metadata. `RenderData` (`src/Core/RenderData.h`) is a `string → nvrhi::ResourceHandle` map for passing resources between render passes. `ref<T>` (in `src/Core/Pointer.h`) is the standard `shared_ptr<T>` alias; construct with `make_ref<T>(...)`.
 
 ### Render Graph (`src/RenderPasses/`)
 
@@ -55,26 +55,21 @@ A DAG of `RenderPass` nodes connected by named typed ports (`RenderPassInput`/`R
 
 ### Slang Shading Pipeline
 
-Slang files live under `src/Scene/*.slang`, `src/Scene/Material/*.slang`, `src/RenderPasses/*/*.slang`, and `src/Utils/**/*.slang`. Path tracing follows a layered shading design:
+Slang files live under `src/Scene/`, `src/Scene/Material/`, `src/RenderPasses/*/`, and `src/Utils/`. The pipeline is layered by responsibility:
 
-- `VertexData.slang` — gathers raw geometric hit data via triangle interpolation
-- `ShadingPrep.slang` — builds geometry-only `ShadingData` from `VertexData` (no normal map, no back-face flip — those are material decisions)
-- `ShadingData.slang` — shading-ready surface, keeping immutable geometric references (`faceN`, `tangentW`) separate from the mutable shading frame (`T/B/N`)
-- `Scene.slang` — GPU `Scene` struct exposed as `ParameterBlock<Scene> gScene` with `StructuredBuffer<>` for mesh/material data
-- `Material/Material.slang` — `IMaterial` interface; bindless `gMaterialTextures` via `ParameterBlock<MaterialTextures>`
-- `Material/GLTFMaterial.slang` — concrete `GLTFMaterial : IMaterial`; owns `prepareShadingFrame()` (normal mapping, back-face handling) and `scatter()` (BSDF sampling)
-- `Material/GLTFBSDFs.slang` — specular/diffuse/BTDF implementations
-- `Material/GGXMicrofacet.slang` — GGX microfacet distribution and masking helpers
-- `Material/BSDFTypes.slang` — `BSDFSample`, event types, `isValidScatter()` for geometric-side validation
-- `Material/TextureSampler.slang` — texture sampling helpers
+- **Geometry stage** (`VertexData` → `ShadingPrep` → `ShadingData`): produces a geometry-only surface. No normal map, no back-face flip — those are material decisions. `ShadingData` keeps immutable geometric references (`faceN`, `tangentW`) separate from the mutable shading frame (`T/B/N`).
+- **Material stage** (`Material/`): `IMaterial` interface with `GLTFMaterial` as the concrete implementation. The material owns `prepareShadingFrame()` (normal mapping, back-face handling) and `scatter()` (BSDF sampling). BSDF math lives in `GLTFBSDFs` / `GGXMicrofacet`; sample validation in `BSDFTypes::isValidScatter()`.
+- **Orchestration** (`PathTracing.slang`): stays thin — fetch hit data, call `prepareShadingData()`, let the material refine the frame, validate, spawn next ray.
 
-`PathTracing.slang` should stay a thin orchestrator: fetch hit data, call `prepareShadingData()`, let the material refine the frame, validate the sample, and spawn the next ray. Do not substitute `faceN` for shading normal `N`: `faceN` is for sidedness/ray offsets, `N` is for BSDF evaluation.
+**Critical rule:** never substitute `faceN` for shading normal `N`. `faceN` is for sidedness checks and ray offsets; `N` is for BSDF evaluation.
+
+`Scene.slang` exposes the GPU scene as `ParameterBlock<Scene> gScene` with `StructuredBuffer<>` for mesh/material data; material textures are bindless via `ParameterBlock<MaterialTextures> gMaterialTextures`.
 
 **Slang idioms:** `import` for module dependencies; `ParameterBlock<>` for GPU globals; `StructuredBuffer<>` for geometry arrays; `#include` only where needed before `import` (e.g., `GLTFMaterial.slang`).
 
 ### Utils (`src/Utils/`)
 
-GUI helpers (`GUI`, `GUIWrapper`, ImGui theming via `imgui_spectrum`), logging (`Logger`), image I/O (`ExrUtils`, `ResourceIO`), math primitives (`Math/` — `Math.h`, `MathConstants.slangh`, `Ray.slang`), and sampling utilities (`Sampling/` — `SampleGenerator` with Slang interface).
+GUI (`GUI`, `GUIWrapper`, `imgui_spectrum` theming), logging (`Logger`), image I/O (`ExrUtils`, `ResourceIO`), math (`Math/`, including `MathConstants.slangh`), and sampling (`Sampling/SampleGenerator` with a Slang interface).
 
 ## Naming Conventions (Falcor-style)
 
@@ -96,25 +91,12 @@ To modify a submodule: edit in-place under `external/`, then `git diff > patches
 
 ## Key Dependencies
 
-Vendored under `external/` in three categories:
+Dependencies live under `external/` in three forms:
+- **Submodules** (see `.gitmodules`): NVRHI (D3D12-only, Vulkan/DX11 disabled), ImGui (DX12 + Win32), TinyUSDZ, Assimp (GLTF/OBJ), DirectXTex (DDS), GLM (experimental + force-radians), spdlog (bundled fmt), GoogleTest.
+- **Vendored in-tree**: imgui-node-editor (render graph UI), TinyEXR + miniz (EXR I/O).
+- **Downloaded by `setup.ps1`** (not in git): Slang v2026.3.1, DXC v1.8.2505.1 — DLLs copied post-build.
 
-**Git submodules** (in `.gitmodules`):
-- **NVRHI**: D3D12-only (Vulkan/DX11 disabled). Has local patch disabling CoopVec.
-- **ImGui**: Immediate-mode GUI (DX12 + Win32 backends, built via `cmake/FindImgui.cmake`).
-- **TinyUSDZ**: USD scene loading. Has local patch for raw colorspace passthrough.
-- **Assimp**: GLTF/OBJ import.
-- **DirectXTex**: DDS texture loading.
-- **GLM**: Math library (vectors, matrices). Experimental features and force-radians enabled.
-- **spdlog**: Logging backend (static build, bundled fmt).
-- **GoogleTest**: Unit testing framework.
-
-**Vendored in-tree** (not submodules):
-- **imgui-node-editor**: Visual node editor for the render graph UI.
-- **TinyEXR** (with miniz): EXR image I/O.
-
-**Downloaded by `setup.ps1`** (not in git):
-- **Slang** (v2026.3.1): Shader language; DLLs copied post-build.
-- **DXC** (v1.8.2505.1): DirectX shader compiler; DLLs copied post-build.
+NVRHI and TinyUSDZ carry local patches — see the Patching section above.
 
 ## Build System Notes
 
@@ -130,6 +112,6 @@ Tests live in `tests/`. The shared test environment is set up in `tests/Environm
 - `PathTracerTest`: Basic (4 spp smoke), Full (4096 spp + error threshold, writes `output.exr`), WhiteFurnaceFull (1024 spp × roughness sweep)
 - `SlangTest`: Basic (Slang reflection + ComputePass verification)
 - `ComputeShaderTest`: Basic (buffer add via ComputePass)
-- `RenderGraphTest`: 6 tests (graph build, ordering, duplicate detection, missing/optional inputs, cycles, bad connections)
+- `RenderGraphTest`: 6 tests — linear build, duplicate node names, missing required input, optional inputs unconnected, cycles, unknown slot connections
 
 The CI subset (`--gtest_filter="-*Full"`) runs 9 tests, excluding `PathTracerTest.Full` and `PathTracerTest.WhiteFurnaceFull`.
