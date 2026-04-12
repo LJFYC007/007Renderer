@@ -40,8 +40,8 @@ int main()
         gReadbackHeap = make_ref<ReadbackHeap>(pDevice);
 
         // Setup scene
-        // ref<Scene> scene = loadSceneWithImporter("D:/Scenes/Bistro_v5_2/BistroInterior_Wine.usdc", pDevice);
-        ref<Scene> scene = loadSceneWithImporter(std::string(PROJECT_DIR) + "/media/cornell_box.usdc", pDevice);
+        ref<Scene> scene = loadSceneWithImporter("D:/Scenes/Bistro_v5_2/BistroInterior_Wine.usdc", pDevice);
+        // ref<Scene> scene = loadSceneWithImporter(std::string(PROJECT_DIR) + "/media/cornell_box.usdc", pDevice);
         if (!scene)
         {
             LOG_ERROR("Failed to load scene from file.");

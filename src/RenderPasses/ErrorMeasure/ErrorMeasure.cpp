@@ -1,6 +1,7 @@
 #include "ErrorMeasure.h"
 #include "Utils/ResourceIO.h"
 #include "Utils/ExrUtils.h"
+#include "Utils/Widgets.h"
 
 namespace
 {
@@ -40,7 +41,7 @@ ErrorMeasure::ErrorMeasure(ref<Device> pDevice) : RenderPass(pDevice)
     mpPass->addConstantBuffer(mCbPerFrame, &mPerFrameData, sizeof(PerFrameCB));
 
     // Load reference texture from EXR file
-    std::string refPath = std::string(PROJECT_DIR) + "/media/reference.exr";
+    std::string refPath = std::string(PROJECT_DIR) + "/media/output.exr";
     mpReferenceTexture = ExrUtils::loadExrToTexture(pDevice, refPath);
     if (mpReferenceTexture)
     {
@@ -108,7 +109,7 @@ RenderData ErrorMeasure::execute(const RenderData& renderData)
 
 void ErrorMeasure::renderUI()
 {
-    GUI::Text("Output Selection:");
+    Widgets::subHeader("Output Selection");
     if (GUI::RadioButton("Source", mSelectedOutput == OutputId::Source))
         mSelectedOutput = OutputId::Source;
     if (GUI::RadioButton("Reference", mSelectedOutput == OutputId::Reference))

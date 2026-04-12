@@ -104,6 +104,8 @@ Single root `CMakeLists.txt` (no nested CMakeLists under `src/` or `tests/`). So
 
 **Note:** `PROJECT_SHADER_DIR` is defined as `${CMAKE_SOURCE_DIR}/shaders` but no `shaders/` directory exists — shader files live under `src/` and are found via `PROJECT_SRC_DIR` search paths in `Program`.
 
+**Clangd/intellisense noise:** editing files that include `imgui.h`, `nvrhi/nvrhi.h`, or project headers that depend on them often produces `<new-diagnostics>` reports like `'imgui.h' file not found`, `Unknown type 'ImVec2'`, `Unknown type 'RenderPassRefreshFlags'`. These come from clangd lacking the CMake include paths — they are **not** real build errors. Verify with `powershell -Command "cmake --build build/RelWithDebInfo --parallel"` instead of trying to "fix" them.
+
 ## Testing
 
 Tests live in `tests/`. The shared test environment is set up in `tests/Environment.cpp` (device, logger, ImGui context initialization shared across test cases).

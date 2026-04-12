@@ -3,7 +3,16 @@
 
 #include "RenderGraphEditor.h"
 #include "Utils/Logger.h"
+#include "Utils/Theme.h"
+#include "Utils/Widgets.h"
 #include <imgui_internal.h>
+
+namespace
+{
+// Pin-direction glyphs rendered beside each pin label.
+constexpr const char* kIconInput = "<";
+constexpr const char* kIconOutput = ">";
+} // namespace
 
 namespace
 {
@@ -163,7 +172,7 @@ void RenderGraphEditor::drawAddPassControls()
 
         if (!mAddPassErrorMessage.empty())
         {
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.35f, 0.35f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_Text, Theme::Luminograph::kAmber);
             ImGui::TextWrapped("%s", mAddPassErrorMessage.c_str());
             ImGui::PopStyleColor();
         }
@@ -317,9 +326,8 @@ void RenderGraphEditor::initializeFromRenderGraph(ref<RenderGraph> graph)
 
 void RenderGraphEditor::renderUI()
 {
-    // Render individual pass UIs
     for (const auto& node : mpCurrentValidGraph->getNodes())
-        if (GUI::CollapsingHeader(node.name.c_str(), ImGuiTreeNodeFlags_DefaultOpen))
+        if (Widgets::sectionHeader(node.name.c_str(), ImGuiTreeNodeFlags_DefaultOpen))
         {
             GUI::ScopedAccumulationReset scope(mpCurrentValidGraph->isUpstreamOfAccumulator(node.name));
             node.pass->renderUI();
@@ -355,63 +363,9 @@ void RenderGraphEditor::setupNodeEditorStyle()
         return;
 
     ed::SetCurrentEditor(mpEditorContext);
-    auto& style = ed::GetStyle();
-
-    struct ColorDef
-    {
-        ed::StyleColor slot;
-        ImVec4 color;
-    };
-
-    const ColorDef colors[] = {
-        {ed::StyleColor_Bg, ImVec4(0.08f, 0.08f, 0.12f, 1.0f)},
-        {ed::StyleColor_Grid, ImVec4(0.12f, 0.12f, 0.18f, 0.6f)},
-        {ed::StyleColor_NodeBg, ImVec4(0.18f, 0.20f, 0.25f, 0.95f)},
-        {ed::StyleColor_NodeBorder, ImVec4(0.35f, 0.40f, 0.50f, 0.8f)},
-        {ed::StyleColor_HovNodeBorder, ImVec4(0.60f, 0.70f, 0.85f, 1.0f)},
-        {ed::StyleColor_SelNodeBorder, ImVec4(0.90f, 0.60f, 0.20f, 1.0f)},
-        {ed::StyleColor_PinRect, ImVec4(0.40f, 0.60f, 0.90f, 0.8f)},
-        {ed::StyleColor_PinRectBorder, ImVec4(0.60f, 0.80f, 1.0f, 1.0f)},
-        {ed::StyleColor_HovLinkBorder, ImVec4(0.75f, 0.85f, 1.0f, 1.0f)},
-        {ed::StyleColor_SelLinkBorder, ImVec4(0.95f, 0.70f, 0.30f, 1.0f)},
-        {ed::StyleColor_HighlightLinkBorder, ImVec4(0.90f, 0.75f, 0.40f, 1.0f)},
-        {ed::StyleColor_NodeSelRect, ImVec4(0.90f, 0.60f, 0.20f, 0.3f)},
-        {ed::StyleColor_NodeSelRectBorder, ImVec4(0.90f, 0.60f, 0.20f, 0.6f)},
-        {ed::StyleColor_LinkSelRect, ImVec4(0.55f, 0.75f, 0.95f, 0.2f)},
-        {ed::StyleColor_LinkSelRectBorder, ImVec4(0.55f, 0.75f, 0.95f, 0.5f)},
-        {ed::StyleColor_Flow, ImVec4(0.90f, 0.70f, 0.30f, 1.0f)},
-        {ed::StyleColor_FlowMarker, ImVec4(1.0f, 0.80f, 0.40f, 1.0f)},
-        {ed::StyleColor_GroupBg, ImVec4(0.12f, 0.15f, 0.20f, 0.7f)},
-        {ed::StyleColor_GroupBorder, ImVec4(0.45f, 0.55f, 0.70f, 0.6f)}
-    };
-    for (const auto& def : colors)
-        style.Colors[def.slot] = def.color;
-
-    style.NodePadding = ImVec4(12, 8, 12, 12);
-    style.NodeRounding = 6.0f;
-    style.NodeBorderWidth = 1.5f;
-    style.HoveredNodeBorderWidth = 2.5f;
-    style.SelectedNodeBorderWidth = 3.0f;
-    style.HoverNodeBorderOffset = 2.0f;
-    style.SelectedNodeBorderOffset = 2.0f;
-
-    style.PinRounding = 4.0f;
-    style.PinBorderWidth = 1.0f;
-    style.PinRadius = 6.0f;
-    style.PinArrowSize = 8.0f;
-    style.PinArrowWidth = 6.0f;
-
-    style.LinkStrength = 150.0f;
-    style.FlowMarkerDistance = 30.0f;
-    style.FlowSpeed = 150.0f;
-    style.FlowDuration = 2.0f;
-
-    style.GroupRounding = 8.0f;
-    style.GroupBorderWidth = 2.0f;
-    style.HighlightConnectedLinks = 1.0f;
-    style.SnapLinkToPinDir = 1.0f;
-
+    Theme::applyNodeEditorStyle();
     ed::SetCurrentEditor(nullptr);
+
     mStyleConfigured = true;
     LOG_DEBUG("Node editor style configured successfully");
 }
@@ -438,7 +392,6 @@ void RenderGraphEditor::drawNodes()
     } tooltip;
 
     mPinRecords.clear();
-    GUI::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
 
     for (const auto& node : mEditorNodes)
     {
@@ -447,12 +400,14 @@ void RenderGraphEditor::drawNodes()
 
         GUI::PushID(node.name.c_str());
         ed::BeginNode(makeNodeId(node.name));
-        GUI::Text("%s", node.name.c_str());
 
+        // Node title — slightly larger, teal-tinted.
+        Widgets::subHeader(node.name.c_str());
+
+        // Input pins (left column)
         GUI::BeginGroup();
         if (!inputs.empty())
         {
-            GUI::Text("Inputs:");
             GUI::PushID("Inputs");
             for (size_t i = 0; i < inputs.size(); ++i)
             {
@@ -462,33 +417,31 @@ void RenderGraphEditor::drawNodes()
                 mPinRecords[pinId.Get()] = PinRecord{node.name, pin.name, pin.type, false};
 
                 ed::BeginPin(pinId, ed::PinKind::Input);
-                GUI::Text("-> %s", pin.name.c_str());
+                ImGui::TextColored(Theme::Luminograph::kTeal, kIconInput);
+                GUI::SameLine(0, 4);
+                GUI::Text("%s", pin.name.c_str());
                 ed::EndPin();
 
                 if (GUI::IsItemHovered())
                 {
                     tooltip.show = true;
-                    tooltip.text = "Input: " + pin.name + "Optional: " + (pin.optional ? "Yes" : "No");
+                    tooltip.text = pin.name + (pin.optional ? "  (optional)" : "");
                 }
 
                 GUI::PopID();
             }
             GUI::PopID();
         }
-        else
-        {
-            GUI::TextDisabled("No inputs");
-        }
         GUI::EndGroup();
 
         GUI::SameLine();
-        GUI::Dummy(ImVec2(50, 0));
+        GUI::Dummy(ImVec2(24, 0));
         GUI::SameLine();
 
+        // Output pins (right column)
         GUI::BeginGroup();
         if (!outputs.empty())
         {
-            GUI::Text("Outputs:");
             GUI::PushID("Outputs");
             for (size_t i = 0; i < outputs.size(); ++i)
             {
@@ -498,31 +451,26 @@ void RenderGraphEditor::drawNodes()
                 mPinRecords[pinId.Get()] = PinRecord{node.name, pin.name, pin.type, true};
 
                 ed::BeginPin(pinId, ed::PinKind::Output);
-                GUI::Text("%s ->\n", pin.name.c_str());
+                GUI::Text("%s", pin.name.c_str());
+                GUI::SameLine(0, 4);
+                ImGui::TextColored(Theme::Luminograph::kTeal, kIconOutput);
                 ed::EndPin();
 
                 if (GUI::IsItemHovered())
                 {
                     tooltip.show = true;
-                    tooltip.text = "Output: " + pin.name;
+                    tooltip.text = pin.name;
                 }
 
                 GUI::PopID();
             }
             GUI::PopID();
         }
-        else
-        {
-            GUI::TextDisabled("No outputs");
-        }
         GUI::EndGroup();
 
-        GUI::Dummy(ImVec2(280, 10));
         ed::EndNode();
         GUI::PopID();
     }
-
-    GUI::PopStyleColor();
 
     if (!mNodeToFocus.empty())
     {
@@ -542,6 +490,8 @@ void RenderGraphEditor::drawNodes()
 void RenderGraphEditor::drawConnections()
 {
     mLinkKeyById.clear();
+    // ed::Link defaults to pure white — invisible on the light paper background.
+    // Pass teal explicitly plus a 2px thickness so the routes read clearly.
     for (const auto& conn : mEditorConnections)
     {
         const std::string key = makeConnectionKey(conn);
@@ -551,7 +501,7 @@ void RenderGraphEditor::drawConnections()
             continue;
         const ed::LinkId link = makeLinkId(key);
         mLinkKeyById[link.Get()] = key;
-        ed::Link(link, fromPin, toPin);
+        ed::Link(link, fromPin, toPin, Theme::Luminograph::kTeal, 2.0f);
     }
 }
 

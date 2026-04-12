@@ -12,6 +12,7 @@ public:
     void renderUI() override;
 
     void setEnableGammaCorrection(bool enable) { mEnableGammaCorrection = enable; }
+    uint32_t getFrameCount() const { return mFrameCount; }
 
     void setScene(ref<Scene> pScene) override
     {

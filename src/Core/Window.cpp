@@ -1,7 +1,7 @@
 #include <iostream>
 
 #include "Window.h"
-#include "Utils/imgui_spectrum.h"
+#include "Utils/Theme.h"
 
 namespace
 {
@@ -85,13 +85,12 @@ Window::Window(ComPtr<ID3D12Device> device, ComPtr<ID3D12CommandQueue> commandQu
 
 void Window::PrepareResources()
 {
-    // Setup Dear ImGui style
-    ImGui::Spectrum::StyleColorsSpectrum();
-
-    // Setup scaling
+    // Apply Luminograph theme
     ImGuiStyle& style = ImGui::GetStyle();
-    style.ScaleAllSizes(mMainScale); // Bake a fixed style scale. (until we have a solution for dynamic style scaling, changing this
-                                     // requires resetting Style + calling this again)
+    Theme::applyGlobalStyle(style);
+
+    // Bake a fixed style scale for DPI.
+    style.ScaleAllSizes(mMainScale);
     style.FontScaleDpi = mMainScale;
 
     // Setup Platform/Renderer backends
@@ -230,6 +229,17 @@ uint2 Window::GetWindowSize() const
     uint width = static_cast<uint32_t>(clientRect.right - clientRect.left);
     uint height = static_cast<uint32_t>(clientRect.bottom - clientRect.top);
     return uint2(width, height);
+}
+
+void Window::ResizeClientArea(uint32_t clientWidth, uint32_t clientHeight)
+{
+    RECT rc = {0, 0, static_cast<LONG>(clientWidth), static_cast<LONG>(clientHeight)};
+    const DWORD style = static_cast<DWORD>(::GetWindowLongPtr(mHwnd, GWL_STYLE));
+    const DWORD exStyle = static_cast<DWORD>(::GetWindowLongPtr(mHwnd, GWL_EXSTYLE));
+    ::AdjustWindowRectEx(&rc, style, FALSE, exStyle);
+    const int w = rc.right - rc.left;
+    const int h = rc.bottom - rc.top;
+    ::SetWindowPos(mHwnd, nullptr, 0, 0, w, h, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
 void Window::CleanupResources()

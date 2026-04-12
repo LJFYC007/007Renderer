@@ -61,6 +61,11 @@ public:
     ID3D12Resource* GetCurrentDisplayTexture() const;
     uint2 GetWindowSize() const;
 
+    /// Resize the client (non-border) area to the given pixel dimensions.
+    /// Window position is preserved; title bar and border overhead are added
+    /// automatically via AdjustWindowRectEx.
+    void ResizeClientArea(uint32_t clientWidth, uint32_t clientHeight);
+
     // Forward declarations of helper functions
     bool CreateDeviceD3D(HWND hWnd);
     void CleanupDeviceD3D();
