@@ -39,15 +39,35 @@ ErrorMeasure::ErrorMeasure(ref<Device> pDevice) : RenderPass(pDevice)
     mCbPerFrame = mpDevice->getDevice()->createBuffer(cbDesc);
     mpPass = make_ref<ComputePass>(pDevice, "/src/RenderPasses/ErrorMeasure/ErrorMeasure.slang", "main");
     mpPass->addConstantBuffer(mCbPerFrame, &mPerFrameData, sizeof(PerFrameCB));
+}
 
-    // Load reference texture from EXR file
-    std::string refPath = std::string(PROJECT_DIR) + "/media/output.exr";
-    mpReferenceTexture = ExrUtils::loadExrToTexture(pDevice, refPath);
+void ErrorMeasure::setTextureReference(const std::string& path)
+{
+    mpReferenceTexture = ExrUtils::loadExrToTexture(mpDevice, path);
     if (mpReferenceTexture)
     {
-        mWidth = mpReferenceTexture->getDesc().width;
-        mHeight = mpReferenceTexture->getDesc().height;
-        prepareResources(mWidth, mHeight);
+        mReferenceMode = ReferenceMode::Texture;
+        LOG_INFO("ErrorMeasure: loaded reference texture from '{}'", path);
+    }
+    else
+    {
+        LOG_WARN("ErrorMeasure: failed to load '{}', staying in current mode", path);
+    }
+}
+
+void ErrorMeasure::setScene(ref<Scene> pScene)
+{
+    RenderPass::setScene(pScene);
+    if (pScene && pScene->camera)
+    {
+        uint32_t w = pScene->camera->getWidth();
+        uint32_t h = pScene->camera->getHeight();
+        if (w > 0 && h > 0 && (w != mWidth || h != mHeight))
+        {
+            mWidth = w;
+            mHeight = h;
+            prepareResources(mWidth, mHeight);
+        }
     }
 }
 

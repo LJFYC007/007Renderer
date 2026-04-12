@@ -30,7 +30,11 @@ public:
         mConstantReferenceColor = color;
     }
 
+    void setTextureReference(const std::string& path);
+
     void setSelectedOutput(OutputId id) { mSelectedOutput = id; }
+
+    void setScene(ref<Scene> pScene) override;
 
     // RenderGraph interface
     std::string getName() const override { return "ErrorMeasure"; }
@@ -43,7 +47,7 @@ private:
     uint32_t mWidth = 0;
     uint32_t mHeight = 0;
     OutputId mSelectedOutput = OutputId::Difference;
-    ReferenceMode mReferenceMode = ReferenceMode::Texture;
+    ReferenceMode mReferenceMode = ReferenceMode::Constant;
     float3 mConstantReferenceColor = {1.f, 1.f, 1.f};
 
     struct PerFrameCB

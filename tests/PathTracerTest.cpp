@@ -61,6 +61,10 @@ TEST_F(PathTracerTest, Full)
     auto renderGraph = RenderGraphBuilder::createDefaultGraph(mpDevice);
     renderGraph->setScene(scene);
 
+    auto errorMeasure = renderGraph->getPassByName<ErrorMeasure>("ErrorMeasure");
+    ASSERT_NE(errorMeasure, nullptr);
+    errorMeasure->setTextureReference(std::string(PROJECT_DIR) + "/media/reference.exr");
+
     for (uint i = 0; i < spp; ++i)
     {
         scene->camera->calculateCameraParameters();

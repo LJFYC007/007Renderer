@@ -7,6 +7,7 @@
 #include "Scene/Importer/Importer.h"
 #include "RenderPasses/RenderGraphBuilder.h"
 #include "RenderPasses/RenderGraphEditor.h"
+#include "RenderPasses/ErrorMeasure/ErrorMeasure.h"
 #include "Utils/Logger.h"
 #include "Utils/GUI.h"
 #include "Utils/ResourceIO.h"
@@ -55,6 +56,9 @@ int main()
         RenderGraphEditor renderGraphEditor(pDevice);
         auto defaultRenderGraph = RenderGraphBuilder::createDefaultGraph(pDevice);
         defaultRenderGraph->setScene(scene);
+
+        auto errorMeasure = defaultRenderGraph->getPassByName<ErrorMeasure>("ErrorMeasure");
+        errorMeasure->setTextureReference(std::string(PROJECT_DIR) + "/media/output.exr");
 
         // Initialize editor from the default graph (this populates the editor's node/connection lists)
         renderGraphEditor.initializeFromRenderGraph(defaultRenderGraph);
