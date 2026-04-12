@@ -1,6 +1,7 @@
 [submodule "external/nvrhi"]
 	path = external/nvrhi
 	url = https://github.com/NVIDIAGameWorks/nvrhi.git
+	ignore = dirty
 [submodule "external/imgui"]
 	path = external/imgui
 	url = https://github.com/ocornut/imgui
@@ -19,6 +20,7 @@
 [submodule "external/tinyusdz"]
 	path = external/tinyusdz
 	url = git@github.com:lighttransport/tinyusdz.git
+	ignore = dirty
 [submodule "external/DirectXTex"]
 	path = external/DirectXTex
 	url = https://github.com/microsoft/DirectXTex
