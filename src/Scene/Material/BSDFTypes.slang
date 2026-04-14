@@ -11,8 +11,8 @@ enum class BSDFEventType
 struct BSDFSample
 {
     float3 wo;     // Outgoing direction in world space
-    float pdf;     // Solid-angle pdf for wo
-    float3 weight; // f(wi, wo) * abs(cosThetaO) / pdf
+    float pdf;     // Full-mixture solid-angle pdf for wo, consistent with evalPdf()
+    float3 weight; // eval(wi, wo) / evalPdf(wi, wo), i.e. f * |cosTheta_o| / pdf
     BSDFEventType eventType;
 };
 

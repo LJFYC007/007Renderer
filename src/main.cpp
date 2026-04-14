@@ -28,8 +28,8 @@ int main()
 
     // Create imgui window with configuration
     Window::desc windowDesc;
-    windowDesc.width = 2424;
-    windowDesc.height = 1719;
+    windowDesc.width = 2440;
+    windowDesc.height = 1788;
     windowDesc.title = "007Renderer";
     windowDesc.enableVSync = false;
 

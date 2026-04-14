@@ -52,6 +52,9 @@ private:
         uint32_t maxDepth;
         uint32_t frameCount;
         float gColor;
+        uint32_t emissiveTriangleCount;
+        float totalEmissiveArea;
+        uint32_t _cbPadding;
     } mPerFrameData;
 
     nvrhi::BufferHandle mCbPerFrame;

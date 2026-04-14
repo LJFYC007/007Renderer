@@ -5,15 +5,19 @@
 RayTracingPass::RayTracingPass(
     ref<Device> pDevice,
     const std::string& shaderPath,
-    const std::unordered_map<std::string, nvrhi::ShaderType>& entryPoints,
+    const std::vector<std::pair<std::string, nvrhi::ShaderType>>& entryPoints,
     const std::vector<std::pair<std::string, std::string>>& defines
 )
     : Pass(pDevice)
 {
     auto pNvrhiDevice = pDevice->getDevice();
     std::string shaderVersion = getLatestLibVersion();
-    Program program(pNvrhiDevice, std::string(PROJECT_DIR) + shaderPath, entryPoints, shaderVersion, defines);
-    // program.printReflectionInfo();
+
+    std::unordered_map<std::string, nvrhi::ShaderType> entryPointMap;
+    for (const auto& [name, type] : entryPoints)
+        entryPointMap[name] = type;
+
+    Program program(pNvrhiDevice, std::string(PROJECT_DIR) + shaderPath, entryPointMap, shaderVersion, defines);
 
     if (!program.generateBindingLayout())
         LOG_ERROR_RETURN("[RayTracingPass] Failed to generate binding layout from program");
@@ -26,28 +30,45 @@ RayTracingPass::RayTracingPass(
         if (pLayout)
             pipelineDesc.addBindingLayout(pLayout);
 
-    // ScatterRayData layout: float3 radiance(12) + bool terminated(4) + float3 thp(12) + uint pathLength(4)
-    //                        + float3 origin(12) + float3 direction(12) + TinyUniformSampleGenerator(16) = 72 bytes
-    // Bounce loop lives in rayGenMain, so recursion depth is always 1.
-    pipelineDesc.maxPayloadSize = 72;
+    // Must match sizeof(ScatterRayData) in PathTracing.slang.
+    pipelineDesc.maxPayloadSize = 88;
     pipelineDesc.maxAttributeSize = 8;
-    pipelineDesc.maxRecursionDepth = 1;
+    pipelineDesc.maxRecursionDepth = 2;
 
-    // Add shaders with correct export names matching the shader
-    mRayGenShader = program.getShader("rayGenMain");
-    mMissShader = program.getShader("missMain");
-    mClosestHitShader = program.getShader("closestHitMain");
-    pipelineDesc.addShader(nvrhi::rt::PipelineShaderDesc().setShader(mRayGenShader).setExportName("rayGenMain"));
-    pipelineDesc.addShader(nvrhi::rt::PipelineShaderDesc().setShader(mMissShader).setExportName("missMain"));
+    std::vector<std::string> missNames;
+
+    for (const auto& [name, type] : entryPoints)
+    {
+        nvrhi::ShaderHandle shader = program.getShader(name);
+        if (type == nvrhi::ShaderType::RayGeneration)
+        {
+            mRayGenShader = shader;
+            pipelineDesc.addShader(nvrhi::rt::PipelineShaderDesc().setShader(shader).setExportName(name.c_str()));
+        }
+        else if (type == nvrhi::ShaderType::Miss)
+        {
+            mMissShaders.push_back(shader);
+            missNames.push_back(name);
+            pipelineDesc.addShader(nvrhi::rt::PipelineShaderDesc().setShader(shader).setExportName(name.c_str()));
+        }
+        else if (type == nvrhi::ShaderType::ClosestHit)
+        {
+            mClosestHitShader = shader;
+        }
+    }
+
+    // Shadow rays reuse hit group 0 with RAY_FLAG_SKIP_CLOSEST_HIT_SHADER,
+    // so no separate shadow hit group is needed.
     pipelineDesc.addHitGroup(
         nvrhi::rt::PipelineHitGroupDesc().setClosestHitShader(mClosestHitShader).setExportName("closestHitMain").setIsProceduralPrimitive(false)
-    ); // Set to true if using intersection shaders
+    );
 
     LOG_DEBUG(
-        "[RayTracingPass] Creating ray tracing pipeline with {} payload, {} attributes, {} recursion depth",
+        "[RayTracingPass] Creating ray tracing pipeline with {} payload, {} attributes, {} recursion depth, {} miss shaders",
         pipelineDesc.maxPayloadSize,
         pipelineDesc.maxAttributeSize,
-        pipelineDesc.maxRecursionDepth
+        pipelineDesc.maxRecursionDepth,
+        mMissShaders.size()
     );
     mPipeline = pNvrhiDevice->createRayTracingPipeline(pipelineDesc);
     if (!mPipeline)
@@ -57,7 +78,8 @@ RayTracingPass::RayTracingPass(
     // Create shader table with matching export names
     mShaderTable = mPipeline->createShaderTable();
     mShaderTable->setRayGenerationShader("rayGenMain");
-    mShaderTable->addMissShader("missMain");
+    for (const auto& name : missNames)
+        mShaderTable->addMissShader(name.c_str());
     mShaderTable->addHitGroup("closestHitMain");
 }
 

@@ -156,6 +156,113 @@ struct GLTFDielectricBTDF
         eta = _eta;
     }
 
+    // Evaluate f(wi, wo) for an arbitrary (wi, wo) pair (cosine NOT included).
+    // Handles both refraction (wo.z < 0) and total internal reflection (wo.z > 0).
+    float3 eval(const float3 wi, const float3 wo)
+    {
+        if (wi.z < kMinCosTheta)
+            return float3(0.f);
+
+        float alpha2 = alpha * alpha;
+        float eta2 = eta * eta;
+
+        if (wo.z > kMinCosTheta)
+        {
+            // Upper hemisphere: possible TIR reflection
+            float3 h = normalize(wi + wo);
+            if (h.z < 0.f)
+                h = -h;
+            float wiDotH = dot(wi, h);
+            if (wiDotH < kMinCosTheta || dot(wo, h) < kMinCosTheta)
+                return float3(0.f);
+
+            // Only contributes if Snell's law gives TIR
+            float sin2ThetaT = eta2 * (1.f - wiDotH * wiDotH);
+            if (sin2ThetaT < 1.f)
+                return float3(0.f);
+
+            float D = evalNdfGGX(h.z, alpha2);
+            float G1wi = evalG1GGX(wi.z, alpha2);
+            float G1wo = evalG1GGX(wo.z, alpha2);
+            // f = (weight * pdf) / |cos_o|, where weight*pdf = D * G1wi * G1wo / (4 * wi.z)
+            return float3(D * G1wi * G1wo / (4.f * wi.z * wo.z));
+        }
+
+        if (-wo.z < kMinCosTheta)
+            return float3(0.f);
+
+        // Lower hemisphere: refraction
+        float3 h = normalize(eta * wi + wo);
+        if (h.z < 0.f)
+            h = -h;
+
+        float wiDotH = dot(wi, h);
+        float woDotH = dot(wo, h);
+        if (wiDotH < kMinCosTheta || -woDotH < kMinCosTheta)
+            return float3(0.f);
+
+        float sin2ThetaT = eta2 * (1.f - wiDotH * wiDotH);
+        if (sin2ThetaT >= 1.f)
+            return float3(0.f);
+
+        float D = evalNdfGGX(h.z, alpha2);
+        float G1wi = evalG1GGX(wi.z, alpha2);
+        float G1wo = evalG1GGX(abs(wo.z), alpha2);
+        float denom = eta * wiDotH + woDotH;
+        if (abs(denom) < kMinCosTheta)
+            return float3(0.f);
+
+        return float3((1.f / eta2) * D * G1wi * G1wo * wiDotH * abs(woDotH) / (wi.z * abs(wo.z) * denom * denom));
+    }
+
+    // Evaluate the sampling PDF for an arbitrary (wi, wo) pair.
+    float evalPdf(const float3 wi, const float3 wo)
+    {
+        if (wi.z < kMinCosTheta)
+            return 0.f;
+
+        float alpha2 = alpha * alpha;
+        float eta2 = eta * eta;
+
+        if (wo.z > kMinCosTheta)
+        {
+            // Upper hemisphere: TIR reflection PDF
+            float3 h = normalize(wi + wo);
+            if (h.z < 0.f)
+                h = -h;
+            float wiDotH = dot(wi, h);
+            if (wiDotH < kMinCosTheta || dot(wo, h) < kMinCosTheta)
+                return 0.f;
+
+            float sin2ThetaT = eta2 * (1.f - wiDotH * wiDotH);
+            if (sin2ThetaT < 1.f)
+                return 0.f; // Not TIR
+
+            float D = evalNdfGGX(h.z, alpha2);
+            return D * h.z / (4.f * wiDotH);
+        }
+
+        if (-wo.z < kMinCosTheta)
+            return 0.f;
+
+        // Lower hemisphere: refraction PDF
+        float3 h = normalize(eta * wi + wo);
+        if (h.z < 0.f)
+            h = -h;
+
+        float wiDotH = dot(wi, h);
+        float woDotH = dot(wo, h);
+        if (wiDotH < kMinCosTheta || -woDotH < kMinCosTheta)
+            return 0.f;
+
+        float D = evalNdfGGX(h.z, alpha2);
+        float denom = eta * wiDotH + woDotH;
+        if (abs(denom) < kMinCosTheta)
+            return 0.f;
+        float jacobian = abs(woDotH) / (denom * denom);
+        return D * h.z * jacobian;
+    }
+
     bool sampleOrTIR<
         S : ISampleGenerator>(const float3 wi, out bool isTransmission, out float3 wo, out float pdf, out float3 weight, inout S sg)
     {
@@ -200,9 +307,12 @@ struct GLTFDielectricBTDF
 
         float G1wo = evalG1GGX(abs(wo.z), alpha2);
 
-        // Walter et al. Jacobian: |dH/dwo| = |wo·H| / (eta·wi·H + wo·H)^2
         float woDotH = dot(wo, h);
+        if (-woDotH < kMinCosTheta)
+            return false;
         float denom = eta * wiDotH + woDotH;
+        if (abs(denom) < kMinCosTheta)
+            return false;
         float jacobian = abs(woDotH) / (denom * denom);
 
         pdf = D * h.z * jacobian;

@@ -50,7 +50,7 @@ TEST_F(PathTracerTest, Basic)
 TEST_F(PathTracerTest, Full)
 {
     const uint spp = 4096;
-    const float threshold = 0.005f; // Convergence threshold
+    const float threshold = 0.0008f; // Convergence threshold
 
     // ref<Scene> scene = loadSceneWithImporter(std::string(PROJECT_DIR) + "/media/cornell_box.gltf", mpDevice);
     ref<Scene> scene = loadSceneWithImporter(std::string(PROJECT_DIR) + "/media/cornell_box.usdc", mpDevice);

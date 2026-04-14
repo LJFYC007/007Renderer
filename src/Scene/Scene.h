@@ -21,6 +21,14 @@ struct Mesh
     // std::string name;
 };
 
+struct EmissiveTriangle
+{
+    uint32_t triangleIndex; // Global primitive index (PrimitiveIndex() in shader)
+    float area;             // World-space triangle area
+    float cdfUpper;         // Cumulative area / totalArea (upper bound of CDF bin)
+    float _padding;         // Pad to 16 bytes for GPU alignment
+};
+
 class Scene
 {
 public:
@@ -29,6 +37,8 @@ public:
     std::vector<Mesh> meshes;
     std::vector<Material> materials;
     std::vector<uint32_t> triangleToMesh;
+    std::vector<EmissiveTriangle> emissiveTriangles;
+    float totalEmissiveArea = 0.f;
     ref<Camera> camera;
     std::string name;
 
@@ -45,6 +55,8 @@ public:
     nvrhi::BufferHandle getMaterialBuffer() const { return mMaterialBuffer; }
     nvrhi::BufferHandle getMeshBuffer() const { return mMeshBuffer; }
     nvrhi::BufferHandle getTriangleToMeshBuffer() const { return mTriangleToMeshBuffer; }
+    nvrhi::BufferHandle getEmissiveTriangleBuffer() const { return mEmissiveTriangleBuffer; }
+    uint32_t getEmissiveTriangleCount() const { return static_cast<uint32_t>(emissiveTriangles.size()); }
 
     // Get material by index
     const Material& getMaterial(uint32_t index) const
@@ -73,6 +85,7 @@ private:
     nvrhi::BufferHandle mMaterialBuffer;
     nvrhi::BufferHandle mMeshBuffer;
     nvrhi::BufferHandle mTriangleToMeshBuffer;
+    nvrhi::BufferHandle mEmissiveTriangleBuffer;
     nvrhi::rt::AccelStructHandle mBlas;
     nvrhi::rt::AccelStructHandle mTlas;
 };

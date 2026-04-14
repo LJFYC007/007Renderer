@@ -1,5 +1,6 @@
 #include "Scene/Material/Material.slang"
 #include "Scene/Material/TextureSampler.slang"
+#include "Utils/Math/MathConstants.slangh"
 import GGXMicrofacet;
 import Scene.Material.GLTFBSDFs;
 import Utils.Sampling.SampleGeneratorInterface;
@@ -8,6 +9,144 @@ struct UVTransform
 {
     float2 scale;
     float2 offset;
+};
+
+// Fully sampled BSDF instance — all textures resolved, lobe weights computed.
+// Operates in shading-frame local space (wi/wo in tangent frame).
+struct GLTFBSDF
+{
+    float3 baseColor;
+    float metallic;
+    float transmission;
+    float alpha;
+    float eta;
+    float baseBudget;
+    float pSpecular;
+    float pTransmission;
+    float pDiffuse;
+    float3 wi;
+
+    // Evaluate f(wi, wo) * |cos(theta_o)|.
+    float3 eval<S : ISampleGenerator>(float3 wo, inout S sg)
+    {
+        float3 result = float3(0.f);
+
+        if (wo.z > kMinCosTheta)
+        {
+            GLTFSpecularBRDF specularBRDF = GLTFSpecularBRDF(baseColor, metallic, alpha, eta);
+            result += specularBRDF.eval(wi, wo, sg) * wo.z;
+
+            GLTFDiffuseBRDF diffuseBRDF = GLTFDiffuseBRDF(baseColor, metallic, eta);
+            result += (1.f - transmission) * diffuseBRDF.eval(wi, wo, sg) * wo.z;
+
+            if (transmission > 0.f)
+            {
+                GLTFDielectricBTDF btdf = GLTFDielectricBTDF(alpha, eta);
+                result += baseBudget * transmission * btdf.eval(wi, wo) * wo.z;
+            }
+        }
+        else if (wo.z < -kMinCosTheta)
+        {
+            if (transmission > 0.f)
+            {
+                GLTFDielectricBTDF btdf = GLTFDielectricBTDF(alpha, eta);
+                result += baseBudget * transmission * baseColor * btdf.eval(wi, wo) * (-wo.z);
+            }
+        }
+
+        return result;
+    }
+
+    // Evaluate the mixture solid-angle PDF.
+    float evalPdf(float3 wo)
+    {
+        float pdf = 0.f;
+        float alpha2 = alpha * alpha;
+
+        if (wo.z > kMinCosTheta)
+        {
+            if (pSpecular > 0.f)
+            {
+                float3 h = normalize(wi + wo);
+                if (h.z > 0.f && dot(wi, h) > kMinCosTheta && dot(wo, h) > kMinCosTheta)
+                {
+                    float D = evalNdfGGX(h.z, alpha2);
+                    pdf += pSpecular * D * h.z / (4.f * abs(dot(wo, h)));
+                }
+            }
+
+            if (pDiffuse > 0.f)
+                pdf += pDiffuse * wo.z * INV_PI;
+
+            if (pTransmission > 0.f)
+            {
+                GLTFDielectricBTDF btdf = GLTFDielectricBTDF(alpha, eta);
+                pdf += pTransmission * btdf.evalPdf(wi, wo);
+            }
+        }
+        else if (wo.z < -kMinCosTheta)
+        {
+            if (pTransmission > 0.f)
+            {
+                GLTFDielectricBTDF btdf = GLTFDielectricBTDF(alpha, eta);
+                pdf += pTransmission * btdf.evalPdf(wi, wo);
+            }
+        }
+
+        return pdf;
+    }
+
+    // Sample a direction. Returns local-space wo in the BSDFSample.
+    BSDFSample sample<S : ISampleGenerator>(inout S sg)
+    {
+        BSDFSample result;
+        result.pdf = 0.f;
+        result.weight = float3(0.f);
+        result.wo = float3(0.f);
+        result.eventType = BSDFEventType.Reflection;
+
+        float3 woLocal;
+        float uSelect = sampleNext1D(sg);
+        float lobePdf;
+        float3 lobeWeight;
+
+        if (uSelect < pSpecular)
+        {
+            GLTFSpecularBRDF specularBRDF = GLTFSpecularBRDF(baseColor, metallic, alpha, eta);
+            if (pSpecular > 0.f && specularBRDF.sample(wi, woLocal, lobePdf, lobeWeight, sg))
+            {
+                result.wo = woLocal;
+                result.eventType = BSDFEventType.Reflection;
+                result.pdf = lobePdf;
+                result.weight = lobeWeight;
+            }
+        }
+        else if (uSelect < pSpecular + pTransmission)
+        {
+            GLTFDielectricBTDF btdf = GLTFDielectricBTDF(alpha, eta);
+            bool isTransmission;
+            if (pTransmission > 0.f && btdf.sampleOrTIR(wi, isTransmission, woLocal, lobePdf, lobeWeight, sg))
+            {
+                result.wo = woLocal;
+                result.eventType = isTransmission ? BSDFEventType.Transmission : BSDFEventType.Reflection;
+                result.pdf = lobePdf;
+                result.weight = lobeWeight;
+            }
+        }
+        else
+        {
+            GLTFDiffuseBRDF diffuseBRDF = GLTFDiffuseBRDF(baseColor, metallic, eta);
+            if (pDiffuse > 0.f && diffuseBRDF.sample(wi, woLocal, lobePdf, lobeWeight, sg))
+            {
+                result.wo = woLocal;
+                result.eventType = BSDFEventType.Reflection;
+                result.pdf = lobePdf;
+                result.weight = lobeWeight;
+            }
+        }
+
+        return result;
+    }
 };
 
 struct GLTFMaterial : IMaterial
@@ -71,90 +210,36 @@ struct GLTFMaterial : IMaterial
         sd.B = B;
     }
 
+    GLTFBSDF prepareBSDF(const ShadingData sd)
+    {
+        GLTFBSDF bsdf;
+        bsdf.wi = sd.toLocal(sd.V);
+
+        bsdf.baseColor = sampleBaseColor(baseColorTextureId, applyUV(sd.uv, baseColorUV), baseColor);
+        bsdf.metallic = sampleMetallic(metallicTextureId, applyUV(sd.uv, metallicUV), metallic);
+        float sampledRoughness = sampleRoughness(roughnessTextureId, applyUV(sd.uv, roughnessUV), roughness);
+        bsdf.transmission = sampleTransmission(transmissionTextureId, applyUV(sd.uv, transmissionUV), transmissionFactor);
+        bsdf.alpha = max(kMinGGXAlpha, sampledRoughness * sampledRoughness);
+
+        float dielectricWeight = 1.0f - bsdf.metallic;
+        bsdf.eta = sd.frontFacing ? (1.0f / ior) : ior;
+
+        // baseBudget = (1-metallic)*(1-macroF): energy reaching the base layer.
+        // The BTDF core has no internal Fresnel, so it must be weighted by this
+        // to avoid double-counting TIR energy captured by specular micro-Fresnel.
+        float macroF = evalFresnelDielectric(bsdf.wi.z, bsdf.eta);
+        bsdf.baseBudget = dielectricWeight * (1.0f - macroF);
+        bsdf.pSpecular = bsdf.metallic + dielectricWeight * macroF;
+        bsdf.pTransmission = bsdf.baseBudget * bsdf.transmission;
+        bsdf.pDiffuse = bsdf.baseBudget * (1.0f - bsdf.transmission);
+
+        return bsdf;
+    }
+
     BSDFSample scatter<S : ISampleGenerator>(const ShadingData sd, inout S sg)
     {
-        BSDFSample sample;
-        sample.pdf = 0.0f;
-        sample.weight = float3(0.0f);
-        sample.wo = float3(0.0f);
-        sample.eventType = BSDFEventType.Reflection;
-
-        float3 wiLocal = sd.toLocal(sd.V);
-        float3 woLocal;
-
-        float3 sampledBaseColor = sampleBaseColor(baseColorTextureId, applyUV(sd.uv, baseColorUV), baseColor);
-        float sampledMetallic = sampleMetallic(metallicTextureId, applyUV(sd.uv, metallicUV), metallic);
-        float sampledRoughness = sampleRoughness(roughnessTextureId, applyUV(sd.uv, roughnessUV), roughness);
-        float sampledTransmission = sampleTransmission(transmissionTextureId, applyUV(sd.uv, transmissionUV), transmissionFactor);
-        float alpha = max(kMinGGXAlpha, sampledRoughness * sampledRoughness);
-
-        float uSelect = sampleNext1D(sg);
-        float pdf;
-        float3 weight;
-
-        float dielectricWeight = 1.0f - sampledMetallic;
-        float eta = sd.frontFacing ? (1.0f / ior) : ior;
-
-        // Dielectric macro-Fresnel steers non-metal energy between the interface
-        // and the base layer (diffuse and/or transmission), while metallic energy
-        // stays purely specular. Applies to opaque dielectrics too — otherwise the
-        // specular highlight on non-metals would never be sampled.
-        float cosI = wiLocal.z;
-        float macroF = evalFresnelDielectric(cosI, eta);
-
-        float baseBudget = dielectricWeight * (1.0f - macroF);
-        float pSpecular = sampledMetallic + dielectricWeight * macroF;
-        float pTransmission = baseBudget * sampledTransmission;
-        float pDiffuse = baseBudget * (1.0f - sampledTransmission);
-
-        if (uSelect < pSpecular)
-        {
-            // Specular lobe: the BRDF already blends metallic/dielectric via lerped F0,
-            // so its weight is the full specular contribution — no extra mixing needed.
-            GLTFSpecularBRDF specularBRDF = GLTFSpecularBRDF(sampledBaseColor, sampledMetallic, alpha, eta);
-            if (pSpecular > 0.0f && specularBRDF.sample(wiLocal, woLocal, pdf, weight, sg))
-            {
-                sample.pdf = pdf * pSpecular;
-                sample.weight = weight / pSpecular;
-                sample.wo = sd.toWorld(woLocal);
-            }
-        }
-        else if (uSelect < pSpecular + pTransmission)
-        {
-            // Transmission lobe: the BTDF returns the core microfacet weight.
-            // We apply the mixing factors: (1-metallic) * transmission * baseColor.
-            GLTFDielectricBTDF btdf = GLTFDielectricBTDF(alpha, eta);
-            bool isTransmission;
-            if (pTransmission > 0.0f && btdf.sampleOrTIR(wiLocal, isTransmission, woLocal, pdf, weight, sg))
-            {
-                sample.pdf = pdf * pTransmission;
-                sample.wo = sd.toWorld(woLocal);
-                if (isTransmission)
-                {
-                    sample.eventType = BSDFEventType.Transmission;
-                    sample.weight = dielectricWeight * sampledTransmission * sampledBaseColor * weight / pTransmission;
-                }
-                else
-                {
-                    // TIR: light reflects without entering the medium, so no baseColor tint.
-                    sample.eventType = BSDFEventType.Reflection;
-                    sample.weight = dielectricWeight * sampledTransmission * weight / pTransmission;
-                }
-            }
-        }
-        else
-        {
-            // Diffuse lobe: the BRDF returns (1-F)*cDiff (with cDiff = (1-metallic)*baseColor).
-            // We must apply the missing (1-transmission) factor to match the full BSDF.
-            GLTFDiffuseBRDF diffuseBRDF = GLTFDiffuseBRDF(sampledBaseColor, sampledMetallic, eta);
-            if (pDiffuse > 0.0f && diffuseBRDF.sample(wiLocal, woLocal, pdf, weight, sg))
-            {
-                sample.pdf = pdf * pDiffuse;
-                sample.weight = (1.0f - sampledTransmission) * weight / pDiffuse;
-                sample.wo = sd.toWorld(woLocal);
-            }
-        }
-
-        return sample;
+        BSDFSample result = prepareBSDF(sd).sample(sg);
+        result.wo = sd.toWorld(result.wo);
+        return result;
     }
 };

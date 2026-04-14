@@ -58,10 +58,14 @@ A DAG of `RenderPass` nodes connected by named typed ports (`RenderPassInput`/`R
 Slang files live under `src/Scene/`, `src/Scene/Material/`, `src/RenderPasses/*/`, and `src/Utils/`. The pipeline is layered by responsibility:
 
 - **Geometry stage** (`VertexData` → `ShadingPrep` → `ShadingData`): produces a geometry-only surface. No normal map, no back-face flip — those are material decisions. `ShadingData` keeps immutable geometric references (`faceN`, `tangentW`) separate from the mutable shading frame (`T/B/N`).
-- **Material stage** (`Material/`): `IMaterial` interface with `GLTFMaterial` as the concrete implementation. The material owns `prepareShadingFrame()` (normal mapping, back-face handling) and `scatter()` (BSDF sampling). BSDF math lives in `GLTFBSDFs` / `GGXMicrofacet`; sample validation in `BSDFTypes::isValidScatter()`.
+- **Material stage** (`Material/`): `IMaterial` interface with `GLTFMaterial` as the concrete implementation. The material owns `prepareShadingFrame()` (normal mapping, back-face handling) and a **Material → BSDF pipeline**: `prepareBSDF(sd)` samples all textures once and returns a `GLTFBSDF` that owns `eval(wo)`, `evalPdf(wo)`, and `sample(sg)` in shading-frame local space. **Callers must hoist `prepareBSDF()` once per hit and call methods on the returned `GLTFBSDF` directly** — each call re-samples 4 textures, so calling `material.scatter()` and then evaluating again via a second `prepareBSDF()` is a perf bug. `GLTFMaterial::scatter()` remains only to satisfy `IMaterial` (used by furnace mode). Per-lobe BSDF math lives in `GLTFBSDFs` / `GGXMicrofacet`; sample validation in `BSDFTypes::isValidScatter()`.
 - **Orchestration** (`PathTracing.slang`): stays thin — fetch hit data, call `prepareShadingData()`, let the material refine the frame, validate, spawn next ray.
 
 **Critical rule:** never substitute `faceN` for shading normal `N`. `faceN` is for sidedness checks and ray offsets; `N` is for BSDF evaluation.
+
+**Shadow / visibility rays must offset both endpoints.** `computeRayOrigin(pos, normal)` (in `Ray.slang`, Wächter & Binder integer-offset method) pushes a point slightly off a surface along `normal`. For NEE shadow rays, offset the origin along the shading surface's oriented face normal *and* the target along the light's face normal oriented toward the shading point. This matches PBRT4's `SpawnRayTo(pFrom, nFrom, pTo, nTo)`. Offsetting only the origin causes false occlusion for nearly-coplanar shading/light points (e.g., ceiling points near a ceiling light) because the ray travels at a shallow angle from below the surface to a point sitting on it, clipping through geometry in between.
+
+**Light sampling (NEE + MIS).** `Scene` collects emissive triangles into an area-weighted CDF at scene-load (`EmissiveTriangle` struct mirrored in `Scene.h` and `Scene.slang`). `LightSampler.slang` exposes `sampleLight()` (area-measure, 1/totalArea constant pdf) and `evalLightPdf()` (solid-angle conversion for MIS). `PathTracing.slang` combines NEE direct lighting with BSDF scattering using the balance heuristic; see the MIS blocks in `closestHitMain`. Emissive hits at bounce 0 accumulate unweighted (camera-direct), later bounces weight by BSDF-pdf-share.
 
 `Scene.slang` exposes the GPU scene as `ParameterBlock<Scene> gScene` with `StructuredBuffer<>` for mesh/material data; material textures are bindless via `ParameterBlock<MaterialTextures> gMaterialTextures`.
 
@@ -69,7 +73,7 @@ Slang files live under `src/Scene/`, `src/Scene/Material/`, `src/RenderPasses/*/
 
 ### Utils (`src/Utils/`)
 
-GUI (`GUI`, `GUIWrapper`, `imgui_spectrum` theming), logging (`Logger`), image I/O (`ExrUtils`, `ResourceIO`), math (`Math/`, including `MathConstants.slangh`), and sampling (`Sampling/SampleGenerator` with a Slang interface).
+GUI (`GUI` namespace + `GUIManager` class in `GUI.h`; shared `Widgets`; `Theme::Luminograph` palette in `Theme.h`), logging (`Logger`), image I/O (`ExrUtils`, `ResourceIO`), math (`Math/`, including `MathConstants.slangh`), and sampling (`Sampling/SampleGenerator` with a Slang interface).
 
 ## Naming Conventions (Falcor-style)
 
@@ -80,6 +84,8 @@ GUI (`GUI`, `GUIWrapper`, `imgui_spectrum` theming), logging (`Logger`), image I
 - Function pointer params: `p` prefix (`pProgram`, `pState`)
 - File/class/public method names: PascalCase
 - Private variables/methods: camelCase
+
+**Exception:** GPU-alignment padding fields in structs mirrored between C++ and Slang use the `_padding` / `_cbPadding` naming (leading underscore). These are not real members — they exist only to make `sizeof` match the 16-byte GPU layout — and the underscore marks them as "do not touch" for readers.
 
 ## Patching External Dependencies
 
@@ -109,6 +115,8 @@ Single root `CMakeLists.txt` (no nested CMakeLists under `src/` or `tests/`). So
 ## Testing
 
 Tests live in `tests/`. The shared test environment is set up in `tests/Environment.cpp` (device, logger, ImGui context initialization shared across test cases).
+
+**Always run the full test suite (`run_tests`) during development.** The `run_tests_ci` target is only for GitHub Actions — it excludes the `Full` convergence tests that catch real rendering regressions.
 
 **Test inventory** (11 total, 9 non-Full):
 - `PathTracerTest`: Basic (4 spp smoke), Full (4096 spp + error threshold, writes `output.exr`), WhiteFurnaceFull (1024 spp × roughness sweep)

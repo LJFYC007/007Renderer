@@ -10,7 +10,7 @@ public:
     RayTracingPass(
         ref<Device> pDevice,
         const std::string& shaderPath,
-        const std::unordered_map<std::string, nvrhi::ShaderType>& entryPoints,
+        const std::vector<std::pair<std::string, nvrhi::ShaderType>>& entryPoints,
         const std::vector<std::pair<std::string, std::string>>& defines = {}
     );
 
@@ -20,7 +20,7 @@ private:
     std::string getLatestLibVersion();
 
     nvrhi::ShaderHandle mRayGenShader;
-    nvrhi::ShaderHandle mMissShader;
+    std::vector<nvrhi::ShaderHandle> mMissShaders;
     nvrhi::ShaderHandle mClosestHitShader;
     nvrhi::rt::ShaderTableHandle mShaderTable;
     nvrhi::rt::PipelineHandle mPipeline;

@@ -152,13 +152,80 @@ void Scene::buildAccelStructs()
 
     commandList->buildTopLevelAccelStruct(mTlas, &instanceDesc, 1);
 
+    // --- Collect emissive triangles and build area-weighted CDF ---
+    emissiveTriangles.clear();
+    totalEmissiveArea = 0.f;
+    uint32_t numTriangles = static_cast<uint32_t>(triangleToMesh.size());
+    for (uint32_t triIdx = 0; triIdx < numTriangles; triIdx++)
+    {
+        uint32_t meshIdx = triangleToMesh[triIdx];
+        uint32_t matIdx = meshes[meshIdx].materialIndex;
+        const Material& mat = materials[matIdx];
+
+        bool isEmissive = (mat.emissiveFactor.r > 0.f || mat.emissiveFactor.g > 0.f || mat.emissiveFactor.b > 0.f);
+        if (!isEmissive)
+            continue;
+
+        uint32_t i0 = indices[triIdx * 3 + 0];
+        uint32_t i1 = indices[triIdx * 3 + 1];
+        uint32_t i2 = indices[triIdx * 3 + 2];
+        float3 p0(vertices[i0].position[0], vertices[i0].position[1], vertices[i0].position[2]);
+        float3 p1(vertices[i1].position[0], vertices[i1].position[1], vertices[i1].position[2]);
+        float3 p2(vertices[i2].position[0], vertices[i2].position[1], vertices[i2].position[2]);
+        float area = 0.5f * glm::length(glm::cross(p1 - p0, p2 - p0));
+
+        if (area > 0.f)
+        {
+            EmissiveTriangle et;
+            et.triangleIndex = triIdx;
+            et.area = area;
+            et.cdfUpper = 0.f;
+            et._padding = 0.f;
+            emissiveTriangles.push_back(et);
+            totalEmissiveArea += area;
+        }
+    }
+
+    // Build CDF (cumulative area / totalArea)
+    if (!emissiveTriangles.empty() && totalEmissiveArea > 0.f)
+    {
+        float runningSum = 0.f;
+        for (auto& et : emissiveTriangles)
+        {
+            runningSum += et.area;
+            et.cdfUpper = runningSum / totalEmissiveArea;
+        }
+        // Ensure last entry is exactly 1.0 (avoid floating-point drift)
+        emissiveTriangles.back().cdfUpper = 1.f;
+    }
+
+    // Always create the buffer (shader reflection expects the binding even if empty).
+    // Use a single dummy entry when there are no emissive triangles.
+    EmissiveTriangle dummy = {0, 0.f, 0.f, 0.f};
+    std::vector<EmissiveTriangle> dummyVec = {dummy};
+    const auto* pBufferData = emissiveTriangles.empty() ? &dummyVec : &emissiveTriangles;
+
+    size_t emissiveBufferSize = pBufferData->size() * sizeof(EmissiveTriangle);
+    nvrhi::BufferDesc emissiveBufferDesc = nvrhi::BufferDesc()
+                                               .setByteSize(emissiveBufferSize)
+                                               .setInitialState(nvrhi::ResourceStates::ShaderResource)
+                                               .setKeepInitialState(true)
+                                               .setDebugName("Scene Emissive Triangle Buffer")
+                                               .setCanHaveRawViews(true)
+                                               .setStructStride(sizeof(EmissiveTriangle));
+    mEmissiveTriangleBuffer = nvrhiDevice->createBuffer(emissiveBufferDesc);
+    if (!mEmissiveTriangleBuffer)
+        LOG_ERROR_RETURN("Failed to create emissive triangle buffer");
+    commandList->writeBuffer(mEmissiveTriangleBuffer, pBufferData->data(), emissiveBufferSize);
+
     commandList->close();
     nvrhiDevice->executeCommandList(commandList);
     LOG_INFO(
-        "Successfully initialized geometry ({} vertices, {} indices, {} meshes, {} materials)",
+        "Successfully initialized geometry ({} vertices, {} indices, {} meshes, {} materials, {} emissive triangles)",
         vertices.size(),
         indices.size(),
         meshes.size(),
-        materials.size()
+        materials.size(),
+        emissiveTriangles.size()
     );
 }

@@ -49,8 +49,11 @@ PathTracingPass::PathTracingPass(ref<Device> pDevice) : RenderPass(pDevice)
 void PathTracingPass::buildRayTracingPass()
 {
     LOG_DEBUG("[PathTracingPass] Recompiling path tracing shader program (furnaceMode={})", static_cast<uint32_t>(mFurnaceMode));
-    std::unordered_map<std::string, nvrhi::ShaderType> entryPoints = {
-        {"rayGenMain", nvrhi::ShaderType::RayGeneration}, {"missMain", nvrhi::ShaderType::Miss}, {"closestHitMain", nvrhi::ShaderType::ClosestHit}
+    std::vector<std::pair<std::string, nvrhi::ShaderType>> entryPoints = {
+        {"rayGenMain", nvrhi::ShaderType::RayGeneration},
+        {"missMain", nvrhi::ShaderType::Miss},
+        {"shadowMissMain", nvrhi::ShaderType::Miss},
+        {"closestHitMain", nvrhi::ShaderType::ClosestHit}
     };
     std::vector<std::pair<std::string, std::string>> defines;
     if (mFurnaceMode == FurnaceMode::WeakWhiteFurnace)
@@ -86,6 +89,8 @@ RenderData PathTracingPass::execute(const RenderData& input)
     mPerFrameData.maxDepth = mMaxDepth;
     mPerFrameData.frameCount = ++mFrameCount;
     mPerFrameData.gColor = mGColorSlider;
+    mPerFrameData.emissiveTriangleCount = mpScene->getEmissiveTriangleCount();
+    mPerFrameData.totalEmissiveArea = mpScene->totalEmissiveArea;
 
     RenderData output;
     output.setResource("output", mTextureOut);
@@ -97,6 +102,7 @@ RenderData PathTracingPass::execute(const RenderData& input)
     (*mpPass)["gScene.triangleToMesh"] = mpScene->getTriangleToMeshBuffer();
     (*mpPass)["gScene.materials"] = mpScene->getMaterialBuffer();
     (*mpPass)["gScene.rtAccel"] = mpScene->getTLAS();
+    (*mpPass)["gScene.emissiveTriangles"] = mpScene->getEmissiveTriangleBuffer();
 
     // Bind all textures to descriptor table for bindless access
     // Pass default texture to fill unused slots
