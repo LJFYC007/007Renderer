@@ -4,9 +4,9 @@
 
 #include "Scene/Importer/Importer.h"
 #include "RenderPasses/RenderGraphBuilder.h"
-#include "RenderPasses/PathTracingPass/PathTracingPass.h"
-#include "RenderPasses/AccumulatePass/AccumulatePass.h"
-#include "RenderPasses/ErrorMeasure/ErrorMeasure.h"
+#include "RenderPasses/PathTracingPass/PathTracing.h"
+#include "RenderPasses/AccumulatePass/Accumulate.h"
+#include "RenderPasses/ErrorMeasurePass/ErrorMeasure.h"
 #include "Utils/ExrUtils.h"
 #include "Environment.h"
 
@@ -111,17 +111,25 @@ TEST_F(PathTracerTest, WhiteFurnaceFull)
             mat.roughnessFactor = roughness;
         scene->buildAccelStructs();
 
-        // Create and configure render graph
-        auto renderGraph = RenderGraphBuilder::createDefaultGraph(mpDevice);
+        // Build a custom graph that bypasses ToneMapping — the weak furnace test
+        // validates BRDF energy conservation in linear radiance space, and the gamma
+        // curve in ToneMappingPass would distort the error magnitudes the threshold
+        // is calibrated against.
+        std::vector<RenderGraphNode> nodes;
+        nodes.emplace_back("PathTracing", make_ref<PathTracingPass>(mpDevice));
+        nodes.emplace_back("Accumulate", make_ref<AccumulatePass>(mpDevice));
+        nodes.emplace_back("ErrorMeasure", make_ref<ErrorMeasure>(mpDevice));
+        nodes.emplace_back("TextureAverage", make_ref<TextureAverage>(mpDevice));
+        std::vector<RenderGraphConnection> connections;
+        connections.emplace_back("PathTracing", "output", "Accumulate", "input");
+        connections.emplace_back("Accumulate", "output", "ErrorMeasure", "source");
+        connections.emplace_back("ErrorMeasure", "output", "TextureAverage", "input");
+        auto renderGraph = RenderGraph::create(mpDevice, nodes, connections);
 
         auto pathTracing = renderGraph->getPassByName<PathTracingPass>("PathTracing");
         ASSERT_NE(pathTracing, nullptr);
         pathTracing->setMissColor(1.0f);
         pathTracing->setFurnaceMode(FurnaceMode::WeakWhiteFurnace);
-
-        auto accumulate = renderGraph->getPassByName<AccumulatePass>("Accumulate");
-        ASSERT_NE(accumulate, nullptr);
-        accumulate->setEnableGammaCorrection(false);
 
         auto errorMeasure = renderGraph->getPassByName<ErrorMeasure>("ErrorMeasure");
         ASSERT_NE(errorMeasure, nullptr);

@@ -37,7 +37,7 @@ ErrorMeasure::ErrorMeasure(ref<Device> pDevice) : RenderPass(pDevice)
     cbDesc.isVolatile = true;
     cbDesc.debugName = "ErrorMeasure/PerFrameCB";
     mCbPerFrame = mpDevice->getDevice()->createBuffer(cbDesc);
-    mpPass = make_ref<ComputePass>(pDevice, "/src/RenderPasses/ErrorMeasure/ErrorMeasure.slang", "main");
+    mpPass = make_ref<ComputePass>(pDevice, "/src/RenderPasses/ErrorMeasurePass/ErrorMeasure.slang", "main");
     mpPass->addConstantBuffer(mCbPerFrame, &mPerFrameData, sizeof(PerFrameCB));
 }
 

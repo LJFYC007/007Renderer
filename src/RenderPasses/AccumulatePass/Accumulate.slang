@@ -8,7 +8,6 @@ cbuffer PerFrameCB
     uint gHeight;
     uint frameCount;
     bool reset;
-    uint enableGamma;
 };
 
 [shader("compute")]
@@ -23,7 +22,4 @@ void main(uint3 dispatchThreadID: SV_DispatchThreadID)
 
     accumulateTexture[id] += input[id];
     output[id] = accumulateTexture[id] / frameCount;
-
-    if (enableGamma)
-        output[id].xyz = pow(output[id].xyz, float3(1.f / 2.2f));
 }

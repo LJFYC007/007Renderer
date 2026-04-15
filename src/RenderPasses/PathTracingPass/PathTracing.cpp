@@ -1,4 +1,4 @@
-#include "PathTracingPass.h"
+#include "PathTracing.h"
 #include "Utils/Logger.h"
 #include "Utils/ResourceIO.h"
 

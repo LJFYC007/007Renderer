@@ -12,7 +12,7 @@
 #include "Scene/Scene.h"
 #include "Scene/Camera/Camera.h"
 #include "RenderPasses/RenderGraphEditor.h"
-#include "RenderPasses/AccumulatePass/AccumulatePass.h"
+#include "RenderPasses/AccumulatePass/Accumulate.h"
 
 namespace GUI
 {

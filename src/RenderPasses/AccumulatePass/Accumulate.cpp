@@ -1,4 +1,4 @@
-#include "AccumulatePass.h"
+#include "Accumulate.h"
 #include "Utils/ResourceIO.h"
 #include "Utils/Math/Math.h"
 
@@ -36,7 +36,7 @@ AccumulatePass::AccumulatePass(ref<Device> pDevice) : RenderPass(pDevice)
     cbDesc.debugName = "AccumulatePass/PerFrameCB";
     mCbPerFrame = mpDevice->getDevice()->createBuffer(cbDesc);
 
-    mpPass = make_ref<ComputePass>(pDevice, "/src/RenderPasses/AccumulatePass/AccumulatePass.slang", "main");
+    mpPass = make_ref<ComputePass>(pDevice, "/src/RenderPasses/AccumulatePass/Accumulate.slang", "main");
     mpPass->addConstantBuffer(mCbPerFrame, &mPerFrameData, sizeof(PerFrameCB));
 }
 
@@ -67,7 +67,6 @@ RenderData AccumulatePass::execute(const RenderData& renderData)
     mPerFrameData.gWidth = mWidth;
     mPerFrameData.gHeight = mHeight;
     mPerFrameData.reset = mReset;
-    mPerFrameData.enableGamma = mEnableGammaCorrection ? 1 : 0;
     if (mReset)
     {
         mFrameCount = 0;

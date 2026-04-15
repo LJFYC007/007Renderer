@@ -1,9 +1,3 @@
-cbuffer PerFrameCB
-{
-    uint gWidth;
-    uint gHeight;
-};
-
 Texture2D<float4> inputTexture;
 RWStructuredBuffer<float4> resultBuffer;
 
@@ -14,6 +8,9 @@ static const uint kTileHeight = 16;
 [numthreads(1, 1, 1)]
 void main(uint3 dispatchThreadId: SV_DispatchThreadID)
 {
+    uint gWidth, gHeight;
+    inputTexture.GetDimensions(gWidth, gHeight);
+
     const uint tilesX = (gWidth + kTileWidth - 1) / kTileWidth;
     const uint tilesY = (gHeight + kTileHeight - 1) / kTileHeight;
 

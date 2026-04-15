@@ -20,15 +20,8 @@ public:
     float4 getAverageResult() const { return mAverageResult; }
 
 private:
-    struct PerFrameCB
-    {
-        uint32_t gWidth;
-        uint32_t gHeight;
-    } mPerFrameData;
-
     float4 mAverageResult;
 
-    nvrhi::BufferHandle mCbPerFrame;
     nvrhi::BufferHandle mResultBuffer;
     size_t mResultBufferSize = 0;
     ref<ComputePass> mpPass;

@@ -31,18 +31,7 @@ constexpr uint32_t kTileHeight = 16;
 
 TextureAverage::TextureAverage(ref<Device> pDevice) : RenderPass(pDevice)
 {
-    nvrhi::BufferDesc cbDesc;
-    cbDesc.byteSize = sizeof(PerFrameCB);
-    cbDesc.isConstantBuffer = true;
-    cbDesc.initialState = nvrhi::ResourceStates::ConstantBuffer;
-    cbDesc.keepInitialState = true;
-    cbDesc.cpuAccess = nvrhi::CpuAccessMode::None;
-    cbDesc.isVolatile = true;
-    cbDesc.debugName = "Utils/TextureAverage/PerFrameCB";
-    mCbPerFrame = mpDevice->getDevice()->createBuffer(cbDesc);
-
     mpPass = make_ref<ComputePass>(pDevice, "/src/RenderPasses/Utils/TextureAverage/TextureAverage.slang", "main");
-    mpPass->addConstantBuffer(mCbPerFrame, &mPerFrameData, sizeof(PerFrameCB));
     mAverageResult = float4(0.0f);
 }
 
@@ -79,10 +68,6 @@ RenderData TextureAverage::execute(const RenderData& renderData)
         return RenderData();
     }
 
-    // Update constant buffer with texture dimensions
-    mPerFrameData.gWidth = mWidth;
-    mPerFrameData.gHeight = mHeight;
-
     const uint32_t tilesX = (mWidth + kTileWidth - 1) / kTileWidth;
     const uint32_t tilesY = (mHeight + kTileHeight - 1) / kTileHeight;
     const size_t tileCount = static_cast<size_t>(tilesX) * static_cast<size_t>(tilesY);
@@ -103,7 +88,6 @@ RenderData TextureAverage::execute(const RenderData& renderData)
     }
 
     // Bind resources to compute pass
-    (*mpPass)["PerFrameCB"] = mCbPerFrame;
     (*mpPass)["inputTexture"] = mpInputTexture;
     (*mpPass)["resultBuffer"] = mResultBuffer;
 

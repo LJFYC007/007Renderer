@@ -11,7 +11,6 @@ public:
 
     void renderUI() override;
 
-    void setEnableGammaCorrection(bool enable) { mEnableGammaCorrection = enable; }
     uint32_t getFrameCount() const { return mFrameCount; }
 
     void setScene(ref<Scene> pScene) override
@@ -33,7 +32,6 @@ private:
     uint32_t mHeight = 0;
     uint32_t mFrameCount = 0;
     bool mReset = false;
-    bool mEnableGammaCorrection = true;
 
     struct PerFrameCB
     {
@@ -41,7 +39,6 @@ private:
         uint32_t gHeight;
         uint32_t frameCount;
         uint32_t reset;
-        uint32_t enableGamma;
     } mPerFrameData;
 
     nvrhi::BufferHandle mCbPerFrame;

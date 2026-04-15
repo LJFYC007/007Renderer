@@ -7,7 +7,7 @@
 #include "Scene/Importer/Importer.h"
 #include "RenderPasses/RenderGraphBuilder.h"
 #include "RenderPasses/RenderGraphEditor.h"
-#include "RenderPasses/ErrorMeasure/ErrorMeasure.h"
+#include "RenderPasses/ErrorMeasurePass/ErrorMeasure.h"
 #include "Utils/Logger.h"
 #include "Utils/GUI.h"
 #include "Utils/ResourceIO.h"
