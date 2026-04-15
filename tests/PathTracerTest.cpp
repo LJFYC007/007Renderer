@@ -61,7 +61,7 @@ TEST_F(PathTracerTest, Full)
     auto renderGraph = RenderGraphBuilder::createDefaultGraph(mpDevice);
     renderGraph->setScene(scene);
 
-    auto errorMeasure = renderGraph->getPassByName<ErrorMeasure>("ErrorMeasure");
+    auto errorMeasure = renderGraph->getPassByName<ErrorMeasurePass>("ErrorMeasure");
     ASSERT_NE(errorMeasure, nullptr);
     errorMeasure->setTextureReference(std::string(PROJECT_DIR) + "/media/reference.exr");
 
@@ -118,7 +118,7 @@ TEST_F(PathTracerTest, WhiteFurnaceFull)
         std::vector<RenderGraphNode> nodes;
         nodes.emplace_back("PathTracing", make_ref<PathTracingPass>(mpDevice));
         nodes.emplace_back("Accumulate", make_ref<AccumulatePass>(mpDevice));
-        nodes.emplace_back("ErrorMeasure", make_ref<ErrorMeasure>(mpDevice));
+        nodes.emplace_back("ErrorMeasure", make_ref<ErrorMeasurePass>(mpDevice));
         nodes.emplace_back("TextureAverage", make_ref<TextureAverage>(mpDevice));
         std::vector<RenderGraphConnection> connections;
         connections.emplace_back("PathTracing", "output", "Accumulate", "input");
@@ -131,7 +131,7 @@ TEST_F(PathTracerTest, WhiteFurnaceFull)
         pathTracing->setMissColor(1.0f);
         pathTracing->setFurnaceMode(FurnaceMode::WeakWhiteFurnace);
 
-        auto errorMeasure = renderGraph->getPassByName<ErrorMeasure>("ErrorMeasure");
+        auto errorMeasure = renderGraph->getPassByName<ErrorMeasurePass>("ErrorMeasure");
         ASSERT_NE(errorMeasure, nullptr);
         errorMeasure->setConstantReference({1.f, 1.f, 1.f});
 

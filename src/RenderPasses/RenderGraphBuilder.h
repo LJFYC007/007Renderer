@@ -16,7 +16,7 @@ public:
         nodes.emplace_back("PathTracing", make_ref<PathTracingPass>(pDevice));
         nodes.emplace_back("Accumulate", make_ref<AccumulatePass>(pDevice));
         nodes.emplace_back("ToneMapping", make_ref<ToneMappingPass>(pDevice));
-        nodes.emplace_back("ErrorMeasure", make_ref<ErrorMeasure>(pDevice));
+        nodes.emplace_back("ErrorMeasure", make_ref<ErrorMeasurePass>(pDevice));
         nodes.emplace_back("TextureAverage", make_ref<TextureAverage>(pDevice));
 
         // Create connections

@@ -13,7 +13,7 @@ struct ErrorMeasurePassRegistration
             RenderPassDescriptor{
                 "ErrorMeasure",
                 "Generates an error visualization comparing a source texture against an optional reference input.",
-                [](ref<Device> pDevice) { return make_ref<ErrorMeasure>(pDevice); }
+                [](ref<Device> pDevice) { return make_ref<ErrorMeasurePass>(pDevice); }
             }
         );
     }
@@ -26,7 +26,7 @@ const std::string kReferenceName = "reference";
 const std::string kOutputName = "output";
 } // namespace
 
-ErrorMeasure::ErrorMeasure(ref<Device> pDevice) : RenderPass(pDevice)
+ErrorMeasurePass::ErrorMeasurePass(ref<Device> pDevice) : RenderPass(pDevice)
 {
     nvrhi::BufferDesc cbDesc;
     cbDesc.byteSize = sizeof(PerFrameCB);
@@ -41,7 +41,7 @@ ErrorMeasure::ErrorMeasure(ref<Device> pDevice) : RenderPass(pDevice)
     mpPass->addConstantBuffer(mCbPerFrame, &mPerFrameData, sizeof(PerFrameCB));
 }
 
-void ErrorMeasure::setTextureReference(const std::string& path)
+void ErrorMeasurePass::setTextureReference(const std::string& path)
 {
     mpReferenceTexture = ExrUtils::loadExrToTexture(mpDevice, path);
     if (mpReferenceTexture)
@@ -55,7 +55,7 @@ void ErrorMeasure::setTextureReference(const std::string& path)
     }
 }
 
-void ErrorMeasure::setScene(ref<Scene> pScene)
+void ErrorMeasurePass::setScene(ref<Scene> pScene)
 {
     RenderPass::setScene(pScene);
     if (pScene && pScene->camera)
@@ -71,17 +71,17 @@ void ErrorMeasure::setScene(ref<Scene> pScene)
     }
 }
 
-std::vector<RenderPassInput> ErrorMeasure::getInputs() const
+std::vector<RenderPassInput> ErrorMeasurePass::getInputs() const
 {
     return {RenderPassInput(kSourceName, RenderDataType::Texture2D), RenderPassInput(kReferenceName, RenderDataType::Texture2D, true)};
 }
 
-std::vector<RenderPassOutput> ErrorMeasure::getOutputs() const
+std::vector<RenderPassOutput> ErrorMeasurePass::getOutputs() const
 {
     return {RenderPassOutput(kOutputName, RenderDataType::Texture2D)};
 }
 
-RenderData ErrorMeasure::execute(const RenderData& renderData)
+RenderData ErrorMeasurePass::execute(const RenderData& renderData)
 {
     mpSourceTexture = dynamic_cast<nvrhi::ITexture*>(renderData[kSourceName].Get());
     uint2 resolution = uint2(mpSourceTexture->getDesc().width, mpSourceTexture->getDesc().height);
@@ -127,7 +127,7 @@ RenderData ErrorMeasure::execute(const RenderData& renderData)
     return output;
 }
 
-void ErrorMeasure::renderUI()
+void ErrorMeasurePass::renderUI()
 {
     Widgets::subHeader("Output Selection");
     if (GUI::RadioButton("Source", mSelectedOutput == OutputId::Source))
@@ -138,7 +138,7 @@ void ErrorMeasure::renderUI()
         mSelectedOutput = OutputId::Difference;
 }
 
-void ErrorMeasure::prepareResources(uint32_t width, uint32_t height)
+void ErrorMeasurePass::prepareResources(uint32_t width, uint32_t height)
 {
     nvrhi::TextureDesc textureDesc = nvrhi::TextureDesc()
                                          .setWidth(width)

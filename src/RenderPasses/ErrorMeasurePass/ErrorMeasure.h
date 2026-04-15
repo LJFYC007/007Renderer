@@ -2,10 +2,10 @@
 #include "RenderPasses/RenderPass.h"
 #include "ShaderPasses/ComputePass.h"
 
-class ErrorMeasure : public RenderPass
+class ErrorMeasurePass : public RenderPass
 {
 public:
-    ErrorMeasure(ref<Device> pDevice);
+    ErrorMeasurePass(ref<Device> pDevice);
 
     enum class OutputId
     {

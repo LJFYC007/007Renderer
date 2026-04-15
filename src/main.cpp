@@ -57,7 +57,7 @@ int main()
         auto defaultRenderGraph = RenderGraphBuilder::createDefaultGraph(pDevice);
         defaultRenderGraph->setScene(scene);
 
-        auto errorMeasure = defaultRenderGraph->getPassByName<ErrorMeasure>("ErrorMeasure");
+        auto errorMeasure = defaultRenderGraph->getPassByName<ErrorMeasurePass>("ErrorMeasure");
         errorMeasure->setTextureReference(std::string(PROJECT_DIR) + "/media/output.exr");
 
         // Initialize editor from the default graph (this populates the editor's node/connection lists)
