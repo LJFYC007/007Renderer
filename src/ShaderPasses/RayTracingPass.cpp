@@ -18,9 +18,6 @@ RayTracingPass::RayTracingPass(
         entryPointMap[name] = type;
 
     Program program(pNvrhiDevice, std::string(PROJECT_DIR) + shaderPath, entryPointMap, shaderVersion, defines);
-
-    if (!program.generateBindingLayout())
-        LOG_ERROR_RETURN("[RayTracingPass] Failed to generate binding layout from program");
     mpBindingSetManager = make_ref<BindingSetManager>(pDevice, program.getReflectionInfo());
 
     // Create ray tracing pipeline with proper configuration

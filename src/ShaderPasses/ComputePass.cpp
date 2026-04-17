@@ -11,8 +11,6 @@ ComputePass::ComputePass(ref<Device> pDevice, const std::string& shaderPath, con
     Program program(pNvrhiDevice, std::string(PROJECT_DIR) + shaderPath, entryPoints, shaderVersion);
     mShader = program.getShader(entryPoint);
     // program.printReflectionInfo();
-    if (!program.generateBindingLayout())
-        LOG_ERROR_RETURN("[ComputePass] Failed to generate binding layout from program");
 
     mpBindingSetManager = make_ref<BindingSetManager>(pDevice, program.getReflectionInfo());
     auto pProgramLayout = program.getProgramLayout();

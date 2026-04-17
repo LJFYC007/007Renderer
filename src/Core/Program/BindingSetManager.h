@@ -1,15 +1,21 @@
 #pragma once
 #include <nvrhi/nvrhi.h>
+#include <map>
 #include <vector>
 #include <unordered_map>
 
 #include "Core/Device.h"
 #include "Core/Program/ReflectionInfo.h"
 
+// Each register space holds EITHER one descriptor table OR one or more regular
+// bindings — never both, and never multiple descriptor tables. Slang's
+// ParameterBlock<> convention gives each bindless array its own space, so this
+// lines up with how shaders in this project are written (see gMaterialTextures
+// / gMaterialSampler in Material.slang). The constructor asserts this.
 class BindingSetManager
 {
 public:
-    BindingSetManager(ref<Device> device, std::vector<ReflectionInfo> reflectionInfo);
+    BindingSetManager(ref<Device> device, const std::vector<ReflectionInfo>& reflectionInfo);
 
     ~BindingSetManager() {}
 
@@ -42,8 +48,7 @@ private:
     };
 
     ref<Device> mpDevice;
-    std::vector<SpaceData> mSpaces;
+    std::map<uint32_t, SpaceData> mSpaces;
     std::unordered_map<std::string, std::pair<uint32_t, uint32_t>> mResourceMap;
     std::unordered_map<std::string, DescriptorTableInfo> mDescriptorTables;
-    uint32_t mSpace = 8;
 };

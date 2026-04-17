@@ -25,43 +25,12 @@ public:
     nvrhi::ShaderHandle getShader(const std::string& entryPoint) const;
     slang::ProgramLayout* getProgramLayout() const { return mpProgramLayout; }
     const std::vector<nvrhi::ShaderHandle>& getShaders() const { return mShaders; }
-    std::vector<ReflectionInfo> getReflectionInfo() const { return mReflectionInfo; }
+    const std::vector<ReflectionInfo>& getReflectionInfo() const { return mReflectionInfo; }
 
     // Debugging utility to print reflection information
     void printReflectionInfo() const;
 
-    bool generateBindingLayout();
-
 private:
-    // Initialize session for Slang compilation
-    void initializeSession(const std::string& profile, const std::vector<std::pair<std::string, std::string>>& defines);
-
-    void printScope(slang::VariableLayoutReflection* pScopeVarLayout, int indent) const;
-
-    void printVarLayout(slang::VariableLayoutReflection* pVarLayout, int indent) const;
-
-    void printTypeLayout(slang::TypeLayoutReflection* pTypeLayout, int indent) const;
-
-    void printRelativeOffsets(slang::VariableLayoutReflection* pVarLayout, int indent) const;
-
-    void printOffset(slang::VariableLayoutReflection* pVarLayout, slang::ParameterCategory layoutUnit, int indent) const;
-
-    void printOffsets(slang::VariableLayoutReflection* pVarLayout, int indent) const;
-
-    void printSize(slang::TypeLayoutReflection* pTypeLayout, slang::ParameterCategory layoutUnit, int indent) const;
-
-    void printSizes(slang::TypeLayoutReflection* pTypeLayout, int indent) const;
-
-    std::string printKind(slang::TypeReflection::Kind kind) const;
-
-    std::string printLayoutUnit(slang::ParameterCategory layoutUnit) const;
-
-    bool processParameterGroup(slang::VariableLayoutReflection* varLayout);
-
-    bool processParameter(slang::VariableLayoutReflection* varLayout, int bindingSpaceOffset = 0, std::string prefix = "");
-    Slang::ComPtr<slang::IGlobalSession> mGlobalSession;
-    Slang::ComPtr<slang::ISession> mSession;
-    Slang::ComPtr<slang::ICompileRequest> mCompileRequest;
     Slang::ComPtr<slang::IComponentType> mLinkedProgram;
     slang::ProgramLayout* mpProgramLayout;
 

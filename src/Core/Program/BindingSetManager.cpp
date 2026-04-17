@@ -1,18 +1,26 @@
 #include "BindingSetManager.h"
 #include "Utils/Logger.h"
 
-BindingSetManager::BindingSetManager(ref<Device> pDevice, std::vector<ReflectionInfo> reflectionInfo) : mpDevice(pDevice)
+BindingSetManager::BindingSetManager(ref<Device> pDevice, const std::vector<ReflectionInfo>& reflectionInfo) : mpDevice(pDevice)
 {
-    mSpaces.resize(mSpace);
-
-    // Group reflection info by binding space and separate descriptor tables from regular bindings
     for (const auto& info : reflectionInfo)
     {
-        uint32_t space = info.bindingSpace;
+        const uint32_t space = info.bindingSpace;
+        SpaceData& spaceData = mSpaces[space];
 
         if (info.isDescriptorTable)
         {
-            // Descriptor table gets its own binding layout
+            if (!spaceData.layoutItems.empty() || !spaceData.descriptorTables.empty())
+            {
+                LOG_ERROR(
+                    "[BindingSetManager] Space {} already has bindings; refusing to add descriptor table '{}'. Put bindless arrays in "
+                    "their own ParameterBlock.",
+                    space,
+                    info.name
+                );
+                continue;
+            }
+
             nvrhi::BindingLayoutDesc layoutDesc;
             layoutDesc.visibility = nvrhi::ShaderType::All;
             layoutDesc.registerSpace = space;
@@ -25,7 +33,6 @@ BindingSetManager::BindingSetManager(ref<Device> pDevice, std::vector<Reflection
                 continue;
             }
 
-            // Create descriptor table
             nvrhi::DescriptorTableHandle descriptorTable = mpDevice->getDevice()->createDescriptorTable(descriptorTableLayout);
             if (!descriptorTable)
             {
@@ -36,7 +43,6 @@ BindingSetManager::BindingSetManager(ref<Device> pDevice, std::vector<Reflection
             mpDevice->getDevice()->resizeDescriptorTable(descriptorTable, info.descriptorTableSize, false);
             LOG_DEBUG("[BindingSetManager] Creating new descriptor table for space {} with size {}", space, info.descriptorTableSize);
 
-            // Store descriptor table info
             DescriptorTableInfo tableInfo;
             tableInfo.space = space;
             tableInfo.index = 0;
@@ -45,70 +51,72 @@ BindingSetManager::BindingSetManager(ref<Device> pDevice, std::vector<Reflection
             tableInfo.size = info.descriptorTableSize;
             mDescriptorTables[info.name] = tableInfo;
 
-            mSpaces[space].descriptorTables.push_back(descriptorTable);
-            mSpaces[space].bindingLayout = descriptorTableLayout;
+            spaceData.descriptorTables.push_back(descriptorTable);
+            spaceData.bindingLayout = descriptorTableLayout;
         }
         else
         {
-            // Regular binding - add to layout and binding set items
-            uint32_t index = static_cast<uint32_t>(mSpaces[space].layoutItems.size());
-            mSpaces[space].layoutItems.push_back(info.bindingLayoutItem);
-            mSpaces[space].bindingSetItems.push_back(info.bindingSetItem);
+            if (!spaceData.descriptorTables.empty())
+            {
+                LOG_ERROR(
+                    "[BindingSetManager] Space {} already has a descriptor table; refusing to add regular binding '{}'. Move one into its own "
+                    "ParameterBlock.",
+                    space,
+                    info.name
+                );
+                continue;
+            }
+
+            const uint32_t index = static_cast<uint32_t>(spaceData.layoutItems.size());
+            spaceData.layoutItems.push_back(info.bindingLayoutItem);
+            spaceData.bindingSetItems.push_back(info.bindingSetItem);
             mResourceMap[info.name] = {space, index};
         }
     }
 
-    // Create binding layouts for spaces with regular bindings
-    for (uint32_t space = 0; space < mSpace; ++space)
+    for (auto& [space, data] : mSpaces)
     {
-        // Skip if already has descriptor table or no items
-        if (!mSpaces[space].descriptorTables.empty() || mSpaces[space].layoutItems.empty())
+        if (!data.descriptorTables.empty() || data.layoutItems.empty())
             continue;
 
         nvrhi::BindingLayoutDesc layoutDesc;
         layoutDesc.visibility = nvrhi::ShaderType::All;
         layoutDesc.registerSpace = space;
-        layoutDesc.bindings = mSpaces[space].layoutItems;
-        mSpaces[space].bindingLayout = mpDevice->getDevice()->createBindingLayout(layoutDesc);
+        layoutDesc.bindings = data.layoutItems;
+        data.bindingLayout = mpDevice->getDevice()->createBindingLayout(layoutDesc);
     }
 }
 
 std::vector<nvrhi::BindingSetHandle> BindingSetManager::getBindingSets()
 {
     std::vector<nvrhi::BindingSetHandle> result;
-    result.resize(mSpace);
+    result.reserve(mSpaces.size());
 
-    for (uint32_t space = 0; space < mSpace; ++space)
+    for (auto& [space, data] : mSpaces)
     {
-        // Descriptor tables
-        if (!mSpaces[space].descriptorTables.empty())
+        if (!data.descriptorTables.empty())
         {
-            auto descriptorTable = mSpaces[space].descriptorTables[0];
-            result[space] = descriptorTable;
+            result.push_back(data.descriptorTables[0]);
             continue;
         }
 
-        // Regular binding sets
-        if (mSpaces[space].layoutItems.empty())
-        {
-            result[space] = nullptr;
+        if (data.layoutItems.empty())
             continue;
-        }
 
         nvrhi::BindingSetDesc bindingSetDesc;
-        bindingSetDesc.bindings = mSpaces[space].bindingSetItems;
+        bindingSetDesc.bindings = data.bindingSetItems;
 
         size_t hash = 0;
         nvrhi::hash_combine(hash, bindingSetDesc);
-        nvrhi::hash_combine(hash, mSpaces[space].bindingLayout);
+        nvrhi::hash_combine(hash, data.bindingLayout);
 
-        if (mSpaces[space].currentHash != hash)
+        if (data.currentHash != hash)
         {
             LOG_DEBUG("[BindingSetManager] Creating new binding set for space {} with hash: {}", space, hash);
-            mSpaces[space].bindingSet = mpDevice->getDevice()->createBindingSet(bindingSetDesc, mSpaces[space].bindingLayout);
-            mSpaces[space].currentHash = hash;
+            data.bindingSet = mpDevice->getDevice()->createBindingSet(bindingSetDesc, data.bindingLayout);
+            data.currentHash = hash;
         }
-        result[space] = mSpaces[space].bindingSet;
+        result.push_back(data.bindingSet);
     }
 
     return result;
@@ -117,9 +125,10 @@ std::vector<nvrhi::BindingSetHandle> BindingSetManager::getBindingSets()
 std::vector<nvrhi::BindingLayoutHandle> BindingSetManager::getBindingLayouts()
 {
     std::vector<nvrhi::BindingLayoutHandle> result;
-    result.resize(mSpace);
-    for (uint32_t space = 0; space < mSpace; ++space)
-        result[space] = mSpaces[space].bindingLayout;
+    result.reserve(mSpaces.size());
+    for (auto& [space, data] : mSpaces)
+        if (data.bindingLayout)
+            result.push_back(data.bindingLayout);
     return result;
 }
 
@@ -146,7 +155,6 @@ void BindingSetManager::setDescriptorTable(
 
     DescriptorTableInfo& tableInfo = it->second;
 
-    // Write actual textures to the descriptor table
     for (size_t i = 0; i < textures.size(); ++i)
     {
         nvrhi::BindingSetItem item = nvrhi::BindingSetItem::Texture_SRV(static_cast<uint32_t>(i), textures[i]);
@@ -154,7 +162,8 @@ void BindingSetManager::setDescriptorTable(
             LOG_ERROR("[BindingSetManager] Failed to write texture {} to descriptor table '{}'", i, name);
     }
 
-    // Fill unused slots with default texture (important for bindless to avoid unbound descriptors)
+    // Fill unused slots with default texture — bindless arrays require every slot
+    // to be written even if unused; unbound descriptors crash the GPU.
     for (size_t i = textures.size(); i < tableInfo.size; ++i)
     {
         nvrhi::BindingSetItem item = nvrhi::BindingSetItem::Texture_SRV(static_cast<uint32_t>(i), defaultTexture);
