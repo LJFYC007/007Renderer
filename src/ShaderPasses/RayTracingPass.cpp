@@ -69,7 +69,7 @@ RayTracingPass::RayTracingPass(
     );
     mPipeline = pNvrhiDevice->createRayTracingPipeline(pipelineDesc);
     if (!mPipeline)
-        LOG_ERROR_RETURN("[RayTracingPass] Failed to create ray tracing pipeline");
+        LOG_ERROR_THROW("[RayTracingPass] Failed to create ray tracing pipeline");
     LOG_DEBUG("[RayTracingPass] Ray tracing pipeline created successfully");
 
     // Create shader table with matching export names

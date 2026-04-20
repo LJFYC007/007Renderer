@@ -75,7 +75,7 @@ slang::ISession* ShaderCompiler::getSession(const std::string& profile, const st
     targetDesc.compilerOptionEntries = targetOptions.data();
     targetDesc.compilerOptionEntryCount = static_cast<uint32_t>(targetOptions.size());
 
-    const char* searchPaths[] = {PROJECT_SHADER_DIR, PROJECT_SRC_DIR};
+    const char* searchPaths[] = {PROJECT_SRC_DIR};
 
     slang::SessionDesc sessionDesc = {};
     sessionDesc.targets = &targetDesc;

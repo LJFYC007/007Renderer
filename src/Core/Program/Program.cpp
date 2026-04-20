@@ -358,11 +358,11 @@ Program::Program(
 )
 {
     if (entryPoints.empty())
-        LOG_ERROR_RETURN("[Program] No entry points provided");
+        LOG_ERROR_THROW("[Program] No entry points provided");
 
     slang::ISession* pSession = ShaderCompiler::get().getSession(profile, defines);
     if (!pSession)
-        LOG_ERROR_RETURN("[Program] Failed to obtain Slang session for profile: {}", profile);
+        LOG_ERROR_THROW("[Program] Failed to obtain Slang session for profile: {}", profile);
 
     // Load module
     Slang::ComPtr<slang::IModule> pModule;
@@ -371,7 +371,7 @@ Program::Program(
     if (pDiagnostics && pDiagnostics->getBufferSize() > 0)
         LOG_DEBUG("[Program] Compilation diagnostics: {}", (const char*)pDiagnostics->getBufferPointer());
     if (!pModule)
-        LOG_ERROR_RETURN("[Slang] Failed to load module: {}", filePath);
+        LOG_ERROR_THROW("[Slang] Failed to load module: {}", filePath);
 
     std::vector<Slang::ComPtr<slang::IEntryPoint>> slangEntryPoints;
     slangEntryPoints.reserve(entryPoints.size());
@@ -380,7 +380,7 @@ Program::Program(
     {
         Slang::ComPtr<slang::IEntryPoint> pSlangEntryPoint;
         if (SLANG_FAILED(pModule->findEntryPointByName(entryPoint.first.c_str(), pSlangEntryPoint.writeRef())))
-            LOG_ERROR_RETURN("[Slang] Failed to find entry point: {}", entryPoint.first);
+            LOG_ERROR_THROW("[Slang] Failed to find entry point: {}", entryPoint.first);
         slangEntryPoints.push_back(pSlangEntryPoint);
     }
 
@@ -392,16 +392,16 @@ Program::Program(
 
     Slang::ComPtr<slang::IComponentType> pProgram;
     if (SLANG_FAILED(pSession->createCompositeComponentType(components.data(), static_cast<SlangInt>(components.size()), pProgram.writeRef())))
-        LOG_ERROR_RETURN("[Slang] Failed to create composite component type");
+        LOG_ERROR_THROW("[Slang] Failed to create composite component type");
 
     if (SLANG_FAILED(pProgram->link(mLinkedProgram.writeRef())))
-        LOG_ERROR_RETURN("[Slang] Failed to link program");
+        LOG_ERROR_THROW("[Slang] Failed to link program");
 
     mpProgramLayout = mLinkedProgram->getLayout(0, pDiagnostics.writeRef());
     if (pDiagnostics && pDiagnostics->getBufferSize() > 0)
         LOG_DEBUG("[Slang] Program layout diagnostics: {}", (const char*)pDiagnostics->getBufferPointer());
     if (!mpProgramLayout)
-        LOG_ERROR_RETURN("[Slang] Failed to get program layout");
+        LOG_ERROR_THROW("[Slang] Failed to get program layout");
 
     mShaders.clear();
     mShaders.reserve(entryPoints.size());
@@ -419,7 +419,7 @@ Program::Program(
         {
             if (pDiagnosticBlob && pDiagnosticBlob->getBufferSize() > 0)
                 LOG_ERROR("[Slang] Entry point diagnostics for {}: {}", entryPointName, (const char*)pDiagnosticBlob->getBufferPointer());
-            LOG_ERROR_RETURN("[Slang] Failed to get entry point code for {}", entryPointName);
+            LOG_ERROR_THROW("[Slang] Failed to get entry point code for {}", entryPointName);
         }
 
         LOG_DEBUG("[Program] Compiled entry point {}: {} bytes", entryPointName, pKernelBlob->getBufferSize());
@@ -429,7 +429,7 @@ Program::Program(
         desc.shaderType = entryPointType;
         auto pShader = device->createShader(desc, pKernelBlob->getBufferPointer(), pKernelBlob->getBufferSize());
         if (!pShader)
-            LOG_ERROR_RETURN("[Program] Failed to create shader for entry point: {}", entryPointName);
+            LOG_ERROR_THROW("[Program] Failed to create shader for entry point: {}", entryPointName);
 
         mShaders.push_back(pShader);
         mEntryPointToShaderIndex[entryPointName] = entryPointIndex;

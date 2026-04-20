@@ -25,8 +25,7 @@ protected:
 
 TEST_F(PathTracerTest, Basic)
 {
-    const uint spp = 4;           // Low SPP for CI
-    const float threshold = 1.0f; // Large threshold
+    const uint spp = 4; // Low SPP for CI
 
     ref<Scene> scene = loadSceneWithImporter(std::string(PROJECT_DIR) + "/media/cornell_box.usdc", mpDevice);
     if (!scene)

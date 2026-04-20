@@ -37,7 +37,7 @@ ComputePass::ComputePass(ref<Device> pDevice, const std::string& shaderPath, con
     pipelineDesc.setComputeShader(mShader);
     mPipeline = pNvrhiDevice->createComputePipeline(pipelineDesc);
     if (!mPipeline)
-        LOG_ERROR_RETURN("[ComputePass] Failed to create compute pipeline");
+        LOG_ERROR_THROW("[ComputePass] Failed to create compute pipeline");
     LOG_DEBUG("[ComputePass] Compute pipeline created successfully");
 }
 

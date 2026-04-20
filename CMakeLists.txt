@@ -190,8 +190,8 @@ set_target_properties(DirectX-Guids PROPERTIES FOLDER "External")
 # ----------------------------------------------------------------------------
 # Library target for shared code
 # ----------------------------------------------------------------------------
-file(GLOB_RECURSE LIB_SOURCES 
-    src/*.cpp 
+file(GLOB_RECURSE LIB_SOURCES CONFIGURE_DEPENDS
+    src/*.cpp
     src/*.h
 )
 # Remove main.cpp from library sources
@@ -201,7 +201,6 @@ add_library(007Core STATIC ${LIB_SOURCES})
 
 target_compile_definitions(007Core PUBLIC
     PROJECT_DIR="${CMAKE_SOURCE_DIR}"
-    PROJECT_SHADER_DIR="${CMAKE_SOURCE_DIR}/shaders"
     PROJECT_SRC_DIR="${CMAKE_SOURCE_DIR}/src"
     PROJECT_EXTERNAL_DIR="${CMAKE_SOURCE_DIR}/external"
     PROJECT_LOG_DIR="${CMAKE_SOURCE_DIR}/logs"
@@ -259,7 +258,7 @@ target_compile_definitions(007Core PUBLIC
 if(BUILD_TESTING)
     enable_testing()
     
-    file(GLOB_RECURSE Tests tests/*.cpp tests/*.h)
+    file(GLOB_RECURSE Tests CONFIGURE_DEPENDS tests/*.cpp tests/*.h)
     add_executable(007Tests ${Tests})
     
     target_link_libraries(007Tests PRIVATE

@@ -36,6 +36,8 @@ int main()
     Window window(pDevice->getD3D12Device(), pDevice->getCommandQueue(), windowDesc);
     window.PrepareResources();
 
+    int exitCode = 0;
+    try
     {
         // Create readback heap
         gReadbackHeap = make_ref<ReadbackHeap>(pDevice);
@@ -115,14 +117,19 @@ int main()
             // Finish rendering
             window.RenderEnd();
         }
-
-        // Release readback heap before device shutdown
-        gReadbackHeap.reset();
     }
+    catch (const std::runtime_error& e)
+    {
+        LOG_ERROR("Runtime error: {}", e.what());
+        exitCode = 1;
+    }
+
+    // Release readback heap before device shutdown
+    gReadbackHeap.reset();
 
     window.CleanupResources();
     pDevice->shutdown();
     LOG_INFO("Renderer shutdown successfully.");
     spdlog::shutdown();
-    return 0;
+    return exitCode;
 }
