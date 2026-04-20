@@ -81,7 +81,7 @@ slang::ISession* ShaderCompiler::getSession(const std::string& profile, const st
     sessionDesc.targets = &targetDesc;
     sessionDesc.targetCount = 1;
     sessionDesc.searchPaths = searchPaths;
-    sessionDesc.searchPathCount = 2;
+    sessionDesc.searchPathCount = static_cast<SlangInt>(std::size(searchPaths));
     sessionDesc.compilerOptionEntries = sessionOptions.data();
     sessionDesc.compilerOptionEntryCount = static_cast<uint32_t>(sessionOptions.size());
 
