@@ -32,7 +32,7 @@ powershell -Command "cmake --build build/RelWithDebInfo --target run_tests"
 powershell -Command "cmake --build build/RelWithDebInfo --target run_tests_ci"
 ```
 
-**Debugging runtime issues:** launch `007Renderer.exe` and inspect `logs/007Renderer.log` — Slang compile errors and scene-load warnings land there.
+**Debugging runtime issues:** launch `007Renderer.exe` and inspect `logs/007Renderer.log` — Slang compile errors and scene-load warnings land there. If you need logs for debug mode, please use DEBUG instead of RelWithDebInfo. NEVER modify the code in Logger.h/cpp while debugging.
 
 ## Naming Conventions (Falcor-style)
 
@@ -72,7 +72,7 @@ A DAG of `RenderPass` nodes connected by named typed ports (`RenderPassInput` / 
 
 ### Scene (`src/Scene/`)
 
-`Scene` holds geometry (vertices, indices, meshes), materials, acceleration structures (TLAS/BLAS), and camera. `Camera` (`src/Scene/Camera/`) has paired C++ and Slang components (`Camera.slang`, `CameraData.slang`).
+`Scene` holds geometry (vertices, indices, `MeshDesc` ranges), **per-BLAS `MeshInstance`s** (meshID + materialIndex + `localToWorld`), materials, acceleration structures (one BLAS per mesh; TLAS instances carry the transforms), and camera. `EmissiveTriangle`s key on `instanceID`, not meshID — a mesh reused by N instances contributes N emitters. `Camera` (`src/Scene/Camera/`) has paired C++ and Slang components (`Camera.slang`, `CameraData.slang`).
 
 **Importers** (`src/Scene/Importer/`): `Importer` is the base class; `loadSceneWithImporter()` dispatches by file extension — USD → `UsdImporter`, GLTF/OBJ → `AssimpImporter` (currently unmaintained). `TextureManager` (`src/Scene/Material/`) handles texture loading (PNG, JPG, EXR, DDS) with `kInvalidTextureId = 0xFFFFFFFF` as sentinel.
 
@@ -139,13 +139,18 @@ Tests live in `tests/`. The shared test environment (device, logger, ImGui conte
 
 **Always run `run_tests` during development.** `run_tests_ci` is a GitHub Actions target and skips the `Full` convergence tests that catch real rendering regressions.
 
-**Test inventory (11 total, 9 non-Full):**
+**Test inventory (15 total, 9 non-Full — the roughness sweep expands to 5 gtest instances):**
 
 | Suite | Cases |
 | --- | --- |
-| `PathTracerTest` | `Basic` (4 spp smoke), **`Full`** (4096 spp + error threshold, writes `output.exr`), **`WhiteFurnaceFull`** (1024 spp × roughness sweep) |
-| `SlangTest` | `Basic` (Slang reflection + ComputePass verification) |
+| `PathTracerTest` | `Basic` (4 spp smoke), **`Full`** (4096 spp + error threshold, saves `output.exr` on failure) |
+| `RoughnessSweep/WhiteFurnaceFull` | **`ConvergesToWhite/r{5,25,50,75,100}`** (1024 spp × 5-value roughness sweep via `INSTANTIATE_TEST_SUITE_P`) |
+| `SlangTest` | `All` (Slang reflection + ComputePass across plain globals, RWTexture, ParameterBlock, bindless) |
 | `ComputeShaderTest` | `Basic` (buffer add via ComputePass) |
 | `RenderGraphTest` | 6 cases: linear build, duplicate node names, missing required input, optional inputs unconnected, cycles, unknown slot connections |
 
-The CI subset (`--gtest_filter="-*Full"`) runs 9 tests, excluding `PathTracerTest.Full` and `PathTracerTest.WhiteFurnaceFull`.
+The CI subset (`--gtest_filter="-*Full*"`) runs 9 tests, excluding `PathTracerTest.Full` plus all 5 `RoughnessSweep/WhiteFurnaceFull.ConvergesToWhite/r*` instances. The trailing wildcard matters — without it the substring match on `WhiteFurnaceFull` is missed.
+
+**Test fixture + artifacts (`tests/TestHelpers.{h,cpp}`):**
+- Derive new suites from `DeviceTest` (grabs the process-lifetime device in `SetUp`) instead of rolling your own fixture.
+- Write test outputs (EXRs, dumps) to `TestHelpers::artifactPath("name.exr")` — resolves to `tests/artifacts/<Suite>.<Test>/`. Save on failure only so passing runs stay hermetic.

@@ -7,19 +7,10 @@
 #include "Utils/ResourceIO.h"
 #include "Utils/Logger.h"
 #include "Environment.h"
+#include "TestHelpers.h"
 
-class ComputeShaderTest : public ::testing::Test
-{
-protected:
-    void SetUp() override
-    {
-        mpDevice = BasicTestEnvironment::getDevice();
-        ASSERT_NE(mpDevice, nullptr);
-        ASSERT_TRUE(mpDevice->isValid());
-    }
-
-    ref<Device> mpDevice;
-};
+class ComputeShaderTest : public DeviceTest
+{};
 
 TEST_F(ComputeShaderTest, Basic)
 {

@@ -1,6 +1,8 @@
 #pragma once
 #include <gtest/gtest.h>
 
+#include <spdlog/sinks/ringbuffer_sink.h>
+
 #include "Core/Device.h"
 #include "Core/Pointer.h"
 #include "Utils/Logger.h"
@@ -11,28 +13,13 @@
 class BasicTestEnvironment : public ::testing::Environment
 {
 public:
-    void SetUp() override
-    {
-        Logger::init();
-        Logger::get()->set_level(spdlog::level::off); // Disable logging for tests
-        sDevice = make_ref<Device>();
-        if (!sDevice->initialize())
-            FAIL() << "Failed to initialize device for Buffer tests";
-        ImGui::CreateContext();
-        gReadbackHeap = make_ref<ReadbackHeap>(sDevice);
-    }
-
-    void TearDown() override
-    {
-        sDevice->getDevice()->waitForIdle();
-        gReadbackHeap.reset();
-        ImGui::DestroyContext();
-        sDevice.reset();
-        spdlog::shutdown();
-    }
+    void SetUp() override;
+    void TearDown() override;
 
     static ref<Device> getDevice() { return sDevice; }
+    static ref<spdlog::sinks::ringbuffer_sink_mt> getLogSink() { return sLogSink; }
 
 private:
     static ref<Device> sDevice;
+    static ref<spdlog::sinks::ringbuffer_sink_mt> sLogSink;
 };

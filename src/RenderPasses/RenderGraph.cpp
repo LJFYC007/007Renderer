@@ -5,6 +5,8 @@
 #include "RenderGraph.h"
 #include "Utils/Logger.h"
 
+RenderGraphBuildStatus RenderGraph::sLastBuildStatus = RenderGraphBuildStatus::Ok;
+
 ref<RenderGraph> RenderGraph::create(
     ref<Device> pDevice,
     const std::vector<RenderGraphNode>& nodes,
@@ -19,6 +21,7 @@ ref<RenderGraph> RenderGraph::create(
 
 bool RenderGraph::build(const std::vector<RenderGraphNode>& nodes, const std::vector<RenderGraphConnection>& connections)
 {
+    sLastBuildStatus = RenderGraphBuildStatus::Ok;
     mNodes = nodes;
     mConnections = connections;
 
@@ -37,6 +40,7 @@ bool RenderGraph::build(const std::vector<RenderGraphNode>& nodes, const std::ve
 
     if (!topologicalSort())
     {
+        sLastBuildStatus = RenderGraphBuildStatus::Cycle;
         LOG_ERROR("Topological sort failed - circular dependency detected");
         return false;
     }
@@ -81,6 +85,7 @@ bool RenderGraph::validateGraph()
     {
         if (nodeNames.count(node.name))
         {
+            sLastBuildStatus = RenderGraphBuildStatus::DuplicateNodeName;
             LOG_ERROR("Duplicate node name found: '{}'", node.name);
             return false;
         }
@@ -92,6 +97,7 @@ bool RenderGraph::validateGraph()
     {
         if (conn.fromPass == conn.toPass)
         {
+            sLastBuildStatus = RenderGraphBuildStatus::Cycle;
             LOG_ERROR("Self-loop detected: Pass '{}' connects to itself", conn.fromPass);
             return false;
         }
@@ -99,6 +105,7 @@ bool RenderGraph::validateGraph()
         std::string inputKey = conn.toPass + "." + conn.toInput;
         if (inputKeys.count(inputKey))
         {
+            sLastBuildStatus = RenderGraphBuildStatus::DuplicateInputConnection;
             LOG_ERROR("Multiple connections to input '{}' in pass '{}'", conn.toInput, conn.toPass);
             return false;
         }
@@ -112,6 +119,7 @@ bool RenderGraph::validateGraph()
         int toNodeIndex = findNode(conn.toPass);
         if (fromNodeIndex == -1 || toNodeIndex == -1)
         {
+            sLastBuildStatus = RenderGraphBuildStatus::UnknownPassInConnection;
             LOG_ERROR("Connection validation failed: Pass '{}' -> '{}' not found", conn.fromPass, conn.toPass);
             return false;
         }
@@ -121,6 +129,7 @@ bool RenderGraph::validateGraph()
             std::any_of(outputs.begin(), outputs.end(), [&conn](const RenderPassOutput& output) { return output.name == conn.fromOutput; });
         if (!outputFound)
         {
+            sLastBuildStatus = RenderGraphBuildStatus::UnknownOutputSlot;
             LOG_ERROR("Output '{}' not found in pass '{}'", conn.fromOutput, conn.fromPass);
             return false;
         }
@@ -129,6 +138,7 @@ bool RenderGraph::validateGraph()
         bool inputFound = std::any_of(inputs.begin(), inputs.end(), [&conn](const RenderPassInput& input) { return input.name == conn.toInput; });
         if (!inputFound)
         {
+            sLastBuildStatus = RenderGraphBuildStatus::UnknownInputSlot;
             LOG_ERROR("Input '{}' not found in pass '{}'", conn.toInput, conn.toPass);
             return false;
         }
@@ -142,6 +152,7 @@ bool RenderGraph::validateGraph()
                 std::string inputKey = node.name + "." + input.name;
                 if (!inputKeys.count(inputKey))
                 {
+                    sLastBuildStatus = RenderGraphBuildStatus::MissingRequiredInput;
                     LOG_ERROR("Required input '{}' in pass '{}' is not connected", input.name, node.name);
                     return false;
                 }

@@ -28,6 +28,20 @@ struct RenderGraphNode
     RenderGraphNode(const std::string& nodeName, ref<RenderPass> renderPass) : name(nodeName), pass(renderPass) {}
 };
 
+// Specific reason the most recent RenderGraph::create() rejected a graph.
+// Tests use this to verify the *right* validator fired, rather than just checking for nullptr.
+enum class RenderGraphBuildStatus
+{
+    Ok,
+    DuplicateNodeName,
+    DuplicateInputConnection,
+    UnknownPassInConnection,
+    UnknownOutputSlot,
+    UnknownInputSlot,
+    MissingRequiredInput,
+    Cycle,
+};
+
 class RenderGraph
 {
 public:
@@ -40,6 +54,9 @@ public:
         const std::vector<RenderGraphNode>& nodes,
         const std::vector<RenderGraphConnection>& connections
     );
+
+    // Status from the most recent create() call. Reset to Ok at the top of each create().
+    static RenderGraphBuildStatus lastBuildStatus() { return sLastBuildStatus; }
 
     // Execute the entire render graph
     RenderData execute();
@@ -93,4 +110,6 @@ private:
     std::vector<std::string> mAvailableOutputs;
     int mSelectedOutputIndex;
     nvrhi::TextureHandle mOutputTexture;
+
+    static RenderGraphBuildStatus sLastBuildStatus;
 };

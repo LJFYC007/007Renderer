@@ -296,7 +296,7 @@ if(BUILD_TESTING)
 
     # Test target for CI
     add_custom_target(run_tests_ci
-        COMMAND $<TARGET_FILE:007Tests> --gtest_filter="-*Full" --gtest_output=xml:${CMAKE_BINARY_DIR}/test-reports/results.xml
+        COMMAND $<TARGET_FILE:007Tests> --gtest_filter="-*Full*" --gtest_output=xml:${CMAKE_BINARY_DIR}/test-reports/results.xml
         DEPENDS 007Tests
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
         COMMENT "Running CI tests (excludes Full tests)"

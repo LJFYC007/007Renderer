@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "Environment.h"
+#include "TestHelpers.h"
 #include "RenderPasses/RenderGraph.h"
 
 namespace
@@ -56,18 +57,8 @@ private:
 };
 } // namespace
 
-class RenderGraphTest : public ::testing::Test
-{
-protected:
-    void SetUp() override
-    {
-        mpDevice = BasicTestEnvironment::getDevice();
-        ASSERT_NE(mpDevice, nullptr);
-        ASSERT_TRUE(mpDevice->isValid());
-    }
-
-    ref<Device> mpDevice;
-};
+class RenderGraphTest : public DeviceTest
+{};
 
 TEST_F(RenderGraphTest, BuildsLinearGraph)
 {
@@ -133,6 +124,7 @@ TEST_F(RenderGraphTest, RejectsDuplicateNodeNames)
 
     auto graph = RenderGraph::create(mpDevice, nodes, connections);
     EXPECT_EQ(graph, nullptr);
+    EXPECT_EQ(RenderGraph::lastBuildStatus(), RenderGraphBuildStatus::DuplicateNodeName);
 }
 
 TEST_F(RenderGraphTest, RejectsMissingRequiredInput)
@@ -159,6 +151,7 @@ TEST_F(RenderGraphTest, RejectsMissingRequiredInput)
 
     auto graph = RenderGraph::create(mpDevice, nodes, connections);
     EXPECT_EQ(graph, nullptr);
+    EXPECT_EQ(RenderGraph::lastBuildStatus(), RenderGraphBuildStatus::MissingRequiredInput);
 }
 
 TEST_F(RenderGraphTest, AllowsOptionalInputsToRemainUnconnected)
@@ -185,6 +178,7 @@ TEST_F(RenderGraphTest, AllowsOptionalInputsToRemainUnconnected)
 
     auto graph = RenderGraph::create(mpDevice, nodes, connections);
     ASSERT_NE(graph, nullptr);
+    EXPECT_EQ(RenderGraph::lastBuildStatus(), RenderGraphBuildStatus::Ok);
     graph->execute();
 }
 
@@ -219,6 +213,7 @@ TEST_F(RenderGraphTest, RejectsCycles)
 
     auto graph = RenderGraph::create(mpDevice, nodes, connections);
     EXPECT_EQ(graph, nullptr);
+    EXPECT_EQ(RenderGraph::lastBuildStatus(), RenderGraphBuildStatus::Cycle);
 }
 
 TEST_F(RenderGraphTest, RejectsConnectionsToUnknownSlots)
@@ -247,4 +242,5 @@ TEST_F(RenderGraphTest, RejectsConnectionsToUnknownSlots)
 
     auto graph = RenderGraph::create(mpDevice, nodes, connections);
     EXPECT_EQ(graph, nullptr);
+    EXPECT_EQ(RenderGraph::lastBuildStatus(), RenderGraphBuildStatus::UnknownOutputSlot);
 }
