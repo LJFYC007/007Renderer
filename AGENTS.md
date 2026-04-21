@@ -60,6 +60,8 @@ Entry point: `src/main.cpp` wires up `Device`, `Window`, and the default `Render
 
 A DAG of `RenderPass` nodes connected by named typed ports (`RenderPassInput` / `RenderPassOutput`, defined alongside `RenderPassRegistry` in `RenderPass.h`). `RenderGraph` topo-sorts and executes passes in order, threading `RenderData` through. `RenderGraphEditor` is the ImGui node-editor UI for runtime rewiring. New passes self-register via static initializers calling `RenderPassRegistry::registerPass`.
 
+`RenderGraphBuilder` (header-only) is the fluent builder used in `main.cpp` to wire the default graph at startup; runtime edits go through `RenderGraphEditor`.
+
 **Concrete passes:** `PathTracingPass`, `AccumulatePass`, `ErrorMeasurePass`, `ToneMappingPass`. Utility passes live under `src/RenderPasses/Utils/` (e.g., `TextureAverage`, a compute-based texture reduction). Each pass colocates its `.slang` shaders; shared Slang headers use `.slangh`.
 
 ### Shader Passes (`src/ShaderPasses/`)
@@ -105,6 +107,8 @@ Slang files live under `src/Scene/`, `src/Scene/Material/`, `src/RenderPasses/*/
 - `ParameterBlock<>` for GPU globals.
 - `StructuredBuffer<>` for geometry arrays.
 - `Scene.slang` exposes the GPU scene as `ParameterBlock<Scene> gScene`; material textures are bindless via `ParameterBlock<MaterialTextures> gMaterialTextures`.
+
+**Session cache:** `ShaderCompiler` keeps a process-lifetime Slang session, so successive `Program` constructions reuse the global session/options. Side effect: edits to `.slang` files don't hot-reload in a long-running session — restart the app to pick them up.
 
 ## External Dependencies & Patches
 
