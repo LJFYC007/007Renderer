@@ -38,7 +38,7 @@ LightSample sampleLight<S : ISampleGenerator>(uint emissiveTriangleCount, float 
         else
             hi = mid;
     }
-    uint triIdx = gScene.emissiveTriangles[lo].triangleIndex;
+    EmissiveTriangle et = gScene.emissiveTriangles[lo];
 
     // Sample a uniform random point on the triangle (Turk 1990)
     float2 u2 = sampleNext2D(sg);
@@ -46,7 +46,7 @@ LightSample sampleLight<S : ISampleGenerator>(uint emissiveTriangleCount, float 
     float baryU = 1.f - su;
     float baryV = u2.y * su;
 
-    VertexData vd = getVertexData(triIdx, float2(baryU, baryV));
+    VertexData vd = getVertexDataForInstance(et.instanceID, et.localTriangleIndex, float2(baryU, baryV));
     ls.position = vd.posW;
     ls.normal = vd.faceNormalW;
     ls.emissive = gScene.materials[vd.materialID].getEmissive(vd.uv);

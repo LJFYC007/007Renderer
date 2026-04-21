@@ -99,7 +99,7 @@ RenderData PathTracingPass::execute(const RenderData& input)
     (*mpPass)["gScene.vertices"] = mpScene->getVertexBuffer();
     (*mpPass)["gScene.indices"] = mpScene->getIndexBuffer();
     (*mpPass)["gScene.meshes"] = mpScene->getMeshBuffer();
-    (*mpPass)["gScene.triangleToMesh"] = mpScene->getTriangleToMeshBuffer();
+    (*mpPass)["gScene.instances"] = mpScene->getInstanceBuffer();
     (*mpPass)["gScene.materials"] = mpScene->getMaterialBuffer();
     (*mpPass)["gScene.rtAccel"] = mpScene->getTLAS();
     (*mpPass)["gScene.emissiveTriangles"] = mpScene->getEmissiveTriangleBuffer();

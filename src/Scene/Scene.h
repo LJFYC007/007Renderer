@@ -1,5 +1,6 @@
 #pragma once
 #include <vector>
+#include <glm/glm.hpp>
 #include <nvrhi/nvrhi.h>
 
 #include "Core/Device.h"
@@ -15,18 +16,37 @@ struct Vertex
     float normal[3];
 };
 
-struct Mesh
+struct MeshDesc
 {
+    uint32_t indexOffset;
+    uint32_t indexCount;
+};
+
+struct MeshInstance
+{
+    uint32_t meshID;
     uint32_t materialIndex;
-    // std::string name;
+    glm::mat4 localToWorld{1.0f};
+};
+
+// 3x4 row-major transform packed as three float4 rows (48 B) + tail (16 B) = 64 B.
+struct InstanceData
+{
+    glm::vec4 row0;
+    glm::vec4 row1;
+    glm::vec4 row2;
+    uint32_t meshID;
+    uint32_t materialID;
+    uint32_t _padding0;
+    uint32_t _padding1;
 };
 
 struct EmissiveTriangle
 {
-    uint32_t triangleIndex; // Global primitive index (PrimitiveIndex() in shader)
-    float area;             // World-space triangle area
-    float cdfUpper;         // Cumulative area / totalArea (upper bound of CDF bin)
-    float _padding;         // Pad to 16 bytes for GPU alignment
+    uint32_t instanceID;
+    uint32_t localTriangleIndex;
+    float area;
+    float cdfUpper;
 };
 
 class Scene
@@ -34,9 +54,9 @@ class Scene
 public:
     std::vector<Vertex> vertices;
     std::vector<uint32_t> indices;
-    std::vector<Mesh> meshes;
+    std::vector<MeshDesc> meshes;
+    std::vector<MeshInstance> instances;
     std::vector<Material> materials;
-    std::vector<uint32_t> triangleToMesh;
     std::vector<EmissiveTriangle> emissiveTriangles;
     float totalEmissiveArea = 0.f;
     ref<Camera> camera;
@@ -44,9 +64,10 @@ public:
 
     Scene(ref<Device> pDevice);
 
+    void addMeshInstance(uint32_t indexOffset, uint32_t indexCount, uint32_t materialIndex, const glm::mat4& localToWorld = glm::mat4(1.0f));
+
     void buildAccelStructs();
 
-    nvrhi::rt::AccelStructHandle getBLAS() const { return mBlas; }
     nvrhi::rt::AccelStructHandle getTLAS() const { return mTlas; }
 
     // Get geometry buffers for shader access
@@ -54,7 +75,7 @@ public:
     nvrhi::BufferHandle getIndexBuffer() const { return mIndexBuffer; }
     nvrhi::BufferHandle getMaterialBuffer() const { return mMaterialBuffer; }
     nvrhi::BufferHandle getMeshBuffer() const { return mMeshBuffer; }
-    nvrhi::BufferHandle getTriangleToMeshBuffer() const { return mTriangleToMeshBuffer; }
+    nvrhi::BufferHandle getInstanceBuffer() const { return mInstanceBuffer; }
     nvrhi::BufferHandle getEmissiveTriangleBuffer() const { return mEmissiveTriangleBuffer; }
     uint32_t getEmissiveTriangleCount() const { return static_cast<uint32_t>(emissiveTriangles.size()); }
 
@@ -84,8 +105,8 @@ private:
     nvrhi::BufferHandle mIndexBuffer;
     nvrhi::BufferHandle mMaterialBuffer;
     nvrhi::BufferHandle mMeshBuffer;
-    nvrhi::BufferHandle mTriangleToMeshBuffer;
+    nvrhi::BufferHandle mInstanceBuffer;
     nvrhi::BufferHandle mEmissiveTriangleBuffer;
-    nvrhi::rt::AccelStructHandle mBlas;
+    std::vector<nvrhi::rt::AccelStructHandle> mBlases;
     nvrhi::rt::AccelStructHandle mTlas;
 };

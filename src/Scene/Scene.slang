@@ -7,17 +7,31 @@ struct Vertex
     float3 normal;
 };
 
-struct MeshInfo
+struct MeshDesc
 {
-    uint materialIndex;
+    uint indexOffset;
+    uint indexCount;
+};
+
+struct InstanceData
+{
+    float4 row0;
+    float4 row1;
+    float4 row2;
+    uint meshID;
+    uint materialID;
+    uint _padding0;
+    uint _padding1;
+
+    float3x4 getLocalToWorld() { return float3x4(row0, row1, row2); }
 };
 
 struct EmissiveTriangle
 {
-    uint triangleIndex; // Global primitive index
-    float area;         // World-space triangle area
-    float cdfUpper;     // Cumulative area / totalArea (upper bound of CDF bin)
-    float _padding;
+    uint instanceID;
+    uint localTriangleIndex;
+    float area;
+    float cdfUpper;
 };
 
 struct Scene
@@ -26,9 +40,9 @@ struct Scene
     StructuredBuffer<Vertex> vertices;
     StructuredBuffer<uint> indices;
     StructuredBuffer<GLTFMaterial> materials;
-    StructuredBuffer<MeshInfo> meshes;
-    StructuredBuffer<uint> triangleToMesh;                // Maps triangle index to mesh index
-    StructuredBuffer<EmissiveTriangle> emissiveTriangles; // Area-weighted CDF for light sampling
+    StructuredBuffer<MeshDesc> meshes;
+    StructuredBuffer<InstanceData> instances;
+    StructuredBuffer<EmissiveTriangle> emissiveTriangles;
 };
 
 ParameterBlock<Scene> gScene;

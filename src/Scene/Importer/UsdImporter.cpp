@@ -231,8 +231,9 @@ void UsdImporter::traverseXformNode(const tinyusdz::tydra::XformNode& node, ref<
 
             if (subsets.empty())
             {
-                // No subsets: whole mesh uses a single top-level material
+                uint32_t indexOffset = static_cast<uint32_t>(scene->indices.size());
                 extractMeshGeometry(geomMesh, worldMatrix, scene);
+                uint32_t indexCount = static_cast<uint32_t>(scene->indices.size()) - indexOffset;
 
                 tinyusdz::Path matPath;
                 const tinyusdz::Material* material{nullptr};
@@ -240,15 +241,15 @@ void UsdImporter::traverseXformNode(const tinyusdz::tydra::XformNode& node, ref<
                 tinyusdz::tydra::GetBoundMaterial(mStage, node.absolute_path, "", &matPath, &material, &err);
                 if (!err.empty())
                     LOG_WARN("No bound material for mesh {}: {}", tinyusdz::to_string(node.absolute_path), err);
-                Mesh mesh;
+
+                uint32_t materialIndex = 0;
                 auto matIt = mMaterialPathToIndex.find(tinyusdz::to_string(matPath));
                 if (matIt != mMaterialPathToIndex.end())
-                    mesh.materialIndex = matIt->second;
-                scene->meshes.push_back(mesh);
+                    materialIndex = matIt->second;
+                scene->addMeshInstance(indexOffset, indexCount, materialIndex);
             }
             else
             {
-                // Each GeomSubset is its own draw call with its own material
                 for (const auto* subset : subsets)
                 {
                     std::vector<int32_t> rawFaces;
@@ -258,7 +259,10 @@ void UsdImporter::traverseXformNode(const tinyusdz::tydra::XformNode& node, ref<
                         continue;
 
                     std::unordered_set<int32_t> faceSet(rawFaces.begin(), rawFaces.end());
+
+                    uint32_t indexOffset = static_cast<uint32_t>(scene->indices.size());
                     extractMeshGeometry(geomMesh, worldMatrix, scene, &faceSet);
+                    uint32_t indexCount = static_cast<uint32_t>(scene->indices.size()) - indexOffset;
 
                     std::string subsetPathStr = tinyusdz::to_string(node.absolute_path) + "/" + subset->name;
                     tinyusdz::Path subsetPath(subsetPathStr, "");
@@ -267,13 +271,13 @@ void UsdImporter::traverseXformNode(const tinyusdz::tydra::XformNode& node, ref<
                     std::string err;
                     tinyusdz::tydra::GetBoundMaterial(mStage, subsetPath, "", &matPath, &material, &err);
 
-                    Mesh mesh;
+                    uint32_t materialIndex = 0;
                     auto matIt = mMaterialPathToIndex.find(tinyusdz::to_string(matPath));
                     if (matIt != mMaterialPathToIndex.end())
-                        mesh.materialIndex = matIt->second;
+                        materialIndex = matIt->second;
                     else
                         LOG_WARN("No material found for subset {}", subsetPathStr);
-                    scene->meshes.push_back(mesh);
+                    scene->addMeshInstance(indexOffset, indexCount, materialIndex);
                 }
             }
         }
@@ -394,7 +398,6 @@ void UsdImporter::extractMeshGeometry(
         return idx;
     };
 
-    uint32_t triangleCount = 0;
     int32_t faceIdx = 0;
 
     for (int32_t faceVertCount : faceVertexCounts)
@@ -405,7 +408,6 @@ void UsdImporter::extractMeshGeometry(
             {
                 for (int32_t i = 0; i < 3; ++i)
                     addVertex(i);
-                triangleCount++;
             }
             else if (faceVertCount == 4)
             {
@@ -415,7 +417,6 @@ void UsdImporter::extractMeshGeometry(
                 addVertex(0);
                 addVertex(2);
                 addVertex(3);
-                triangleCount += 2;
             }
             else
                 LOG_WARN("Polygon with {} vertices found, skipping", faceVertCount);
@@ -424,9 +425,6 @@ void UsdImporter::extractMeshGeometry(
         faceOffset += faceVertCount;
         faceIdx++;
     }
-
-    for (uint32_t i = 0; i < triangleCount; ++i)
-        scene->triangleToMesh.push_back(static_cast<uint32_t>(scene->meshes.size()));
 }
 
 static UVTransform extractUVTransform(const tinyusdz::tydra::UVTexture& uvTex)

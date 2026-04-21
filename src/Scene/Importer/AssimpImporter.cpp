@@ -30,52 +30,42 @@ ref<Scene> AssimpImporter::loadScene(const std::string& fileName)
     ref<Scene> scene = make_ref<Scene>(mpDevice);
     // Load meshes
     scene->meshes.reserve(aiScene->mNumMeshes);
+    scene->instances.reserve(aiScene->mNumMeshes);
     for (unsigned int i = 0; i < aiScene->mNumMeshes; ++i)
     {
         const aiMesh* aiMesh = aiScene->mMeshes[i];
 
-        Mesh mesh;
-        // mesh.name = aiMesh->mName.C_Str();
-        // if (mesh.name.empty())
-        //     mesh.name = "Mesh_" + std::to_string(i);
-        mesh.materialIndex = aiMesh->mMaterialIndex;
+        uint32_t indexOffset = static_cast<uint32_t>(scene->indices.size());
 
-        // Current vertex offset for this mesh
+        // aiProcess_PreTransformVertices flattens world xform into positions.
         uint32_t vertexOffset = static_cast<uint32_t>(scene->vertices.size());
-
-        // Load vertices
         for (unsigned int j = 0; j < aiMesh->mNumVertices; ++j)
         {
             Vertex vertex = {};
 
-            // Position
             vertex.position[0] = aiMesh->mVertices[j].x;
             vertex.position[1] = aiMesh->mVertices[j].y;
             vertex.position[2] = aiMesh->mVertices[j].z;
 
-            // Normal
             vertex.normal[0] = aiMesh->mNormals[j].x;
             vertex.normal[1] = aiMesh->mNormals[j].y;
             vertex.normal[2] = aiMesh->mNormals[j].z;
 
-            // Texture coordinates (use first UV channel)
             vertex.texCoord[0] = aiMesh->mTextureCoords[0][j].x;
             vertex.texCoord[1] = aiMesh->mTextureCoords[0][j].y;
 
             scene->vertices.push_back(vertex);
         }
 
-        // Load indices
-        uint32_t currentMeshIndex = static_cast<uint32_t>(scene->meshes.size());
         for (unsigned int j = 0; j < aiMesh->mNumFaces; ++j)
         {
             const aiFace& face = aiMesh->mFaces[j];
             for (unsigned int k = 0; k < face.mNumIndices; ++k)
                 scene->indices.push_back(vertexOffset + face.mIndices[k]);
-            scene->triangleToMesh.push_back(currentMeshIndex);
         }
 
-        scene->meshes.push_back(std::move(mesh));
+        uint32_t indexCount = static_cast<uint32_t>(scene->indices.size()) - indexOffset;
+        scene->addMeshInstance(indexOffset, indexCount, aiMesh->mMaterialIndex);
     }
 
     // Load materials
