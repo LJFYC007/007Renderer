@@ -8,7 +8,7 @@ Contributor + AI-agent guide for 007Renderer. For the user-facing intro and road
 
 1. **Build from PowerShell only.** `cmake` and `ninja` are on PATH in bash, so configure appears to succeed — then the build fails with `'fxc.exe' is not recognized`. `fxc.exe` (Windows SDK FX Compiler, used for HLSL) is only reachable after the user's PowerShell `$PROFILE` runs. Wrap every build/test command in `powershell -Command "..."`.
 2. **Clangd diagnostics are noise, not build errors.** Edits to files that include `imgui.h`, `nvrhi/nvrhi.h`, or dependent project headers often produce `<new-diagnostics>` reports like *"'imgui.h' file not found"* or *"Unknown type 'ImVec2'"*. These come from clangd missing the CMake include paths — they are **not** real build errors. Verify with an actual `cmake --build` before trying to "fix" them.
-3. **Run the full test suite, not the CI subset.** `run_tests` executes all 11 cases including the `Full` convergence tests that catch real rendering regressions; `run_tests_ci` skips those and exists only for GitHub Actions parity.
+3. **Run the full test suite, not the CI subset.** `run_tests` executes all 15 cases (including the 6 `Full` convergence tests that catch real rendering regressions); `run_tests_ci` skips those and exists only for GitHub Actions parity.
 4. **Never substitute `faceN` for the shading normal `N` in Slang.** `faceN` is for sidedness checks and ray offsets only. Using it as a shading normal silently corrupts BSDF evaluation.
 
 ## Build, Run, Test
@@ -16,23 +16,14 @@ Contributor + AI-agent guide for 007Renderer. For the user-facing intro and road
 Prerequisites: run `.\setup.ps1` (PowerShell) to fetch Slang v2026.3.1 and DXC v1.8.2505.1 into `external/`.
 
 ```bash
-# Configure (Ninja generator, MSVC x64 toolchain)
 powershell -Command "cmake -S . -B build/RelWithDebInfo -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo"
-
-# Build
 powershell -Command "cmake --build build/RelWithDebInfo --parallel"
-
-# Run
 powershell -Command "build/RelWithDebInfo/bin/RelWithDebInfo/007Renderer.exe"
-
-# Full test suite — use this during development
-powershell -Command "cmake --build build/RelWithDebInfo --target run_tests"
-
-# GitHub Actions subset (9 non-Full cases) — for CI parity only
-powershell -Command "cmake --build build/RelWithDebInfo --target run_tests_ci"
+powershell -Command "cmake --build build/RelWithDebInfo --target run_tests"     # full (15 cases) — use during dev
+powershell -Command "cmake --build build/RelWithDebInfo --target run_tests_ci"  # CI parity only (9 non-Full)
 ```
 
-**Debugging runtime issues:** launch `007Renderer.exe` and inspect `logs/007Renderer.log` — Slang compile errors and scene-load warnings land there. If you need logs for debug mode, please use DEBUG instead of RelWithDebInfo. NEVER modify the code in Logger.h/cpp while debugging.
+**Debugging runtime issues:** launch `007Renderer.exe` and inspect `logs/007Renderer.log` — Slang compile errors and scene-load warnings land there. For debug-mode logs, build `DEBUG` instead. Never modify `Logger.h/.cpp`.
 
 ## Naming Conventions (Falcor-style)
 
@@ -58,11 +49,9 @@ Entry point: `src/main.cpp` wires up `Device`, `Window`, and the default `Render
 
 ### Render Graph (`src/RenderPasses/`)
 
-A DAG of `RenderPass` nodes connected by named typed ports (`RenderPassInput` / `RenderPassOutput`, defined alongside `RenderPassRegistry` in `RenderPass.h`). `RenderGraph` topo-sorts and executes passes in order, threading `RenderData` through. `RenderGraphEditor` is the ImGui node-editor UI for runtime rewiring. New passes self-register via static initializers calling `RenderPassRegistry::registerPass`.
+A DAG of `RenderPass` nodes connected by named typed ports (`RenderPassInput` / `RenderPassOutput`, defined alongside `RenderPassRegistry` in `RenderPass.h`). `RenderGraph` topo-sorts and executes passes in order, threading `RenderData` through. New passes self-register via static initializers calling `RenderPassRegistry::registerPass`. `RenderGraphBuilder` (header-only) wires the default graph at startup in `main.cpp`; runtime rewiring goes through the ImGui-based `RenderGraphEditor`.
 
-`RenderGraphBuilder` (header-only) is the fluent builder used in `main.cpp` to wire the default graph at startup; runtime edits go through `RenderGraphEditor`.
-
-**Concrete passes:** `PathTracingPass`, `AccumulatePass`, `ErrorMeasurePass`, `ToneMappingPass`. Utility passes live under `src/RenderPasses/Utils/` (e.g., `TextureAverage`, a compute-based texture reduction). Each pass colocates its `.slang` shaders; shared Slang headers use `.slangh`.
+Each pass colocates its `.slang` shaders in the same directory; shared Slang headers use `.slangh`. Utility passes live under `src/RenderPasses/Utils/`.
 
 ### Shader Passes (`src/ShaderPasses/`)
 
@@ -74,17 +63,15 @@ A DAG of `RenderPass` nodes connected by named typed ports (`RenderPassInput` / 
 
 `Scene` holds geometry (vertices, indices, `MeshDesc` ranges), **per-BLAS `MeshInstance`s** (meshID + materialIndex + `localToWorld`), materials, acceleration structures (one BLAS per mesh; TLAS instances carry the transforms), and camera. `EmissiveTriangle`s key on `instanceID`, not meshID — a mesh reused by N instances contributes N emitters. `Camera` (`src/Scene/Camera/`) has paired C++ and Slang components (`Camera.slang`, `CameraData.slang`).
 
-**Importers** (`src/Scene/Importer/`): `Importer` is the base class; `loadSceneWithImporter()` dispatches by file extension — USD → `UsdImporter`, GLTF/OBJ → `AssimpImporter` (currently unmaintained). `TextureManager` (`src/Scene/Material/`) handles texture loading (PNG, JPG, EXR, DDS) with `kInvalidTextureId = 0xFFFFFFFF` as sentinel.
-
-**Scene assets:** `media/` holds `cornell_box.usdc` / `.gltf`, `sphere.usdc`, and `reference.exr` (used by `PathTracerTest.Full`). Tests resolve paths via `PROJECT_DIR + "/media/..."`.
+**Importers** (`src/Scene/Importer/`): `Importer` is the base class; `loadSceneWithImporter()` dispatches by file extension — USD → `UsdImporter`, GLTF/OBJ → `AssimpImporter` (currently unmaintained). `TextureManager` (`src/Scene/Material/`) handles texture loading (PNG, JPG, EXR, DDS) with `kInvalidTextureId = 0xFFFFFFFF` as sentinel. Tests resolve scene-asset paths via `PROJECT_DIR + "/media/..."`.
 
 ### Utils (`src/Utils/`)
 
-GUI (`GUI` namespace + `GUIManager` class in `GUI.h`; shared `Widgets`; `Theme::Luminograph` palette in `Theme.h`), logging (`Logger`), image I/O (`ExrUtils`, `ResourceIO`), math (`Math/` + `MathConstants.slangh`), and sampling (`Sampling/SampleGenerator` with a Slang interface).
+GUI (`GUI.h` namespace + `GUIManager`; `Theme::Luminograph` palette), `Logger`, EXR/image I/O, `Math/` + `MathConstants.slangh`, and `Sampling/SampleGenerator` (C++/Slang pair).
 
 ## Slang Shading Pipeline
 
-Slang files live under `src/Scene/`, `src/Scene/Material/`, `src/RenderPasses/*/`, and `src/Utils/`. The pipeline is layered by responsibility:
+The pipeline is layered by responsibility:
 
 - **Geometry stage** (`VertexData` → `ShadingPrep` → `ShadingData`): produces a geometry-only surface. No normal map, no back-face flip — those are material decisions. `ShadingData` keeps immutable geometric refs (`faceN`, `tangentW`) separate from the mutable shading frame (`T/B/N`).
 - **Material stage** (`Material/`): `IMaterial` interface with `GLTFMaterial` as the concrete implementation. The material owns `prepareShadingFrame()` (normal map + back-face handling) and a **Material → BSDF pipeline**: `prepareBSDF(sd)` samples all textures once and returns a `GLTFBSDF` that owns `eval(wo)`, `evalPdf(wo)`, and `sample(sg)` in shading-frame local space. `GLTFMaterial::scatter()` exists only to satisfy `IMaterial` (used by furnace mode). Per-lobe BSDF math lives in `GLTFBSDFs` / `GGXMicrofacet`; sample validation in `BSDFTypes::isValidScatter()`.
@@ -92,9 +79,8 @@ Slang files live under `src/Scene/`, `src/Scene/Material/`, `src/RenderPasses/*/
 
 ### Critical Slang Rules
 
-- **`faceN` vs `N`** — never substitute `faceN` for the shading normal. `faceN` is for sidedness checks and ray offsets; `N` is for BSDF evaluation. *(Also in Before You Start.)*
-- **Hoist `prepareBSDF(sd)` once per hit** — 4 texture samples per call. *(Also in Before You Start.)*
-- **Shadow / visibility rays must offset both endpoints.** `computeRayOrigin(pos, normal)` (in `Ray.slang`, Wächter & Binder integer offsets) pushes a point slightly off a surface along `normal`. For NEE shadow rays, offset the origin along the shading surface's oriented face normal *and* the target along the light's face normal oriented toward the shading point. Matches PBRT4's `SpawnRayTo(pFrom, nFrom, pTo, nTo)`. Offsetting only the origin causes false occlusion for nearly-coplanar shading/light points (e.g., ceiling points near a ceiling light) because the ray travels at a shallow angle from below the surface to a point sitting on it, clipping through geometry in between.
+- **Hoist `prepareBSDF(sd)` once per hit** — 4 texture samples per call.
+- **Shadow / visibility rays must offset both endpoints** via `computeRayOrigin(pos, normal)` in `Ray.slang` — offset the shading point along its oriented face normal *and* the light point along its face normal oriented back toward the shading point. Matches PBRT4's `SpawnRayTo(pFrom, nFrom, pTo, nTo)`. Rationale lives next to the function.
 - **`import` vs `#include` macro scoping.** Use `import` for module dependencies; `#include` only where needed *before* `import` (e.g., `GLTFMaterial.slang`). Macros from `#include` do **not** cross `import` boundaries — a macro defined in a header you `#include` is invisible inside a module you `import`.
 
 ### Light Sampling (NEE + MIS)
@@ -112,13 +98,9 @@ Slang files live under `src/Scene/`, `src/Scene/Material/`, `src/RenderPasses/*/
 
 ## External Dependencies & Patches
 
-Under `external/` in three forms:
+Submodules live under `external/` (see `.gitmodules`). Non-obvious facts: NVRHI is configured D3D12-only (Vulkan/DX11 disabled), GLM is built with `GLM_ENABLE_EXPERIMENTAL` + `GLM_FORCE_RADIANS`, imgui-node-editor and TinyEXR+miniz are vendored in-tree (not submodules), and Slang/DXC are downloaded by `setup.ps1` (not in git) with DLLs copied post-build.
 
-- **Submodules** (`.gitmodules`): NVRHI (D3D12-only; Vulkan/DX11 disabled), ImGui (DX12 + Win32), TinyUSDZ, Assimp (GLTF/OBJ), DirectXTex (DDS), GLM (experimental + force-radians), spdlog (bundled fmt), GoogleTest.
-- **Vendored in-tree**: imgui-node-editor (render-graph UI), TinyEXR + miniz (EXR I/O).
-- **Downloaded by `setup.ps1`** (not in git): Slang v2026.3.1, DXC v1.8.2505.1 — DLLs are copied post-build.
-
-**Local patches** live in `patches/` and are applied to submodules by CMake using sentinel files to avoid re-application:
+**Local patches** in `patches/` are applied to submodules by CMake using sentinel files to avoid re-application:
 
 | Patch | Applied to | Sentinel |
 | --- | --- | --- |
@@ -127,29 +109,13 @@ Under `external/` in three forms:
 
 **To modify a submodule:** edit in-place under `external/`, then `git diff > patches/<name>.patch` from within the submodule directory. Patches must be reapplied after `git submodule update`.
 
-## Build System Notes
-
-- Single root `CMakeLists.txt` (no nested `CMakeLists` under `src/` or `tests/`). Sources collected via `file(GLOB_RECURSE)`.
-- `007Core` static library contains all `src/` code except `main.cpp`; `007Renderer` executable links `007Core`; `007Tests` links `007Core` + GoogleTest.
-- `PROJECT_SHADER_DIR` is defined as `${CMAKE_SOURCE_DIR}/shaders` but no such directory exists — shader files live under `src/` and are found via `PROJECT_SRC_DIR` search paths in `Program`.
-
 ## Testing
 
 Tests live in `tests/`. The shared test environment (device, logger, ImGui context) is set up in `tests/Environment.cpp`.
 
-**Always run `run_tests` during development.** `run_tests_ci` is a GitHub Actions target and skips the `Full` convergence tests that catch real rendering regressions.
+Suites: `PathTracerTest` (incl. `Full` 4096-spp convergence), `RoughnessSweep/WhiteFurnaceFull` (5-value GGX sweep), `SlangTest`, `ComputeShaderTest`, `RenderGraphTest`.
 
-**Test inventory (15 total, 9 non-Full — the roughness sweep expands to 5 gtest instances):**
-
-| Suite | Cases |
-| --- | --- |
-| `PathTracerTest` | `Basic` (4 spp smoke), **`Full`** (4096 spp + error threshold, saves `output.exr` on failure) |
-| `RoughnessSweep/WhiteFurnaceFull` | **`ConvergesToWhite/r{5,25,50,75,100}`** (1024 spp × 5-value roughness sweep via `INSTANTIATE_TEST_SUITE_P`) |
-| `SlangTest` | `All` (Slang reflection + ComputePass across plain globals, RWTexture, ParameterBlock, bindless) |
-| `ComputeShaderTest` | `Basic` (buffer add via ComputePass) |
-| `RenderGraphTest` | 6 cases: linear build, duplicate node names, missing required input, optional inputs unconnected, cycles, unknown slot connections |
-
-The CI subset (`--gtest_filter="-*Full*"`) runs 9 tests, excluding `PathTracerTest.Full` plus all 5 `RoughnessSweep/WhiteFurnaceFull.ConvergesToWhite/r*` instances. The trailing wildcard matters — without it the substring match on `WhiteFurnaceFull` is missed.
+**CI-filter gotcha:** `run_tests_ci` uses `--gtest_filter="-*Full*"`. The trailing `*` matters — without it, the substring match on `WhiteFurnaceFull` is missed and the roughness sweep leaks into CI.
 
 **Test fixture + artifacts (`tests/TestHelpers.{h,cpp}`):**
 - Derive new suites from `DeviceTest` (grabs the process-lifetime device in `SetUp`) instead of rolling your own fixture.
