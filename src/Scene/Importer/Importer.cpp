@@ -11,10 +11,10 @@ namespace
 const std::unordered_set<std::string> kUsdExtensions = {".usd", ".usda", ".usdc", ".usdz"};
 
 // Assimp supported file extensions (commonly used ones)
-const std::unordered_set<std::string> kAssimpExtensions = {".gltf", ".glb", ".fbx", ".obj", ".3ds", ".dae", ".x",   ".blend", ".ase", ".ifc",  ".xgl",
-                                                           ".zgl",  ".ply", ".dxf", ".lwo", ".lws", ".lxo", ".stl", ".x",     ".ac",  ".ms3d", ".cob",
-                                                           ".scn",  ".md2", ".md3", ".pk3", ".mdc", ".md5", ".smd", ".vta",   ".m3",  ".3d",   ".b3d",
-                                                           ".q3d",  ".q3s", ".nff", ".off", ".raw", ".ter", ".mdl", ".hmp",   ".ndo"};
+const std::unordered_set<std::string> kAssimpExtensions = {".gltf", ".glb", ".fbx", ".obj", ".3ds", ".dae", ".x",   ".blend", ".ase",  ".ifc", ".xgl",
+                                                           ".zgl",  ".ply", ".dxf", ".lwo", ".lws", ".lxo", ".stl", ".ac",    ".ms3d", ".cob", ".scn",
+                                                           ".md2",  ".md3", ".pk3", ".mdc", ".md5", ".smd", ".vta", ".m3",    ".3d",   ".b3d", ".q3d",
+                                                           ".q3s",  ".nff", ".off", ".raw", ".ter", ".mdl", ".hmp", ".ndo"};
 
 std::string getFileExtension(const std::string& fileName)
 {

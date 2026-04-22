@@ -16,7 +16,6 @@
 int main()
 {
     Logger::init();
-    auto logger = Logger::get();
 
     // Initialize device (D3D12 + NVRHI)
     ref<Device> pDevice = make_ref<Device>();
@@ -92,8 +91,7 @@ int main()
 
             // Get current render graph and execute
             auto renderGraph = renderGraphEditor.getCurrentRenderGraph();
-            RenderData finalOutput;
-            finalOutput = renderGraph->execute();
+            renderGraph->execute();
 
             // Set texture for display using the selected output
             nvrhi::TextureHandle imageTexture = renderGraph->getFinalOutputTexture();

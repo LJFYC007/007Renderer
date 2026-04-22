@@ -1,8 +1,11 @@
+#pragma once
 #include <imgui.h>
 #include <d3d12.h>
 
-// Simple free list based allocator
-struct ExampleDescriptorHeapAllocator
+// Simple free-list-based allocator for a D3D12 descriptor heap (SRV/CBV/UAV).
+// Forked from the upstream ImGui DX12 example; ImGui calls back into Alloc/Free
+// so its internal texture uploads can reserve descriptor slots inside the app's heap.
+struct DescriptorHeapAllocator
 {
     ID3D12DescriptorHeap* mpHeap = nullptr;
     D3D12_DESCRIPTOR_HEAP_TYPE mHeapType = D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES;

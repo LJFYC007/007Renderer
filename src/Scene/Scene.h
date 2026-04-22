@@ -40,6 +40,7 @@ struct InstanceData
     uint32_t _padding0;
     uint32_t _padding1;
 };
+static_assert(sizeof(InstanceData) == 64, "InstanceData must be 64 B to match Slang row-major float3x4 + 16-byte tail");
 
 struct EmissiveTriangle
 {
@@ -78,15 +79,6 @@ public:
     nvrhi::BufferHandle getInstanceBuffer() const { return mInstanceBuffer; }
     nvrhi::BufferHandle getEmissiveTriangleBuffer() const { return mEmissiveTriangleBuffer; }
     uint32_t getEmissiveTriangleCount() const { return static_cast<uint32_t>(emissiveTriangles.size()); }
-
-    // Get material by index
-    const Material& getMaterial(uint32_t index) const
-    {
-        if (index < materials.size())
-            return materials[index];
-        static Material defaultMaterial;
-        return defaultMaterial;
-    }
 
     // Texture management
     uint32_t loadTexture(const float* data, uint32_t width, uint32_t height, uint32_t channels, const std::string& debugName = "");

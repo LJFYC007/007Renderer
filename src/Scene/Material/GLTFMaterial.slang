@@ -201,13 +201,8 @@ struct GLTFMaterial : IMaterial
 
         float3 N = normalize(tsN.x * baseT + tsN.y * baseB + tsN.z * baseN);
 
-        // Re-orthogonalize against sd.tangentW (stable geometric reference) to avoid frame drift
-        float3 T = normalize(sd.tangentW.xyz - dot(sd.tangentW.xyz, N) * N);
-        float3 B = sd.tangentW.w * cross(N, T);
-
-        sd.N = N;
-        sd.T = T;
-        sd.B = B;
+        // Re-orthogonalize against sd.tangentW (stable geometric reference) to avoid frame drift.
+        sd.buildTBN(N);
     }
 
     GLTFBSDF prepareBSDF(const ShadingData sd)

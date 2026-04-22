@@ -35,7 +35,7 @@ struct ScatterRayData
     float prevBsdfPdf; // PDF of the BSDF sample that generated this ray (for MIS at next emissive hit)
     float3 prevPos;    // Position of the previous shading point (for evalLightPdf at next emissive hit)
 
-    TinyUniformSampleGenerator sg; // Per-ray state for the sample generator (up to 16B)
+    TinyUniformSampleGenerator sg; // Per-ray state for the sample generator
 
     __init(TinyUniformSampleGenerator sg)
     {
@@ -151,11 +151,7 @@ void closestHitMain(inout ScatterRayData scatterRay, BuiltInTriangleIntersection
     // shading hemisphere aligns with the geometric hemisphere used
     // by isValidScatter(). This isolates the BRDF energy loss from
     // smooth-normal / face-normal divergence.
-    float3 N = hit.frontFacing ? hit.faceN : -hit.faceN;
-    float3 t = hit.tangentW.xyz - dot(hit.tangentW.xyz, N) * N;
-    hit.T = normalize(t);
-    hit.B = hit.tangentW.w * cross(N, hit.T);
-    hit.N = N;
+    hit.buildTBN(hit.getOrientedFaceNormal());
 
     BSDFSample sample = material.scatter(hit, scatterRay.sg);
 

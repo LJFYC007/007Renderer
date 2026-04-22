@@ -16,10 +16,7 @@ ShadingData prepareShadingData(VertexData vd, float3 rayOrigin, float3 rayDir, f
 
     sd.frontFacing = dot(vd.faceNormalW, rayDir) <= 0.0f;
 
-    sd.N = vd.normalW;
-    float3 t = vd.tangentW.xyz - dot(vd.tangentW.xyz, sd.N) * sd.N;
-    sd.T = normalize(t);
-    sd.B = vd.tangentW.w * cross(sd.N, sd.T);
+    sd.buildTBN(vd.normalW);
 
     return sd;
 }

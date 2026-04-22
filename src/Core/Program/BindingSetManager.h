@@ -17,8 +17,6 @@ class BindingSetManager
 public:
     BindingSetManager(ref<Device> device, const std::vector<ReflectionInfo>& reflectionInfo);
 
-    ~BindingSetManager() {}
-
     std::vector<nvrhi::BindingSetHandle> getBindingSets();
     std::vector<nvrhi::BindingLayoutHandle> getBindingLayouts();
 

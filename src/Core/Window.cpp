@@ -17,7 +17,7 @@ static UINT g_frameIndex = 0;
 static ComPtr<ID3D12Device> g_pd3dDevice = nullptr;
 static ID3D12DescriptorHeap* g_pd3dRtvDescHeap = nullptr;
 static ID3D12DescriptorHeap* g_pd3dSrvDescHeap = nullptr;
-static ExampleDescriptorHeapAllocator g_pd3dSrvDescHeapAlloc;
+static DescriptorHeapAllocator g_pd3dSrvDescHeapAlloc;
 static ComPtr<ID3D12CommandQueue> g_pd3dCommandQueue = nullptr;
 static ID3D12GraphicsCommandList* g_pd3dCommandList = nullptr;
 static ID3D12Fence* g_fence = nullptr;
@@ -276,39 +276,14 @@ bool Window::CreateDeviceD3D(HWND hWnd)
         sd.Stereo = FALSE;
     }
 
-    // [DEBUG] Enable debug interface
-#ifdef DX12_ENABLE_DEBUG_LAYER
-    ID3D12Debug* pdx12Debug = nullptr;
-    if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&pdx12Debug))))
-    {
-        pdx12Debug->EnableDebugLayer();
-
-        // Enable GPU-based validation (GBV) for enhanced debugging
-        ID3D12Debug3* pdx12Debug3 = nullptr;
-        if (SUCCEEDED(pdx12Debug->QueryInterface(IID_PPV_ARGS(&pdx12Debug3))))
-        {
-            pdx12Debug3->SetEnableGPUBasedValidation(TRUE);
-            pdx12Debug3->SetGPUBasedValidationFlags(D3D12_GPU_BASED_VALIDATION_FLAGS_NONE);
-            pdx12Debug3->Release();
-        }
-
-        pdx12Debug->Release();
-    }
-#endif
-
-    // Create device
-    // D3D_FEATURE_LEVEL featureLevel = D3D_FEATURE_LEVEL_11_0;
-    // if (D3D12CreateDevice(nullptr, featureLevel, IID_PPV_ARGS(&g_pd3dDevice)) != S_OK)
-    //     return false;
-
-    // [DEBUG] Setup debug interface to break on any warnings/errors
+    // Debug layer + GBV are enabled upstream by Device::initialize(). Here we only
+    // attach break-on-severity to the already-created device's InfoQueue.
 #ifdef DX12_ENABLE_DEBUG_LAYER
     ID3D12InfoQueue* pInfoQueue = nullptr;
     if (SUCCEEDED(g_pd3dDevice->QueryInterface(IID_PPV_ARGS(&pInfoQueue))))
     {
         pInfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true);
         pInfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, true);
-        pInfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, true);
         pInfoQueue->Release();
     }
 #endif
@@ -340,15 +315,6 @@ bool Window::CreateDeviceD3D(HWND hWnd)
             return false;
         g_pd3dSrvDescHeapAlloc.Create(g_pd3dDevice.Get(), g_pd3dSrvDescHeap);
     }
-
-    // {
-    //     D3D12_COMMAND_QUEUE_DESC desc = {};
-    //     desc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-    //     desc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
-    //     desc.NodeMask = 1;
-    //     if (g_pd3dDevice->CreateCommandQueue(&desc, IID_PPV_ARGS(&g_pd3dCommandQueue)) != S_OK)
-    //         return false;
-    // }
 
     for (UINT i = 0; i < APP_NUM_FRAMES_IN_FLIGHT; i++)
         if (g_pd3dDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&g_frameContext[i].CommandAllocator)) != S_OK)
@@ -405,7 +371,7 @@ void Window::CleanupDeviceD3D()
             g_frameContext[i].CommandAllocator->Release();
             g_frameContext[i].CommandAllocator = nullptr;
         }
-    // if (g_pd3dCommandQueue) { g_pd3dCommandQueue->Release(); g_pd3dCommandQueue = nullptr; }
+    // g_pd3dCommandQueue and g_pd3dDevice are ComPtrs; Release is automatic when the Window dtor runs.
     if (g_pd3dCommandList)
     {
         g_pd3dCommandList->Release();
@@ -431,7 +397,6 @@ void Window::CleanupDeviceD3D()
         CloseHandle(g_fenceEvent);
         g_fenceEvent = nullptr;
     }
-    // if (g_pd3dDevice) { g_pd3dDevice->Release(); g_pd3dDevice = nullptr; }
 }
 
 void CreateRenderTarget()

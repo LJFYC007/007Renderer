@@ -20,6 +20,9 @@ struct Ray
     RayDesc toRayDesc() { return RayDesc(origin, tMin, dir, tMax); }
 }
 
+// Self-intersection-free ray origin (Wächter & Binder, "A Fast and Robust
+// Method for Avoiding Self-Intersection", Ray Tracing Gems Ch. 6).
+// Constants are tuned to fp32 mantissa spacing near the surface.
 float3 computeRayOrigin(float3 pos, float3 normal)
 {
     const float origin = 1.f / 16.f;

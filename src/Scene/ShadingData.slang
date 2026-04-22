@@ -22,4 +22,14 @@ struct ShadingData
 
     float3 toLocal(float3 w) { return float3(dot(w, T), dot(w, B), dot(w, N)); }
     float3 toWorld(float3 w) { return w.x * T + w.y * B + w.z * N; }
+
+    // Rebuild the mutable T/B/N frame from a new shading normal while keeping
+    // tangentW as the geometric reference (Gram-Schmidt against N).
+    [mutating]
+    void buildTBN(float3 shadingN)
+    {
+        this.N = shadingN;
+        this.T = normalize(tangentW.xyz - dot(tangentW.xyz, shadingN) * shadingN);
+        this.B = tangentW.w * cross(shadingN, this.T);
+    }
 };

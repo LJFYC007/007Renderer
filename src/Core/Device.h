@@ -60,6 +60,5 @@ private:
 
 #ifdef _DEBUG
     ID3D12Debug* mpDx12Debug = nullptr;
-    ID3D12InfoQueue* mpInfoQueue = nullptr;
 #endif
 };

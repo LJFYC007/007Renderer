@@ -10,7 +10,6 @@ ComputePass::ComputePass(ref<Device> pDevice, const std::string& shaderPath, con
     std::string shaderVersion = getLatestComputeShaderVersion();
     Program program(pNvrhiDevice, std::string(PROJECT_DIR) + shaderPath, entryPoints, shaderVersion);
     mShader = program.getShader(entryPoint);
-    // program.printReflectionInfo();
 
     mpBindingSetManager = make_ref<BindingSetManager>(pDevice, program.getReflectionInfo());
     auto pProgramLayout = program.getProgramLayout();

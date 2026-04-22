@@ -32,7 +32,7 @@ public:
 
 private:
     Slang::ComPtr<slang::IComponentType> mLinkedProgram;
-    slang::ProgramLayout* mpProgramLayout;
+    slang::ProgramLayout* mpProgramLayout = nullptr;
 
     std::vector<nvrhi::ShaderHandle> mShaders;                        // All shaders
     std::unordered_map<std::string, size_t> mEntryPointToShaderIndex; // Map entry point names to shader indices

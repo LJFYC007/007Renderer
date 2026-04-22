@@ -57,5 +57,4 @@ export struct TinyUniformSampleGenerator : ISampleGenerator
     }
 
     uint state;
-    uint3 _pad;
 };

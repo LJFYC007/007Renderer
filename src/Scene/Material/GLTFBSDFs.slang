@@ -1,5 +1,4 @@
 #include "Utils/Math/MathConstants.slangh"
-import Utils.Sampling.Sample;
 import Utils.Sampling.SampleGeneratorInterface;
 import GGXMicrofacet;
 
