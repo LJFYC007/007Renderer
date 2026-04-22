@@ -7,7 +7,7 @@ cbuffer PerFrameCB
     uint gWidth;
     uint gHeight;
     uint frameCount;
-    bool reset;
+    uint reset;
 };
 
 [shader("compute")]
@@ -17,7 +17,7 @@ void main(uint3 dispatchThreadID: SV_DispatchThreadID)
     uint2 id = dispatchThreadID.xy;
     if (id.x >= gWidth || id.y >= gHeight)
         return;
-    if (reset == 1)
+    if (reset != 0)
         accumulateTexture[id] = float4(0.f);
 
     accumulateTexture[id] += input[id];
