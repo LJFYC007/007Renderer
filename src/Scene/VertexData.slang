@@ -49,7 +49,8 @@ VertexData interpolateVertices(Vertex v0, Vertex v1, Vertex v2, float2 barycentr
     {
         float3 up = abs(vd.faceNormalW.y) < 0.9f ? float3(0, 1, 0) : float3(1, 0, 0);
         tangentW = normalize(cross(up, vd.faceNormalW));
-        handedness = 1.0f;
+        // Inherit mirror parity so the fallback frame stays consistent with the UV-derived branch on mirrored instances.
+        handedness = mirrorSign;
     }
     vd.tangentW = float4(tangentW, handedness);
     vd.materialID = materialID;
