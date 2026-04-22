@@ -32,6 +32,8 @@ RayTracingPass::RayTracingPass(
     pipelineDesc.maxAttributeSize = 8;
     pipelineDesc.maxRecursionDepth = 2;
 
+    std::string rayGenName;
+    std::string closestHitName;
     std::vector<std::string> missNames;
 
     for (const auto& [name, type] : entryPoints)
@@ -40,6 +42,7 @@ RayTracingPass::RayTracingPass(
         if (type == nvrhi::ShaderType::RayGeneration)
         {
             mRayGenShader = shader;
+            rayGenName = name;
             pipelineDesc.addShader(nvrhi::rt::PipelineShaderDesc().setShader(shader).setExportName(name.c_str()));
         }
         else if (type == nvrhi::ShaderType::Miss)
@@ -51,13 +54,14 @@ RayTracingPass::RayTracingPass(
         else if (type == nvrhi::ShaderType::ClosestHit)
         {
             mClosestHitShader = shader;
+            closestHitName = name;
         }
     }
 
     // Shadow rays reuse hit group 0 with RAY_FLAG_SKIP_CLOSEST_HIT_SHADER,
     // so no separate shadow hit group is needed.
     pipelineDesc.addHitGroup(
-        nvrhi::rt::PipelineHitGroupDesc().setClosestHitShader(mClosestHitShader).setExportName("closestHitMain").setIsProceduralPrimitive(false)
+        nvrhi::rt::PipelineHitGroupDesc().setClosestHitShader(mClosestHitShader).setExportName(closestHitName.c_str()).setIsProceduralPrimitive(false)
     );
 
     LOG_DEBUG(
@@ -74,10 +78,10 @@ RayTracingPass::RayTracingPass(
 
     // Create shader table with matching export names
     mShaderTable = mPipeline->createShaderTable();
-    mShaderTable->setRayGenerationShader("rayGenMain");
+    mShaderTable->setRayGenerationShader(rayGenName.c_str());
     for (const auto& name : missNames)
         mShaderTable->addMissShader(name.c_str());
-    mShaderTable->addHitGroup("closestHitMain");
+    mShaderTable->addHitGroup(closestHitName.c_str());
 }
 
 void RayTracingPass::execute(uint32_t width, uint32_t height, uint32_t depth)
