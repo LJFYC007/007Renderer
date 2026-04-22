@@ -207,7 +207,7 @@ ReadbackHeap::~ReadbackHeap()
 
 nvrhi::BufferHandle ReadbackHeap::allocateBuffer(size_t size)
 {
-    if (size < mBufferSize && mpBuffer)
+    if (size <= mBufferSize && mpBuffer)
         return mpBuffer;
 
     // Grow the buffer size exponentially
