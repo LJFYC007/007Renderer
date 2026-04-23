@@ -80,10 +80,12 @@ jobs:
         Write-Host "✅ Successfully built ${{ matrix.build_type }} version"
 
     - name: Run CI tests and generate report
+      env:
+        RENDERER_FAST_TESTS: "1"
       run: |
         $reportDir = "build/test-reports"
         if (!(Test-Path -Path $reportDir)) {
           New-Item -ItemType Directory -Path $reportDir -Force | Out-Null
         }
         $testExe = "build\${{ matrix.build_type }}\bin\${{ matrix.build_type }}\007Tests.exe"
-        & $testExe --gtest_filter="-*Full" --gtest_output=xml:build/test-reports/results.xml
+        & $testExe --gtest_output=xml:build/test-reports/results.xml

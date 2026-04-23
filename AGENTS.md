@@ -8,7 +8,7 @@ Contributor + AI-agent guide for 007Renderer. For the user-facing intro and road
 
 1. **Build from PowerShell only.** `cmake` and `ninja` are on PATH in bash, so configure appears to succeed — then the build fails with `'fxc.exe' is not recognized`. `fxc.exe` (Windows SDK FX Compiler, used for HLSL) is only reachable after the user's PowerShell `$PROFILE` runs. Wrap every build/test command in `powershell -Command "..."`.
 2. **Clangd diagnostics are noise, not build errors.** Edits to files that include `imgui.h`, `nvrhi/nvrhi.h`, or dependent project headers often produce `<new-diagnostics>` reports like *"'imgui.h' file not found"* or *"Unknown type 'ImVec2'"*. These come from clangd missing the CMake include paths — they are **not** real build errors. Verify with an actual `cmake --build` before trying to "fix" them.
-3. **Run the full test suite, not the CI subset.** `run_tests` executes all 15 cases (including the 6 `Full` convergence tests that catch real rendering regressions); `run_tests_ci` skips those and exists only for GitHub Actions parity.
+3. **Run the full test suite, not the CI subset.** `run_tests` runs the slow convergence tests that catch real rendering regressions (Cornell 4096-spp, 5-value white-furnace roughness sweep); `run_tests_ci` sets `RENDERER_FAST_TESTS=1` so those self-skip via `GTEST_SKIP()`, and exists only for GitHub Actions parity.
 4. **Never substitute `faceN` for the shading normal `N` in Slang.** `faceN` is for sidedness checks and ray offsets only. Using it as a shading normal silently corrupts BSDF evaluation.
 
 ## Build, Run, Test
@@ -19,8 +19,9 @@ Prerequisites: run `.\setup.ps1` (PowerShell) to fetch Slang v2026.3.1 and DXC v
 powershell -Command "cmake -S . -B build/RelWithDebInfo -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo"
 powershell -Command "cmake --build build/RelWithDebInfo --parallel"
 powershell -Command "build/RelWithDebInfo/bin/RelWithDebInfo/007Renderer.exe"
-powershell -Command "cmake --build build/RelWithDebInfo --target run_tests"     # full (15 cases) — use during dev
-powershell -Command "cmake --build build/RelWithDebInfo --target run_tests_ci"  # CI parity only (9 non-Full)
+powershell -Command "cmake --build build/RelWithDebInfo --target run_tests"       # slow convergence tests included, benchmarks self-skip — use during dev
+powershell -Command "cmake --build build/RelWithDebInfo --target run_tests_ci"    # RENDERER_FAST_TESTS=1, slow + benchmark tests self-skip (CI parity)
+powershell -Command "cmake --build build/RelWithDebInfo --target run_benchmarks"  # RENDERER_RUN_BENCHMARKS=1, benchmarks only (Bistro, etc.)
 ```
 
 **Debugging runtime issues:** launch `007Renderer.exe` and inspect `logs/007Renderer.log` — Slang compile errors and scene-load warnings land there. For debug-mode logs, build `DEBUG` instead. Never modify `Logger.h/.cpp`.
@@ -113,9 +114,9 @@ Submodules live under `external/` (see `.gitmodules`). Non-obvious facts: NVRHI 
 
 Tests live in `tests/`. The shared test environment (device, logger, ImGui context) is set up in `tests/Environment.cpp`.
 
-Suites: `PathTracerTest` (incl. `Full` 4096-spp convergence), `RoughnessSweep/WhiteFurnaceFull` (5-value GGX sweep), `SlangTest`, `ComputeShaderTest`, `RenderGraphTest`.
+Suites: `PathTracer` (Smoke, `CornellConverges` 4096-spp, `BistroCurve` convergence-curve benchmark), `WhiteFurnace.Converges` parameterized over 5 GGX roughnesses, `Slang` (CBuffer/RWTexture/ParamBlock/Bindless), `ComputeShader`, `RenderGraphBuild`.
 
-**CI-filter gotcha:** `run_tests_ci` uses `--gtest_filter="-*Full*"`. The trailing `*` matters — without it, the substring match on `WhiteFurnaceFull` is missed and the roughness sweep leaks into CI.
+**Gating via env vars, not name filters.** Slow convergence tests and opt-in benchmarks self-skip via `GTEST_SKIP()` based on `RENDERER_FAST_TESTS` / `RENDERER_RUN_BENCHMARKS` (`tests/TestHelpers.{h,cpp}::isFastMode/isBenchMode`). The CMake custom targets set the right env vars for each mode; no `--gtest_filter` substring tricks. When adding a slow or benchmark-only test, gate it at the top of the body with an `if (TestHelpers::is*Mode()) GTEST_SKIP() << ...;` — don't encode the policy into the test name.
 
 **Test fixture + artifacts (`tests/TestHelpers.{h,cpp}`):**
 - Derive new suites from `DeviceTest` (grabs the process-lifetime device in `SetUp`) instead of rolling your own fixture.

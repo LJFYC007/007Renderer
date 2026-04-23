@@ -2,6 +2,10 @@ Texture2D<float4> source;
 Texture2D<float4> reference;
 RWTexture2D<float4> output;
 
+static const uint kMetricMAE = 0;
+static const uint kMetricRelMSE = 1;
+static const float kRelMSEEps = 1e-2f; // per-channel denominator epsilon; prevents dark-pixel blowup
+
 cbuffer PerFrameCB
 {
     uint gWidth;
@@ -9,6 +13,7 @@ cbuffer PerFrameCB
     uint gSelectedOutput;
     uint gReferenceMode; // 0 = Texture, 1 = Constant
     float3 gConstantColor;
+    uint gMetric;
 };
 
 [shader("compute")]
@@ -27,7 +32,11 @@ void main(uint3 dispatchThreadID: SV_DispatchThreadID)
     else if (gSelectedOutput == 1) // Reference
         result = ref;
     else // Difference (default)
-        result = float4(abs(ref.xyz - source[id].xyz), 1.f);
+    {
+        float3 diff = ref.xyz - source[id].xyz;
+        float3 value = (gMetric == kMetricRelMSE) ? (diff * diff) / (ref.xyz * ref.xyz + kRelMSEEps) : abs(diff);
+        result = float4(value, 1.f);
+    }
 
     output[id] = result;
 }

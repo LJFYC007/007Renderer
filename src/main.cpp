@@ -59,7 +59,7 @@ int main()
         defaultRenderGraph->setScene(scene);
 
         auto errorMeasure = defaultRenderGraph->getPassByName<ErrorMeasurePass>("ErrorMeasure");
-        errorMeasure->setTextureReference(std::string(PROJECT_DIR) + "/media/output.exr");
+        errorMeasure->setTextureReference(std::string(PROJECT_DIR) + "/media/bistro_reference.exr");
 
         // Initialize editor from the default graph (this populates the editor's node/connection lists)
         renderGraphEditor.initializeFromRenderGraph(defaultRenderGraph);

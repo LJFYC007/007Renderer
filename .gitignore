@@ -42,3 +42,4 @@ imgui.ini
 editor.json
 external/nvrhi/
 external/tinyusdz/
+/tests/artifacts

@@ -286,24 +286,37 @@ if(BUILD_TESTING)
         gtest_discover_tests(007Tests)
     endif()
 
-    # Test targets
+    # Test targets — gating is via environment variables (see TestHelpers.h):
+    #   RENDERER_FAST_TESTS=1     → slow convergence tests self-skip
+    #   RENDERER_RUN_BENCHMARKS=1 → benchmark tests run (otherwise self-skip)
     add_custom_target(run_tests
-        COMMAND ${CMAKE_CTEST_COMMAND} --verbose --output-on-failure
+        COMMAND ${CMAKE_COMMAND} -E env --unset=RENDERER_FAST_TESTS --unset=RENDERER_RUN_BENCHMARKS
+            ${CMAKE_CTEST_COMMAND} --verbose --output-on-failure
         DEPENDS 007Tests
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-        COMMENT "Running all tests"
+        COMMENT "Running all tests (benchmarks self-skip without RENDERER_RUN_BENCHMARKS=1)"
     )
 
-    # Test target for CI
     add_custom_target(run_tests_ci
-        COMMAND $<TARGET_FILE:007Tests> --gtest_filter="-*Full*" --gtest_output=xml:${CMAKE_BINARY_DIR}/test-reports/results.xml
+        COMMAND ${CMAKE_COMMAND} -E env RENDERER_FAST_TESTS=1 --unset=RENDERER_RUN_BENCHMARKS
+            $<TARGET_FILE:007Tests> --gtest_output=xml:${CMAKE_BINARY_DIR}/test-reports/results.xml
         DEPENDS 007Tests
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-        COMMENT "Running CI tests (excludes Full tests)"
+        COMMENT "Running CI tests (slow + benchmark tests self-skip)"
+    )
+
+    # Benchmark-only mode: RENDERER_RUN_BENCHMARKS=1 runs BenchmarkTest-derived
+    # fixtures and skips DeviceTest-derived ones (see tests/TestHelpers.h).
+    add_custom_target(run_benchmarks
+        COMMAND ${CMAKE_COMMAND} -E env RENDERER_RUN_BENCHMARKS=1
+            $<TARGET_FILE:007Tests>
+        DEPENDS 007Tests
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+        COMMENT "Running benchmark tests only"
     )
 
     # Hide auxiliary test target
-    set_target_properties(run_tests run_tests_ci PROPERTIES FOLDER "Utilities")
+    set_target_properties(run_tests run_tests_ci run_benchmarks PROPERTIES FOLDER "Utilities")
 endif()
 
 # ----------------------------------------------------------------------------

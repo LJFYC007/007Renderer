@@ -1,11 +1,28 @@
 #include "TestHelpers.h"
 
+#include <cstdlib>
 #include <filesystem>
 
 #include "Utils/ResourceIO.h"
 
 namespace TestHelpers
 {
+static bool envSet(const char* name)
+{
+    const char* v = std::getenv(name);
+    return v != nullptr && v[0] != '\0';
+}
+
+bool isFastMode()
+{
+    return envSet("RENDERER_FAST_TESTS");
+}
+
+bool isBenchMode()
+{
+    return envSet("RENDERER_RUN_BENCHMARKS");
+}
+
 static std::string sanitizeForPath(std::string s)
 {
     for (char& c : s)

@@ -9,10 +9,10 @@
 #include "Environment.h"
 #include "TestHelpers.h"
 
-class ComputeShaderTest : public DeviceTest
+class ComputeShader : public DeviceTest
 {};
 
-TEST_F(ComputeShaderTest, Basic)
+TEST_F(ComputeShader, BufferAdd)
 {
     const uint32_t elementCount = 1000;
     std::vector<float> inputA(elementCount, 0.1f);

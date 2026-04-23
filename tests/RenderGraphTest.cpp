@@ -57,10 +57,10 @@ private:
 };
 } // namespace
 
-class RenderGraphTest : public DeviceTest
+class RenderGraphBuild : public DeviceTest
 {};
 
-TEST_F(RenderGraphTest, BuildsLinearGraph)
+TEST_F(RenderGraphBuild, BuildsLinearGraph)
 {
     auto executionLog = std::make_shared<std::vector<std::string>>();
 
@@ -104,7 +104,7 @@ TEST_F(RenderGraphTest, BuildsLinearGraph)
     EXPECT_EQ((*executionLog)[2], "Sink");
 }
 
-TEST_F(RenderGraphTest, RejectsDuplicateNodeNames)
+TEST_F(RenderGraphBuild, RejectsDuplicateNodeNames)
 {
     auto executionLog = std::make_shared<std::vector<std::string>>();
 
@@ -127,7 +127,7 @@ TEST_F(RenderGraphTest, RejectsDuplicateNodeNames)
     EXPECT_EQ(RenderGraph::lastBuildStatus(), RenderGraphBuildStatus::DuplicateNodeName);
 }
 
-TEST_F(RenderGraphTest, RejectsMissingRequiredInput)
+TEST_F(RenderGraphBuild, RejectsMissingRequiredInput)
 {
     auto executionLog = std::make_shared<std::vector<std::string>>();
 
@@ -154,7 +154,7 @@ TEST_F(RenderGraphTest, RejectsMissingRequiredInput)
     EXPECT_EQ(RenderGraph::lastBuildStatus(), RenderGraphBuildStatus::MissingRequiredInput);
 }
 
-TEST_F(RenderGraphTest, AllowsOptionalInputsToRemainUnconnected)
+TEST_F(RenderGraphBuild, AllowsUnconnectedOptional)
 {
     auto executionLog = std::make_shared<std::vector<std::string>>();
 
@@ -182,7 +182,7 @@ TEST_F(RenderGraphTest, AllowsOptionalInputsToRemainUnconnected)
     graph->execute();
 }
 
-TEST_F(RenderGraphTest, RejectsCycles)
+TEST_F(RenderGraphBuild, RejectsCycles)
 {
     auto executionLog = std::make_shared<std::vector<std::string>>();
 
@@ -216,7 +216,7 @@ TEST_F(RenderGraphTest, RejectsCycles)
     EXPECT_EQ(RenderGraph::lastBuildStatus(), RenderGraphBuildStatus::Cycle);
 }
 
-TEST_F(RenderGraphTest, RejectsConnectionsToUnknownSlots)
+TEST_F(RenderGraphBuild, RejectsConnectionsToUnknownSlots)
 {
     auto executionLog = std::make_shared<std::vector<std::string>>();
 

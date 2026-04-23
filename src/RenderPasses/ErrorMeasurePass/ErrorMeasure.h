@@ -20,6 +20,13 @@ public:
         Constant,
     };
 
+    enum class ErrorMetric : uint32_t
+    {
+        MAE = 0,    // |src - ref| per channel
+        RelMSE = 1, // (src - ref)^2 / (ref^2 + eps) per channel
+    };
+    // Values are mirrored by kMetricMAE/kMetricRelMSE in ErrorMeasure.slang; keep in sync.
+
     RenderData execute(const RenderData& input) override;
 
     void renderUI() override;
@@ -33,6 +40,8 @@ public:
     void setTextureReference(const std::string& path);
 
     void setSelectedOutput(OutputId id) { mSelectedOutput = id; }
+
+    void setMetric(ErrorMetric m) { mMetric = m; }
 
     void setScene(ref<Scene> pScene) override;
 
@@ -48,6 +57,7 @@ private:
     uint32_t mHeight = 0;
     OutputId mSelectedOutput = OutputId::Difference;
     ReferenceMode mReferenceMode = ReferenceMode::Constant;
+    ErrorMetric mMetric = ErrorMetric::MAE;
     float3 mConstantReferenceColor = {1.f, 1.f, 1.f};
 
     struct PerFrameCB
@@ -57,8 +67,9 @@ private:
         uint32_t gSelectedOutput;
         uint32_t gReferenceMode;
         float3 gConstantColor;
-        float _padding;
+        uint32_t gMetric;
     } mPerFrameData;
+    static_assert(sizeof(PerFrameCB) % 16 == 0, "ErrorMeasure PerFrameCB must stay 16-byte aligned.");
 
     nvrhi::BufferHandle mCbPerFrame;
     nvrhi::TextureHandle mpSourceTexture;

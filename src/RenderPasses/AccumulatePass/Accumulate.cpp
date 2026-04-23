@@ -22,6 +22,7 @@ struct AccumulatePassRegistration
 
 const std::string kInputName = "input";
 const std::string kOutputName = "output";
+constexpr int kMaxSppSliderMax = 8192;
 } // namespace
 
 AccumulatePass::AccumulatePass(ref<Device> pDevice) : RenderPass(pDevice)
@@ -59,10 +60,18 @@ RenderData AccumulatePass::execute(const RenderData& renderData)
         mWidth = resolution.x;
         mHeight = resolution.y;
         prepareResources();
+        // Fresh accumulateTexture contents are undefined; the shader's reset branch zero-clears it.
+        mReset = true;
     }
 
     if (hasFlag(GUI::getRefreshFlags(), RenderPassRefreshFlags::ResetAccumulation))
         mReset = true;
+
+    RenderData output;
+    output.setResource(kOutputName, mTextureOut);
+
+    if (mMaxSpp > 0 && mFrameCount >= mMaxSpp && !mReset)
+        return output;
 
     mPerFrameData.gWidth = mWidth;
     mPerFrameData.gHeight = mHeight;
@@ -74,8 +83,6 @@ RenderData AccumulatePass::execute(const RenderData& renderData)
     }
     mPerFrameData.frameCount = ++mFrameCount;
 
-    RenderData output;
-    output.setResource(kOutputName, mTextureOut);
     (*mpPass)["PerFrameCB"] = mCbPerFrame;
     (*mpPass)["input"] = pInputTexture;
     (*mpPass)["accumulateTexture"] = mAccumulateTexture;
@@ -88,6 +95,9 @@ void AccumulatePass::renderUI()
 {
     if (GUI::Button("Reset Accumulation"))
         mReset = true;
+    int maxSpp = static_cast<int>(mMaxSpp);
+    if (GUI::SliderInt("Max SPP (0 = unlimited)", &maxSpp, 0, kMaxSppSliderMax))
+        mMaxSpp = static_cast<uint32_t>(maxSpp);
 }
 
 void AccumulatePass::prepareResources()

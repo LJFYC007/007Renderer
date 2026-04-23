@@ -27,15 +27,42 @@ nvrhi::BufferHandle createStructuredBufferSRV(ref<Device> device, const void* da
 nvrhi::BufferHandle createStructuredBufferUAV(ref<Device> device, size_t byteSize, size_t stride, const char* name);
 
 nvrhi::TextureHandle createFloat4Texture1D(ref<Device> device, const float4* texels, uint32_t width, const char* name);
+
+// Gating signals consumed by test bodies to self-skip via GTEST_SKIP():
+// RENDERER_FAST_TESTS=1     → skip slow convergence tests
+// RENDERER_RUN_BENCHMARKS=1 → include benchmark tests (otherwise skipped)
+bool isFastMode();
+bool isBenchMode();
 } // namespace TestHelpers
 
-// Shared base fixture: grabs the process-lifetime device and asserts it is valid.
-// Replaces the identical SetUp() that used to live in every test fixture.
+// Base fixture for functional tests; grabs the process-lifetime device and
+// self-skips when RENDERER_RUN_BENCHMARKS=1.
 class DeviceTest : public ::testing::Test
 {
 protected:
     void SetUp() override
     {
+        if (TestHelpers::isBenchMode())
+            GTEST_SKIP() << "non-benchmark test; unset RENDERER_RUN_BENCHMARKS to run";
+
+        mpDevice = BasicTestEnvironment::getDevice();
+        ASSERT_NE(mpDevice, nullptr);
+        ASSERT_TRUE(mpDevice->isValid());
+    }
+
+    ref<Device> mpDevice;
+};
+
+// Benchmark fixture: runs only when RENDERER_RUN_BENCHMARKS=1. Pair with
+// a TEST_F(SuiteName, ...) derived from this to self-gate benchmarks.
+class BenchmarkTest : public ::testing::Test
+{
+protected:
+    void SetUp() override
+    {
+        if (!TestHelpers::isBenchMode())
+            GTEST_SKIP() << "benchmark; set RENDERER_RUN_BENCHMARKS=1 to run";
+
         mpDevice = BasicTestEnvironment::getDevice();
         ASSERT_NE(mpDevice, nullptr);
         ASSERT_TRUE(mpDevice->isValid());

@@ -112,6 +112,7 @@ RenderData ErrorMeasurePass::execute(const RenderData& renderData)
     mPerFrameData.gSelectedOutput = static_cast<uint32_t>(mSelectedOutput);
     mPerFrameData.gReferenceMode = static_cast<uint32_t>(mReferenceMode);
     mPerFrameData.gConstantColor = mConstantReferenceColor;
+    mPerFrameData.gMetric = static_cast<uint32_t>(mMetric);
 
     (*mpPass)["PerFrameCB"] = mCbPerFrame;
     (*mpPass)["source"] = mpSourceTexture;
@@ -136,6 +137,12 @@ void ErrorMeasurePass::renderUI()
         mSelectedOutput = OutputId::Reference;
     if (GUI::RadioButton("Difference", mSelectedOutput == OutputId::Difference))
         mSelectedOutput = OutputId::Difference;
+
+    Widgets::subHeader("Error Metric");
+    if (GUI::RadioButton("MAE", mMetric == ErrorMetric::MAE))
+        mMetric = ErrorMetric::MAE;
+    if (GUI::RadioButton("RelMSE", mMetric == ErrorMetric::RelMSE))
+        mMetric = ErrorMetric::RelMSE;
 }
 
 void ErrorMeasurePass::prepareResources(uint32_t width, uint32_t height)
