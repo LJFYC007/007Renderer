@@ -6,7 +6,7 @@ Contributor + AI-agent guide for 007Renderer. For the user-facing intro and road
 
 **Four rules — each one has bitten past contributors. Read before touching anything.**
 
-1. **Build from PowerShell only.** `cmake` and `ninja` are on PATH in bash, so configure appears to succeed — then the build fails with `'fxc.exe' is not recognized`. `fxc.exe` (Windows SDK FX Compiler, used for HLSL) is only reachable after the user's PowerShell `$PROFILE` runs. Wrap every build/test command in `powershell -Command "..."`.
+1. **Build from PowerShell 7 only.** `cmake` and `ninja` are on PATH in bash, so configure appears to succeed — then the build fails with `'fxc.exe' is not recognized`. `fxc.exe` (Windows SDK FX Compiler, used for HLSL) is only reachable after the user's PowerShell `$PROFILE` runs. Wrap every build/test command in `pwsh -Command "..."` (PowerShell 7 / `pwsh.exe`); the legacy `powershell.exe` (Windows PowerShell 5.1) is no longer used.
 2. **Clangd diagnostics are noise, not build errors.** Edits to files that include `imgui.h`, `nvrhi/nvrhi.h`, or dependent project headers often produce `<new-diagnostics>` reports like *"'imgui.h' file not found"* or *"Unknown type 'ImVec2'"*. These come from clangd missing the CMake include paths — they are **not** real build errors. Verify with an actual `cmake --build` before trying to "fix" them.
 3. **Run the full test suite, not the CI subset.** `run_tests` runs the slow convergence tests that catch real rendering regressions (Cornell 4096-spp, 5-value white-furnace roughness sweep); `run_tests_ci` sets `RENDERER_FAST_TESTS=1` so those self-skip via `GTEST_SKIP()`, and exists only for GitHub Actions parity.
 4. **Never substitute `faceN` for the shading normal `N` in Slang.** `faceN` is for sidedness checks and ray offsets only. Using it as a shading normal silently corrupts BSDF evaluation.
@@ -16,12 +16,12 @@ Contributor + AI-agent guide for 007Renderer. For the user-facing intro and road
 Prerequisites: run `.\setup.ps1` (PowerShell) to fetch Slang v2026.3.1 and DXC v1.8.2505.1 into `external/`.
 
 ```bash
-powershell -Command "cmake -S . -B build/RelWithDebInfo -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo"
-powershell -Command "cmake --build build/RelWithDebInfo --parallel"
-powershell -Command "build/RelWithDebInfo/bin/RelWithDebInfo/007Renderer.exe"
-powershell -Command "cmake --build build/RelWithDebInfo --target run_tests"       # slow convergence tests included, benchmarks self-skip — use during dev
-powershell -Command "cmake --build build/RelWithDebInfo --target run_tests_ci"    # RENDERER_FAST_TESTS=1, slow + benchmark tests self-skip (CI parity)
-powershell -Command "cmake --build build/RelWithDebInfo --target run_benchmarks"  # RENDERER_RUN_BENCHMARKS=1, benchmarks only (Bistro, etc.)
+pwsh -Command "cmake -S . -B build/RelWithDebInfo -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo"
+pwsh -Command "cmake --build build/RelWithDebInfo --parallel"
+pwsh -Command "build/RelWithDebInfo/bin/RelWithDebInfo/007Renderer.exe"
+pwsh -Command "cmake --build build/RelWithDebInfo --target run_tests"       # slow convergence tests included, benchmarks self-skip — use during dev
+pwsh -Command "cmake --build build/RelWithDebInfo --target run_tests_ci"    # RENDERER_FAST_TESTS=1, slow + benchmark tests self-skip (CI parity)
+pwsh -Command "cmake --build build/RelWithDebInfo --target run_benchmarks"  # RENDERER_RUN_BENCHMARKS=1, benchmarks only (Bistro, etc.)
 ```
 
 **Debugging runtime issues:** launch `007Renderer.exe` and inspect `logs/007Renderer.log` — Slang compile errors and scene-load warnings land there. For debug-mode logs, build `DEBUG` instead. Never modify `Logger.h/.cpp`.
@@ -68,7 +68,7 @@ Each pass colocates its `.slang` shaders in the same directory; shared Slang hea
 
 ### Utils (`src/Utils/`)
 
-GUI (`GUI.h` namespace + `GUIManager`; `Theme::Luminograph` palette), `Logger`, EXR/image I/O, `Math/` + `MathConstants.slangh`, and `Sampling/SampleGenerator` (C++/Slang pair).
+GUI (`GUI.h` namespace + `GUIManager`; `Theme::Luminograph` palette), reusable ImGui widgets (`Widgets.h` — `headerStrip`, `sectionHeader`, `sparkline`, `accumulationBar`, plus `dpiScale()` for `-X * FontScaleDpi` width sizing), `Logger`, EXR/image I/O, `ResourceIO` (GPU readback / upload helpers used by tests), `Math/` + `MathConstants.slangh`, and `Sampling/SampleGenerator` (C++/Slang pair).
 
 ## Slang Shading Pipeline
 

@@ -218,7 +218,9 @@ void GUIManager::renderMainLayout(ref<Scene> scene, RenderGraphEditor* pRenderGr
     ImGui::PopStyleVar();
 
     const float headerHeight = Widgets::headerHeight();
-    Widgets::headerStrip(io.DeltaTime, io.Framerate);
+    const uint64_t sceneTris = scene ? scene->getTriangleCount() : 0ull;
+    const uint64_t gpuMemMB = mpDevice ? mpDevice->getVideoMemoryUsageMB() : 0ull;
+    Widgets::headerStrip({io.DeltaTime, io.Framerate, sceneTris, gpuMemMB});
 
     // Content = TopRow + hsplitter + Editor. Each child consumes `size + ItemSpacing.y`
     // of vertical cursor, and the trailing ItemSpacing still advances after the last
@@ -324,6 +326,10 @@ void GUIManager::renderMainLayout(ref<Scene> scene, RenderGraphEditor* pRenderGr
 
 void GUIManager::renderSettingsPanel(ref<Scene> scene, RenderGraphEditor* pRenderGraphEditor, nvrhi::TextureHandle image, Window& window)
 {
+    // Reserve trailing space for the right-side labels so they don't get
+    // clipped by the panel border.
+    ImGui::PushItemWidth(-120.0f * Widgets::dpiScale());
+
     if (Widgets::sectionHeader("Output Settings", ImGuiTreeNodeFlags_DefaultOpen))
     {
         ref<RenderGraph> renderGraph = pRenderGraphEditor->getCurrentRenderGraph();
@@ -351,6 +357,8 @@ void GUIManager::renderSettingsPanel(ref<Scene> scene, RenderGraphEditor* pRende
 
     if (pRenderGraphEditor)
         pRenderGraphEditor->renderUI();
+
+    ImGui::PopItemWidth();
 }
 
 uint2 GUIManager::renderRenderingPanel(ImTextureID textureId, uint32_t cameraWidth, uint32_t cameraHeight, const char* sceneName, uint32_t frameCount)

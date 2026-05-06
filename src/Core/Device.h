@@ -42,6 +42,10 @@ public:
     // Check if device is valid
     bool isValid() const { return mpD3d12Device && mNvrhiDevice; }
 
+    // Local (dedicated VRAM) usage for the adapter, in megabytes. 0 if the
+    // adapter does not expose IDXGIAdapter3 or the query fails.
+    uint64_t getVideoMemoryUsageMB() const;
+
 private:
     // Helper methods
     bool createD3D12Device();
@@ -52,6 +56,7 @@ private:
     nvrhi::CommandListHandle mCommandList;
     ComPtr<IDXGIFactory4> mpDxgiFactory;
     ComPtr<IDXGIAdapter1> mpAdapter;
+    ComPtr<IDXGIAdapter3> mpAdapter3; // QI'd once at init for VRAM queries.
     nvrhi::DeviceHandle mNvrhiDevice;
     nvrhi::CommandListParameters mCmdParams;
 

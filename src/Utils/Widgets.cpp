@@ -11,7 +11,7 @@ using namespace Theme::Luminograph;
 namespace
 {
 constexpr float kWordmarkScale = 1.70f;
-constexpr float kSectionTitleScale = 1.25f;
+constexpr float kSectionTitleScale = 1.35f;
 constexpr float kSubHeaderScale = 1.10f;
 
 constexpr int kFrameHistorySize = 240;
@@ -23,17 +23,17 @@ ImU32 toU32(const ImVec4& c)
     return ImGui::GetColorU32(c);
 }
 
-float dpiScale()
-{
-    const float s = ImGui::GetStyle().FontScaleDpi;
-    return s > 0.0f ? s : 1.0f;
-}
-
 void drawHairline(ImDrawList* dl, ImVec2 a, ImVec2 b)
 {
     dl->AddLine(a, b, toU32(kHairline), 1.0f * dpiScale());
 }
 } // namespace
+
+float dpiScale()
+{
+    const float s = ImGui::GetStyle().FontScaleDpi;
+    return s > 0.0f ? s : 1.0f;
+}
 
 void sparkline(ImDrawList* dl, ImVec2 topLeft, ImVec2 size, const float* values, int count, int offset, ImU32 lineColor, ImU32 bgColor)
 {
@@ -80,9 +80,30 @@ float headerHeight()
     return ImGui::GetFontSize() * 2.4f;
 }
 
-void headerStrip(float deltaSeconds, float fps)
+namespace
 {
-    sFrameHistory[sFrameHistoryOffset] = deltaSeconds * 1000.0f;
+void formatTriangleCount(char* out, size_t n, uint64_t tris)
+{
+    if (tris >= 1'000'000ull)
+        std::snprintf(out, n, "%.2fM tris", static_cast<double>(tris) / 1.0e6);
+    else if (tris >= 1'000ull)
+        std::snprintf(out, n, "%.1fK tris", static_cast<double>(tris) / 1.0e3);
+    else
+        std::snprintf(out, n, "%llu tris", static_cast<unsigned long long>(tris));
+}
+
+void formatGpuMem(char* out, size_t n, uint64_t mb)
+{
+    if (mb >= 1024ull)
+        std::snprintf(out, n, "%.2f GB", static_cast<double>(mb) / 1024.0);
+    else
+        std::snprintf(out, n, "%llu MB", static_cast<unsigned long long>(mb));
+}
+} // namespace
+
+void headerStrip(const HeaderMetrics& metrics)
+{
+    sFrameHistory[sFrameHistoryOffset] = metrics.deltaSeconds * 1000.0f;
     sFrameHistoryOffset = (sFrameHistoryOffset + 1) % kFrameHistorySize;
 
     const float height = headerHeight();
@@ -118,24 +139,36 @@ void headerStrip(float deltaSeconds, float fps)
     const float wordRightEdge = wordPos.x + ImGui::CalcTextSize(wordmark).x;
     ImGui::PopFont();
 
-    char frameText[64];
-    std::snprintf(frameText, sizeof(frameText), "%6.2f ms   %6.1f fps", deltaSeconds * 1000.0f, fps);
-    const ImVec2 frameSize = ImGui::CalcTextSize(frameText);
+    // Single-line readout: timing in primary ink, scene/GPU stats in muted ink.
+    char timingText[64];
+    std::snprintf(timingText, sizeof(timingText), "%6.2f ms   %6.1f fps", metrics.deltaSeconds * 1000.0f, metrics.fps);
+
+    char trisText[32];
+    char memText[32];
+    formatTriangleCount(trisText, sizeof(trisText), metrics.sceneTris);
+    formatGpuMem(memText, sizeof(memText), metrics.gpuMemMB);
+    char statsText[80];
+    std::snprintf(statsText, sizeof(statsText), "   |   %s   %s", trisText, memText);
+
+    const ImVec2 timingSize = ImGui::CalcTextSize(timingText);
+    const ImVec2 statsSize = ImGui::CalcTextSize(statsText);
 
     const float gap = 16.0f;
     const float rightEdge = br.x - padX;
-    const float frameX = rightEdge - frameSize.x;
+    const float statsX = rightEdge - statsSize.x;
+    const float timingX = statsX - timingSize.x;
 
-    dl->AddText(ImVec2(frameX, baseCenterY), toU32(kInk), frameText);
+    dl->AddText(ImVec2(timingX, baseCenterY), toU32(kInk), timingText);
+    dl->AddText(ImVec2(statsX, baseCenterY), toU32(kInkMuted), statsText);
 
     const float sepY0 = origin.y + 8.0f;
     const float sepY1 = br.y - 8.0f;
-    drawHairline(dl, ImVec2(frameX - gap * 0.5f, sepY0), ImVec2(frameX - gap * 0.5f, sepY1));
+    drawHairline(dl, ImVec2(timingX - gap * 0.5f, sepY0), ImVec2(timingX - gap * 0.5f, sepY1));
 
     // Right-anchored, capped so wide windows don't stretch it.
     const float sparkHeight = height - 10.0f;
     const float sparkMaxWidth = 220.0f;
-    const float sparkRight = frameX - gap;
+    const float sparkRight = timingX - gap;
     const float sparkLeftLimit = wordRightEdge + gap;
     const float sparkLeft = (std::max)(sparkLeftLimit, sparkRight - sparkMaxWidth);
     const float sparkWidth = sparkRight - sparkLeft;
@@ -169,7 +202,7 @@ bool sectionHeader(const char* label, ImGuiTreeNodeFlags flags)
     const ImVec2 origin = ImGui::GetCursorScreenPos();
     const float lineHeight = ImGui::GetFrameHeight();
 
-    const float ruleWidth = 2.0f;
+    const float ruleWidth = 3.0f;
     dl->AddRectFilled(ImVec2(origin.x, origin.y + 2.0f), ImVec2(origin.x + ruleWidth, origin.y + lineHeight - 2.0f), toU32(kTeal));
 
     ImGui::Indent(ruleWidth + 6.0f);

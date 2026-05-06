@@ -70,6 +70,7 @@ void Device::shutdown()
     }
 
     mpCommandQueue.Reset();
+    mpAdapter3.Reset();
     mpAdapter.Reset();
     mpD3d12Device.Reset();
 
@@ -103,6 +104,7 @@ bool Device::createD3D12Device()
         // Try to create device with this adapter
         if (SUCCEEDED(D3D12CreateDevice(mpAdapter.Get(), D3D_FEATURE_LEVEL_12_0, IID_PPV_ARGS(&mpD3d12Device))))
         {
+            mpAdapter.As(&mpAdapter3);
             // Convert wide string to regular string for logging
             std::wstring wstr(desc.Description);
             int size_needed = WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), (int)wstr.size(), NULL, 0, NULL, NULL);
@@ -120,6 +122,7 @@ bool Device::createD3D12Device()
     if (SUCCEEDED(mpDxgiFactory->EnumWarpAdapter(IID_PPV_ARGS(&mpAdapter))))
     {
         CHECKHR(D3D12CreateDevice(mpAdapter.Get(), D3D_FEATURE_LEVEL_12_0, IID_PPV_ARGS(&mpD3d12Device)));
+        mpAdapter.As(&mpAdapter3);
         LOG_INFO("Using WARP software adapter");
         return true;
     }
@@ -151,6 +154,16 @@ bool Device::createNVRHIDevice()
         return false;
     }
     return true;
+}
+
+uint64_t Device::getVideoMemoryUsageMB() const
+{
+    if (!mpAdapter3)
+        return 0;
+    DXGI_QUERY_VIDEO_MEMORY_INFO info = {};
+    if (FAILED(mpAdapter3->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &info)))
+        return 0;
+    return info.CurrentUsage / (1024ull * 1024ull);
 }
 
 void MessageCallback::message(nvrhi::MessageSeverity severity, const char* messageText)

@@ -4,6 +4,7 @@
 
 #include "RenderGraph.h"
 #include "Utils/Logger.h"
+#include "Utils/Widgets.h"
 
 RenderGraphBuildStatus RenderGraph::sLastBuildStatus = RenderGraphBuildStatus::Ok;
 
@@ -305,6 +306,9 @@ void RenderGraph::renderOutputSelectionUI()
     for (const auto& output : mAvailableOutputs)
         outputNames.push_back(output.c_str());
 
+    // Label "Output" is short; reserve only ~60 px so long pass.output names
+    // (e.g. "ErrorMeasure.output") aren't clipped inside the combo.
+    ImGui::SetNextItemWidth(-60.0f * Widgets::dpiScale());
     if (GUI::Combo("Output", &mSelectedOutputIndex, outputNames.data(), static_cast<int>(outputNames.size())))
         mSelectedOutputKey = mAvailableOutputs[mSelectedOutputIndex];
 }

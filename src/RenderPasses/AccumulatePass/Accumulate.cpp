@@ -96,8 +96,9 @@ void AccumulatePass::renderUI()
     if (GUI::Button("Reset Accumulation"))
         mReset = true;
     int maxSpp = static_cast<int>(mMaxSpp);
-    if (GUI::SliderInt("Max SPP (0 = unlimited)", &maxSpp, 0, kMaxSppSliderMax))
+    if (GUI::SliderInt("Max SPP", &maxSpp, 0, kMaxSppSliderMax))
         mMaxSpp = static_cast<uint32_t>(maxSpp);
+    ImGui::SetItemTooltip("0 = unlimited");
 }
 
 void AccumulatePass::prepareResources()

@@ -20,7 +20,7 @@ constexpr ImVec4 kHairline = ImVec4(0.784f, 0.761f, 0.702f, 1.000f);    // 1px r
 
 // Ink (text)
 constexpr ImVec4 kInk = ImVec4(0.110f, 0.118f, 0.133f, 1.000f);      // #1C1E22 near-black
-constexpr ImVec4 kInkMuted = ImVec4(0.392f, 0.400f, 0.420f, 1.000f); // secondary text
+constexpr ImVec4 kInkMuted = ImVec4(0.275f, 0.290f, 0.322f, 1.000f); // secondary text
 constexpr ImVec4 kInkDisabled = ImVec4(0.620f, 0.620f, 0.600f, 1.000f);
 
 // Teal — the single interaction accent

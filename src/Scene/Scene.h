@@ -79,6 +79,7 @@ public:
     nvrhi::BufferHandle getInstanceBuffer() const { return mInstanceBuffer; }
     nvrhi::BufferHandle getEmissiveTriangleBuffer() const { return mEmissiveTriangleBuffer; }
     uint32_t getEmissiveTriangleCount() const { return static_cast<uint32_t>(emissiveTriangles.size()); }
+    uint64_t getTriangleCount() const { return indices.size() / 3; }
 
     // Texture management
     uint32_t loadTexture(const float* data, uint32_t width, uint32_t height, uint32_t channels, const std::string& debugName = "");
